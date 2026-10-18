@@ -95,22 +95,15 @@
  .how li{grid-template-columns:32px minmax(0,1fr)}
 }
 
-/* Animated hero backdrop: a full bleed grid that drifts slowly, with a soft accent light sweeping
-   across its lines. Both layers fade out toward the edges so the content stays calm and readable. */
-.hero::before,.hero::after{content:"";position:absolute;z-index:-1;top:-56px;bottom:-48px;left:calc(50% - 50vw);right:calc(50% - 50vw);pointer-events:none;
- -webkit-mask-image:radial-gradient(ellipse 70% 75% at 50% 40%,#000 30%,transparent 78%);mask-image:radial-gradient(ellipse 70% 75% at 50% 40%,#000 30%,transparent 78%)}
-.hero::before{
- background-image:linear-gradient(to right,var(--grid) 1px,transparent 1px),linear-gradient(to bottom,var(--grid) 1px,transparent 1px);
- background-size:48px 48px;opacity:.75;animation:gridDrift 28s linear infinite}
-.hero::after{
- background:radial-gradient(circle 280px at var(--sx,30%) var(--sy,35%),var(--accent) 0%,transparent 70%);
- -webkit-mask-image:linear-gradient(to right,#000 1px,transparent 1px),linear-gradient(to bottom,#000 1px,transparent 1px);mask-image:linear-gradient(to right,#000 1px,transparent 1px),linear-gradient(to bottom,#000 1px,transparent 1px);
- -webkit-mask-size:48px 48px;mask-size:48px 48px;opacity:.55;animation:gridDrift 28s linear infinite,sweep 16s ease-in-out infinite alternate}
-@property --sx{syntax:'<percentage>';inherits:false;initial-value:30%}
-@property --sy{syntax:'<percentage>';inherits:false;initial-value:35%}
-@keyframes gridDrift{from{background-position:0 0;-webkit-mask-position:0 0;mask-position:0 0}to{background-position:48px 48px;-webkit-mask-position:48px 48px;mask-position:48px 48px}}
-@keyframes sweep{0%{--sx:18%;--sy:30%}50%{--sx:62%;--sy:62%}100%{--sx:84%;--sy:28%}}
-@media (prefers-reduced-motion:reduce){.hero::before,.hero::after{animation:none}}
+/* Hero backdrop: a static full bleed grid, clear toward the edges and fading out at the centre so the
+   content stays calm. The second mask fades it out at the bottom so it never ends in a hard line. */
+.hero::before{content:"";position:absolute;z-index:-1;top:-56px;bottom:-48px;left:calc(50% - 50vw);right:calc(50% - 50vw);pointer-events:none;
+ background-image:linear-gradient(to right,var(--border-strong) 1px,transparent 1px),linear-gradient(to bottom,var(--border-strong) 1px,transparent 1px);
+ background-size:48px 48px;background-position:center top;
+ -webkit-mask-image:radial-gradient(ellipse 60% 65% at 50% 45%,transparent 25%,#000 85%),linear-gradient(to bottom,#000 70%,transparent);
+ -webkit-mask-composite:source-in;
+ mask-image:radial-gradient(ellipse 60% 65% at 50% 45%,transparent 25%,#000 85%),linear-gradient(to bottom,#000 70%,transparent);
+ mask-composite:intersect}
 
 /* Per figure run time and their average. */
 .figuresWrap{display:flex;flex-direction:column;gap:16px;min-width:0}
