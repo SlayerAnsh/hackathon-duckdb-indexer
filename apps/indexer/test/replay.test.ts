@@ -9,7 +9,7 @@ test('replay lifecycle, ordering, duplicate delivery and expiry without event', 
   const s = track(await Store.open(await temp(), '', 1, hash)), rpc = fake(async () => { throw Error('query') })
   rpc.getLogs = async () => [event(1, 'EntityCreated', 1, 5), event(1, 'ExpiryExtended', 2, 10), event(2, 'EntityCreated', 1), event(2, 'EntityDeleted', 2), event(3, 'EntityCreated', 3), event(4, 'EntityCreated', 1, 5), event(4, 'ExpiryExtended', 2, 50), event(4, 'EntityPatched', 3), event(5, 'EntityPatched', 4), event(3, 'EntityCreated', 3)]
   expect(await replayLiveKeys(rpc, s, 10)).toEqual([key(3), key(4)])
-  expect(await rows(s, "SELECT table_name FROM information_schema.tables WHERE table_name LIKE 'replay_%'")).toHaveLength(0)
+  expect(await rows(s, 'SELECT * FROM replay_live')).toHaveLength(2)
 })
 test('adaptive suggested range, halving and rate limit', async () => {
   for (const suggested of [true, false]) {
@@ -42,4 +42,23 @@ test('unrelated errors do not commit a window', async () => {
   rpc.getLogs = async () => { throw new RpcError('invalid parameter', 200, -32602) }
   await expect(fetchLogsAdaptive(rpc, 0, 9, commit)).rejects.toThrow('invalid parameter')
   expect(commit).not.toHaveBeenCalled()
+})
+
+test('permanent replay expiry is clamped and completed live keys are reused', async () => {
+  const s = track(await Store.open(await temp(), '', 1, hash)), rpc = fake(async () => { throw Error('query') })
+  rpc.getLogs = async () => [event(1, 'EntityCreated', 1, 0xffffffffffffffffn)]
+  expect(await replayLiveKeys(rpc, s, 10)).toEqual([key(1)])
+  expect(Number((await rows(s, 'SELECT expires_at FROM replay_events'))[0]!.expires_at)).toBe(Number.MAX_SAFE_INTEGER)
+  rpc.getLogs = async () => { throw Error('must reuse replay') }
+  expect(await replayLiveKeys(rpc, s, 10)).toEqual([key(1)])
+})
+test('a different replay target discards cached keys and fetch progress', async () => {
+  const s = track(await Store.open(await temp(), '', 1, hash)), rpc = fake(async () => { throw Error('query') })
+  rpc.getLogs = async () => [event(1, 'EntityCreated', 1, 15)]
+  expect(await replayLiveKeys(rpc, s, 10)).toEqual([key(1)])
+  await s.conn.run("CREATE TABLE replay_fetched(key VARCHAR PRIMARY KEY); INSERT INTO replay_fetched VALUES ('old')")
+  rpc.getLogs = async () => []
+  expect(await replayLiveKeys(rpc, s, 20)).toEqual([])
+  expect(Number((await rows(s, 'SELECT block FROM replay_target'))[0]!.block)).toBe(20)
+  expect(await rows(s, "SELECT 1 FROM information_schema.tables WHERE table_name = 'replay_fetched'")).toHaveLength(0)
 })

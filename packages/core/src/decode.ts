@@ -16,6 +16,9 @@ export function decodeAttribute(key: string, a: { name: string; type: string; va
   }
   return { key: key.toLowerCase(), name: a.name, type: a.type as AttrType, value, num }
 }
+export function clampBlock(value: string | number | bigint): number {
+  return Number(BigInt(value) > BigInt(Number.MAX_SAFE_INTEGER) ? Number.MAX_SAFE_INTEGER : value)
+}
 export function decodeEntity(e: RpcEntity): { entity: EntityRow; attributes: AttributeRow[] } {
   // ROW_SELECT supplies these fields; reject incomplete projections instead of inventing rows.
   if (e.key === undefined || e.owner === undefined || e.creator === undefined ||
@@ -24,7 +27,7 @@ export function decodeEntity(e: RpcEntity): { entity: EntityRow; attributes: Att
   }
   const entity: EntityRow = {
     key: e.key.toLowerCase(), owner: e.owner.toLowerCase(), creator: e.creator.toLowerCase(),
-    created_at: Number(e.createdAt), updated_at: Number(e.updatedAt), expires_at: Number(e.expiresAt),
+    created_at: clampBlock(e.createdAt), updated_at: clampBlock(e.updatedAt), expires_at: clampBlock(e.expiresAt),
     content_type: e.contentType ?? null,
     creation_flags: typeof e.creationFlags === 'number' ? e.creationFlags : e.creationFlags.raw,
   }

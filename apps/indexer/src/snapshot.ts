@@ -1,3 +1,5 @@
+import * as T from '@duckdb/node-api'
+import { clearReplay } from './replay'
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import type { Manifest } from '@asi/core'
@@ -22,8 +24,9 @@ export async function writeSnapshot(store: Store, dir: string, head: number, met
   await writeFile(join(dir, 'manifest.json.tmp'), JSON.stringify(manifest))
   await rename(join(dir, 'manifest.json.tmp'), join(dir, 'manifest.json'))
   await store.transaction(async () => {
-    await store.conn.run('DELETE FROM changes WHERE block <= ?', [head])
+    await store.conn.run('DELETE FROM changes WHERE block <= ?', [head], [T.UBIGINT])
     await store.setState({ snapshot_version: version, snapshot_block: head })
+    await clearReplay(store)
   })
   const retained = [...versions, 'v' + version].filter(v => /^v\d+$/.test(v)).sort((a, b) => Number(b.slice(1)) - Number(a.slice(1)))
   for (const old of retained.slice(keep)) await rm(join(dir, 'snap', old), { recursive: true, force: true })

@@ -63,3 +63,11 @@ test('store identity normalizes blank expressions', async () => {
   await reopened.setState({ head_block: 1 })
   expect((await reopened.state())!.expression).toBe('')
 })
+test('stores permanent expiry and u256 numeric projection with explicit types', async () => {
+  const s = track(await Store.open(await temp(), '', 1, hash))
+  const value: Parameters<Store['upsert']>[0][number] = row(); value.entity.expires_at = Number.MAX_SAFE_INTEGER
+  value.attributes = [{ key: value.entity.key, name: 'huge', type: 'u256', value: '1' + '0'.repeat(77), num: 1e77 }]
+  await s.upsert([value], 10)
+  expect(Number((await rows(s, 'SELECT expires_at FROM entities'))[0]!.expires_at)).toBe(Number.MAX_SAFE_INTEGER)
+  expect((await rows(s, 'SELECT num FROM attributes'))[0]!.num).toBe(1e77)
+})

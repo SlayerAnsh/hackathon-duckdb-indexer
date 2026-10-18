@@ -1,3 +1,4 @@
+import * as T from '@duckdb/node-api'
 import { writeFile, rename } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Delta, EntityRow, AttributeRow } from '@asi/core'
@@ -6,7 +7,7 @@ export async function writeDelta(store: Store, dir: string): Promise<Delta> {
   const state = await store.state()
   if (!state) throw Error('Missing sync checkpoint')
   const delta: Delta = { fromBlock: state.snapshot_block + 1, toBlock: state.head_block, entities: [], attributes: [], tombstones: [] }
-  const changes = (await store.conn.runAndReadAll(`SELECT key, block, deleted FROM changes WHERE block > ? QUALIFY row_number() OVER (PARTITION BY key ORDER BY block DESC, rowid DESC) = 1 ORDER BY key`, [state.snapshot_block])).getRowObjects()
+  const changes = (await store.conn.runAndReadAll(`SELECT key, block, deleted FROM changes WHERE block > ? QUALIFY row_number() OVER (PARTITION BY key ORDER BY block DESC, rowid DESC) = 1 ORDER BY key`, [state.snapshot_block], [T.UBIGINT])).getRowObjects()
   for (const change of changes) {
     const key = String(change.key)
     if (change.deleted) { delta.tombstones.push({ key, block: Number(change.block) }); continue }

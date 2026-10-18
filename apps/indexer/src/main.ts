@@ -6,7 +6,7 @@ import { createHandler, serve } from './http'
 import { createRpc, hasCreatorTerm, RpcError, type ArkivRpc } from '@asi/core'
 import { loadConfig, storeDir, type Config } from './config'
 import { Store } from './store'
-import { replayLiveKeys } from './replay'
+import { replayLiveKeys, replayTarget } from './replay'
 import { backfill, backfillByKeys } from './backfill'
 import { readManifest, writeSnapshot } from './snapshot'
 async function runBackfill(config: Config, logsRpc: ArkivRpc, queryRpc: ArkivRpc, store: Store, head: number, log?: (msg: string) => void): Promise<void> {
@@ -28,11 +28,12 @@ export async function bootstrap(config: Config, rpc: ArkivRpc, log: (msg: string
   try {
     if (!hasCreatorTerm(config.expression)) log('Warning: INDEX_EXPRESSION has no $creator term; attributes can be written by anyone.')
     const state = await store.state()
-    const head = state?.head_block ?? Math.max(0, await rpc.blockNumber() - config.confirmations)
+    const pendingTarget = config.backfillMode === 'logs' ? await replayTarget(store) : null
+    const head = state?.head_block ?? pendingTarget ?? Math.max(0, await rpc.blockNumber() - config.confirmations)
     const meta = { chainId, genesisHash, expression: config.expression }
     if (!state) {
-      // Discard partial row fetches before a new pinned backfill; retain replay checkpoints.
-      await store.transaction(async () => { await store.conn.run('DELETE FROM attributes; DELETE FROM entities; DELETE FROM changes') })
+      // Preserve committed key fetches for the pending replay target.
+      if (pendingTarget === null) await store.transaction(async () => { await store.conn.run('DELETE FROM attributes; DELETE FROM entities; DELETE FROM changes') })
       const hash = await rpc.blockHash(head)
       await runBackfill(config, rpc, queryRpc, store, head, log)
       if (await rpc.blockHash(head) !== hash) throw Error('Canonical header changed during backfill')

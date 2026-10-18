@@ -32,3 +32,6 @@ test('optional content and attributes may be absent', () => {
   const decoded = decodeEntity({ ...fixture, contentType: undefined, attributes: undefined })
   expect(decoded.entity.content_type).toBeNull(); expect(decoded.attributes).toEqual([])
 })
+test('clamps block fields beyond safe integer precision', () => {
+  expect(decodeEntity({ ...fixture, createdAt: '0xffffffffffffffff', updatedAt: '0xffffffffffffffff', expiresAt: '0xffffffffffffffff' }).entity).toMatchObject({ created_at: Number.MAX_SAFE_INTEGER, updated_at: Number.MAX_SAFE_INTEGER, expires_at: Number.MAX_SAFE_INTEGER })
+})

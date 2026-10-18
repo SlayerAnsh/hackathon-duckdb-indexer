@@ -1,3 +1,4 @@
+import * as T from '@duckdb/node-api'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { DuckDBInstance, type DuckDBConnection } from '@duckdb/node-api'
@@ -21,7 +22,7 @@ export class Store {
       const saved = (await conn.runAndReadAll('SELECT * FROM store_identity')).getRowObjects()[0]
       if (saved && saved.expression !== expression) throw Error(`Stored expression "${saved.expression}" differs from configured "${expression}" at ${dir}. Delete the store or restore the expression.`)
       if (saved && (Number(saved.chain_id) !== chainId || saved.genesis_hash !== genesisHash)) throw Error('Chain identity mismatch at ' + dir)
-      if (!saved) await conn.run('INSERT INTO store_identity VALUES (?, ?, ?)', [chainId, genesisHash, expression])
+      if (!saved) await conn.run('INSERT INTO store_identity VALUES (?, ?, ?)', [chainId, genesisHash, expression], [T.UBIGINT, T.VARCHAR, T.VARCHAR])
       return store
     } catch (error) { store.close(); throw error }
   }
@@ -34,30 +35,31 @@ export class Store {
     const previous = await this.state()
     const state = { ...this.identity, start_block: 0, head_block: 0, head_hash: null, snapshot_version: 0, snapshot_block: 0, ...previous, ...partial }
     const values = [state.chain_id, state.genesis_hash, state.expression, state.start_block, state.head_block, state.snapshot_version, state.snapshot_block, state.head_hash]
-    if (previous) await this.conn.run('UPDATE sync_state SET chain_id = ?, genesis_hash = ?, expression = ?, start_block = ?, head_block = ?, snapshot_version = ?, snapshot_block = ?, head_hash = ?', values)
-    else await this.conn.run('INSERT INTO sync_state (chain_id, genesis_hash, expression, start_block, head_block, snapshot_version, snapshot_block, head_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', values)
+    const types = [T.UBIGINT, T.VARCHAR, T.VARCHAR, T.UBIGINT, T.UBIGINT, T.INTEGER, T.UBIGINT, T.VARCHAR]
+    if (previous) await this.conn.run('UPDATE sync_state SET chain_id = ?, genesis_hash = ?, expression = ?, start_block = ?, head_block = ?, snapshot_version = ?, snapshot_block = ?, head_hash = ?', values, types)
+    else await this.conn.run('INSERT INTO sync_state (chain_id, genesis_hash, expression, start_block, head_block, snapshot_version, snapshot_block, head_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', values, types)
   }
 
   async upsert(rows: { entity: EntityRow; attributes: AttributeRow[] }[], changeBlock: number | null): Promise<void> {
     for (const { entity: e, attributes } of rows) {
-      await this.conn.run('INSERT OR REPLACE INTO entities VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [e.key, e.owner, e.creator, e.created_at, e.updated_at, e.expires_at, e.content_type, e.creation_flags])
+      await this.conn.run('INSERT OR REPLACE INTO entities VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [e.key, e.owner, e.creator, e.created_at, e.updated_at, e.expires_at, e.content_type, e.creation_flags], [T.VARCHAR, T.VARCHAR, T.VARCHAR, T.UBIGINT, T.UBIGINT, T.UBIGINT, T.VARCHAR, T.INTEGER])
       await this.conn.run('DELETE FROM attributes WHERE key = ?', [e.key])
-      for (const a of attributes) await this.conn.run('INSERT INTO attributes VALUES (?, ?, ?, ?, ?)', [e.key, a.name, a.type, a.value, a.num])
-      if (changeBlock !== null) await this.conn.run('INSERT INTO changes VALUES (?, ?, false)', [changeBlock, e.key])
+      for (const a of attributes) await this.conn.run('INSERT INTO attributes VALUES (?, ?, ?, ?, ?)', [e.key, a.name, a.type, a.value, a.num], [T.VARCHAR, T.VARCHAR, T.VARCHAR, T.VARCHAR, T.DOUBLE])
+      if (changeBlock !== null) await this.conn.run('INSERT INTO changes VALUES (?, ?, ?)', [changeBlock, e.key, false], [T.UBIGINT, T.VARCHAR, T.BOOLEAN])
     }
   }
   async remove(keys: string[], changeBlock: number): Promise<void> {
     for (const key of keys) {
       await this.conn.run('DELETE FROM attributes WHERE key = ?', [key])
       await this.conn.run('DELETE FROM entities WHERE key = ?', [key])
-      await this.conn.run('INSERT INTO changes VALUES (?, ?, true)', [changeBlock, key])
+      await this.conn.run('INSERT INTO changes VALUES (?, ?, ?)', [changeBlock, key, true], [T.UBIGINT, T.VARCHAR, T.BOOLEAN])
     }
   }
   async indexedKeys(): Promise<Set<string>> {
     return new Set((await this.conn.runAndReadAll('SELECT key FROM entities')).getRowObjects().map(r => String(r.key)))
   }
   async sweepExpired(head: number): Promise<number> {
-    const keys = (await this.conn.runAndReadAll('SELECT key FROM entities WHERE expires_at <= ?', [head])).getRowObjects().map(r => String(r.key))
+    const keys = (await this.conn.runAndReadAll('SELECT key FROM entities WHERE expires_at <= ?', [head], [T.UBIGINT])).getRowObjects().map(r => String(r.key))
     await this.remove(keys, head)
     return keys.length
   }

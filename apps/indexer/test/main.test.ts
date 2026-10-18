@@ -45,3 +45,27 @@ test('CLI configuration errors have no stack trace', async () => {
   const stderr = await new Response(proc.stderr).text()
   expect(await proc.exited).toBe(1); expect(stderr).toContain('TIRAMISU_API_KEY'); expect(stderr).not.toContain(' at ')
 })
+test('logs bootstrap resumes fetched chunks at its original target after restart', async () => {
+  const { event } = await import('./events')
+  const config = loadConfig({ TIRAMISU_API_KEY: 'x', DATA_DIR: await temp() })
+  const logs = fake(async () => { throw Error('public query') })
+  const getLogs = mock(async () => Array.from({ length: 51 }, (_, n) => event(n + 1, 'EntityCreated', 1, 1000)))
+  logs.getLogs = getLogs
+  let calls = 0
+  const query = fake(async (_text, opts) => {
+    if (++calls === 2) throw Error('fetch failed')
+    return { data: [raw()], blockNumber: opts.atBlock! }
+  })
+  await expect(bootstrap(config, logs, () => {}, query)).rejects.toThrow('fetch failed')
+  logs.blockNumber = async () => 203
+  query.query = mock(async (_text, opts) => {
+    expect(opts.atBlock).toBe(100)
+    return { data: [], blockNumber: opts.atBlock! }
+  })
+  const result = await bootstrap(config, logs, () => {}, query); track(result.store)
+  expect(result.head).toBe(100)
+  expect(getLogs).toHaveBeenCalledTimes(1)
+  expect(query.query).toHaveBeenCalledTimes(1)
+  expect((await result.store.indexedKeys()).size).toBe(1)
+  expect(await rows(result.store, "SELECT table_name FROM information_schema.tables WHERE table_name LIKE 'replay_%'")).toHaveLength(0)
+})
