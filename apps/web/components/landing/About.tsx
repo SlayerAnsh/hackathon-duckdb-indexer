@@ -13,7 +13,7 @@ export function About() {
   <div className={s.about}>
    <div className={s.aboutLead}>
     <h2 id="about-h">About the project</h2>
-    <p>A self hosted, read only SQL index over Arkiv. It mirrors the entities that match one query expression, and rows vanish here when they expire on chain.</p>
+    <p>A self hosted, read only SQL index over Arkiv. It mirrors every live entity (or only those matching an optional query expression), and rows vanish here when they expire on chain.</p>
     <ul className={s.links}>
      <li><a href="#">Source repository</a></li>
      <li><a href="https://arkiv.network" target="_blank" rel="noreferrer">Arkiv documentation</a></li>

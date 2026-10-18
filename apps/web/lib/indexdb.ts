@@ -11,7 +11,9 @@ export function applyDeltaSql(delta: Delta): string[] {
   const insert = (table: string, rows: (string | number | null)[][], columns = '') => {
     if (rows.length) sql.push('INSERT INTO ' + table + columns + ' VALUES ' + rows.map(row => '(' + row.map(literal).join(', ') + ')').join(', '))
   }
-  insert('delta_entities', delta.entities.map(e => [e.key, e.owner, e.creator, e.created_at, e.updated_at, e.expires_at, e.content_type, e.creation_flags]), ' (' + ENTITY_INSERT_COLUMNS + ')')
+  const pending = (e: Delta['entities'][number]) => e.attrs_pending ? 'true' : 'false'
+  if (delta.entities.length) sql.push('INSERT INTO delta_entities (' + ENTITY_INSERT_COLUMNS + ', attrs_pending) VALUES ' + delta.entities
+    .map(e => '(' + [e.key, e.owner, e.creator, e.created_at, e.updated_at, e.expires_at, e.content_type, e.creation_flags].map(literal).join(', ') + ', ' + pending(e) + ')').join(', '))
   insert('delta_attributes', delta.attributes.map(a => [a.key, a.name, a.type, a.value, a.num]))
   insert('delta_tombstones', delta.tombstones.map(t => [t.key, t.block]))
   return [...sql, ...MATERIALIZE_SQL]

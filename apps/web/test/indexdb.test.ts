@@ -21,6 +21,13 @@ test('delta escapes strings, leaves numbers unquoted and preserves NULL', () => 
   expect(sql).toContain("'it''s', 9")
 })
 
+test('delta carries the pending flag of log derived rows', () => {
+  const row = { key: 'k', owner: 'o', creator: 'c', created_at: 1, updated_at: 2, expires_at: 10, content_type: null, creation_flags: 0 }
+  const sql = applyDeltaSql({ ...empty, entities: [{ ...row, attrs_pending: true }, { ...row, key: 'f' }] }).join(';')
+  expect(sql).toContain("'k', 'o', 'c', 1, 2, 10, NULL, 0, true")
+  expect(sql).toContain("'f', 'o', 'c', 1, 2, 10, NULL, 0, false")
+})
+
 const manifest = { chainId: 1, genesisHash: '0xabc' } as Manifest
 test('chain matches', () => expect(chainCheck(manifest, 1, '0xABC')).toEqual({ ok: true }))
 test('chain mismatch has reason', () => {
@@ -88,7 +95,7 @@ test('snapshot rollover clears live rows and refreshes within its transaction', 
     connection: { query: async (sql: string) => {
       statements.push(sql)
       // Substitute fixture tables for remote Parquet, preserving the production transaction flow.
-      if (sql.startsWith('CREATE OR REPLACE TABLE base_entities AS')) sql = 'CREATE OR REPLACE TABLE base_entities AS SELECT * FROM fixture_entities'
+      if (sql.startsWith('INSERT INTO base_entities BY NAME')) sql = 'INSERT INTO base_entities BY NAME SELECT * FROM fixture_entities'
       if (sql.startsWith('CREATE OR REPLACE TABLE base_attributes AS')) sql = 'CREATE OR REPLACE TABLE base_attributes AS SELECT * FROM fixture_attributes'
       await conn.run(sql)
     } },

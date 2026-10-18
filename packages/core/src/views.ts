@@ -68,9 +68,10 @@ export function setHeadSql(block: number): string[] {
 export function loadSnapshotSql(entitiesUrl: string, attributesUrl: string): string[] {
   const quote = (url: string) => `'${url.replaceAll("'", "''")}'`
   return [
-    `CREATE OR REPLACE TABLE base_entities AS SELECT * FROM read_parquet(${quote(entitiesUrl)})`,
+    // Insert by name so snapshots written before progressive backfill get the attrs_pending default.
+    // ADD COLUMN IF NOT EXISTS is avoided: DuckDB WASM resets an existing column to its default.
+    'DELETE FROM base_entities',
+    `INSERT INTO base_entities BY NAME SELECT * FROM read_parquet(${quote(entitiesUrl)})`,
     `CREATE OR REPLACE TABLE base_attributes AS SELECT * FROM read_parquet(${quote(attributesUrl)})`,
-    // Snapshots written before progressive backfill have no attrs_pending column.
-    'ALTER TABLE base_entities ADD COLUMN IF NOT EXISTS attrs_pending BOOLEAN DEFAULT false',
   ]
 }

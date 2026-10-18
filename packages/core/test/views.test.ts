@@ -217,3 +217,20 @@ test('materialized output equals the original merge across mixed sources and hea
     expect(await rows('SELECT * FROM attributes ORDER BY key, name')).toEqual(expectedAttributes)
   }
 })
+
+test('loadSnapshotSql keeps pending flags and never alters an existing column', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'views-pending'))
+  try {
+    const entities = join(dir, 'entities.parquet')
+    const attributes = join(dir, 'attributes.parquet')
+    await entity('base', 'p', 200, 10, true); await entity('base', 'f')
+    await conn.run(`COPY base_entities TO ${quote(entities)} (FORMAT parquet)`)
+    await conn.run(`COPY base_attributes TO ${quote(attributes)} (FORMAT parquet)`)
+    const statements = loadSnapshotSql(entities, attributes)
+    // DuckDB WASM resets an existing column to its default on ADD COLUMN IF NOT EXISTS.
+    expect(statements.some(sql => /ADD COLUMN/i.test(sql))).toBe(false)
+    await run(statements)
+    await run(MATERIALIZE_SQL)
+    expect(await rows('SELECT key, attrs_pending FROM entities ORDER BY key')).toEqual([{ key: 'f', attrs_pending: false }, { key: 'p', attrs_pending: true }])
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
