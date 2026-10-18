@@ -25,7 +25,7 @@ export function chainCheck(m: Manifest, chainId: number, genesisHash: string): {
 
 export type IndexState = {
   status: 'loading' | 'ready' | 'error'; error?: string; manifest?: Manifest
-  liveTail?: LiveStatus; deltaTo?: number; liveHead?: number; chainOk?: boolean
+  liveTail?: LiveStatus; deltaTo?: number; liveHead?: number; chainOk?: boolean; source?: 'indexer' | 'disk'
 }
 
 export class IndexDb {
@@ -87,13 +87,18 @@ export class IndexDb {
     } catch {
       throw new Error('indexer unavailable')
     }
-    if (!response.ok && response.status !== 304) throw new Error('indexer unavailable (HTTP ' + response.status + ')')
+    if (!response.ok && response.status !== 304) {
+      const body = response.status === 503 ? await response.json().catch(() => null) as { error?: unknown } | null : null
+      throw new Error(typeof body?.error === 'string' ? body.error : 'indexer unavailable (HTTP ' + response.status + ')')
+    }
     return response
   }
 
   private async poll() {
     if (!this.state.manifest || Date.now() - this.manifestAt >= 10_000) {
-      const manifest: Manifest = await (await this.data('manifest.json')).json()
+      const manifestResponse = await this.data('manifest.json')
+      const source = manifestResponse.headers.get('x-served-by') === 'disk' ? 'disk' : 'indexer'
+      const manifest: Manifest = await manifestResponse.json()
       const [chain, genesis] = await Promise.all([this.rpc.chainId(), this.rpc.genesisHash()])
       const check = chainCheck(manifest, chain, genesis)
       if (this.state.manifest?.version !== manifest.version) {
@@ -102,7 +107,7 @@ export class IndexDb {
         this.etag = null
         this.state = { ...this.state, deltaTo: undefined }
       }
-      this.state = { ...this.state, manifest, chainOk: check.ok, error: check.reason }
+      this.state = { ...this.state, manifest, source, chainOk: check.ok, error: check.reason }
       this.manifestAt = Date.now()
     }
     const response = await this.data('delta.json', this.etag ? { 'If-None-Match': this.etag } : undefined)

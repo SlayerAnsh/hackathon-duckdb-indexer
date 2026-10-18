@@ -30,12 +30,15 @@ services:
       args:
         NEXT_PUBLIC_TIRAMISU_RPC_URL: ${NEXT_PUBLIC_TIRAMISU_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
     expose: ["3000"]
+    # Read only copy of the index so stored data stays reachable while the indexer is down.
+    volumes: ["${INDEX_DATA_PATH:-./data}:/data:ro"]
     environment:
       INDEXER_URL: http://indexer:8080
+      DATA_DIR: /data
       NEXT_PUBLIC_TIRAMISU_RPC_URL: ${NEXT_PUBLIC_TIRAMISU_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
     depends_on:
       indexer:
-        condition: service_healthy
+        condition: service_started
     restart: unless-stopped
 
   demo-writer:

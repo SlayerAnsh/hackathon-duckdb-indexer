@@ -14,7 +14,7 @@ test('compose keeps data persistent, credentials isolated, and writer opt in', (
   expect(JSON.stringify(s.indexer)).not.toContain('DEMO_PRIVATE_KEY');
   expect(s.indexer.volumes).toContain('${INDEX_DATA_PATH:-./data}:/data');
   expect(s.indexer.healthcheck.test.join(' ')).toContain("fetch('http://localhost:8080/health')");
-  expect(s.web.depends_on.indexer.condition).toBe('service_healthy');
+  expect(s.web.depends_on.indexer.condition).toBe('service_started');
   expect(s.web.ports).toBeUndefined();
   expect(s.web.expose).toEqual(['3000']);
   expect(s.web.environment.INDEXER_URL).toBe('http://indexer:8080');
@@ -30,6 +30,12 @@ test('compose keeps data persistent, credentials isolated, and writer opt in', (
     expect(service.build.context).toBe('.');
     expect(JSON.stringify(service.build.args ?? {})).not.toContain('TIRAMISU_API_KEY');
   }
+});
+
+test('web mounts the index read only for the disk fallback', () => {
+  const { services: s } = Bun.YAML.parse(read('docker-compose.yml')) as any;
+  expect(s.web.volumes).toEqual(['${INDEX_DATA_PATH:-./data}:/data:ro']);
+  expect(s.web.environment.DATA_DIR).toBe('/data');
 });
 
 test('images use locked workspace installs and the standalone runtime layout', () => {
