@@ -1,6 +1,6 @@
 # Arkiv SQL Indexer
 
-Run SQL over live Arkiv data in your browser. A Bun indexer mirrors one selective Arkiv expression into Parquet snapshots and a JSON delta, while a Next.js dashboard loads the data into DuckDB WASM for joins, grouping, and exploration without a server SQL endpoint. The synthetic support desk demonstrates updates, ownership transfers, and expiring data.
+Run SQL over live Arkiv data in your browser. A Bun indexer mirrors every live Arkiv entity, optionally filtered by an Arkiv expression into Parquet snapshots and a JSON delta, while a Next.js dashboard loads the data into DuckDB WASM for joins, grouping, and exploration without a server SQL endpoint. The synthetic support desk demonstrates updates, ownership transfers, and expiring data.
 
 Live demo: TODO
 
@@ -14,7 +14,7 @@ Requires Docker with Compose v2, access to Tiramisu, and a Tiramisu API key.
 cp .env.example .env
 ```
 
-Fill `TIRAMISU_API_KEY` and set `INDEX_EXPRESSION` in `.env` to this exact demo expression. Keep the single quotes so Compose preserves the dollar sign:
+Fill `TIRAMISU_API_KEY` in `.env`. Leave `INDEX_EXPRESSION` blank to index every entity, or set it to this demo expression. Keep the single quotes so Compose preserves the dollar sign:
 
 ```dotenv
 INDEX_EXPRESSION='$creator = addr(0x1f61c3cac1612c020f64739b128c5f198939c8cd)'
@@ -83,3 +83,5 @@ Three layers enforce expiry. Snapshots exclude entities whose `expires_at <= hea
 Demo video: TODO. Record less than 3 minutes showing the dashboard, a JOIN and GROUP BY, heartbeat expiry, verify, and the `$creator` filter badge. Heartbeats live for 10 minutes, so prepare one near expiry before recording.
 
 Future work includes Parquet expiry buckets, DataFusion, DuckLake, and server side SQL. These are outside the current browser SQL design.
+
+Backfill defaults to `BACKFILL_MODE=logs`. It replays native operation logs from `PUBLIC_RPC_URL` without credentials, computes live keys at the confirmed block, then fetches rows in batches of 50 keys at that block. The backend API key is used only for key lookups in logs mode. Live sync uses the same public log and private key lookup split. `BACKFILL_MODE=query` explicitly opts into the legacy filtered query scan, which can consume substantial monthly quota.

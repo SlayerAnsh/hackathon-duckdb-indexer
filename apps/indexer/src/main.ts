@@ -6,9 +6,16 @@ import { createHandler, serve } from './http'
 import { createRpc, hasCreatorTerm, RpcError, type ArkivRpc } from '@asi/core'
 import { loadConfig, storeDir, type Config } from './config'
 import { Store } from './store'
-import { backfill } from './backfill'
+import { replayLiveKeys } from './replay'
+import { backfill, backfillByKeys } from './backfill'
 import { readManifest, writeSnapshot } from './snapshot'
-export async function bootstrap(config: Config, rpc: ArkivRpc, log: (msg: string) => void = console.log): Promise<{ store: Store; dir: string; head: number }> {
+async function runBackfill(config: Config, logsRpc: ArkivRpc, queryRpc: ArkivRpc, store: Store, head: number, log?: (msg: string) => void): Promise<void> {
+  if (config.backfillMode === 'logs') {
+    const keys = await replayLiveKeys(logsRpc, store, head, log)
+    await backfillByKeys(queryRpc, store, config.expression, keys, head, log)
+  } else await backfill(queryRpc, store, config.expression, head, log)
+}
+export async function bootstrap(config: Config, rpc: ArkivRpc, log: (msg: string) => void = console.log, queryRpc: ArkivRpc = rpc): Promise<{ store: Store; dir: string; head: number }> {
   const chainId = await rpc.chainId(), genesisHash = await rpc.genesisHash()
   const base = storeDir(config.dataDir, chainId, genesisHash)
   let dir = base
@@ -24,10 +31,10 @@ export async function bootstrap(config: Config, rpc: ArkivRpc, log: (msg: string
     const head = state?.head_block ?? Math.max(0, await rpc.blockNumber() - config.confirmations)
     const meta = { chainId, genesisHash, expression: config.expression }
     if (!state) {
-      // An interrupted backfill has no checkpoint. Discard its partial rows before a new pinned scan.
+      // Discard partial row fetches before a new pinned backfill; retain replay checkpoints.
       await store.transaction(async () => { await store.conn.run('DELETE FROM attributes; DELETE FROM entities; DELETE FROM changes') })
       const hash = await rpc.blockHash(head)
-      await backfill(rpc, store, config.expression, head, log)
+      await runBackfill(config, rpc, queryRpc, store, head, log)
       if (await rpc.blockHash(head) !== hash) throw Error('Canonical header changed during backfill')
       await store.transaction(async () => { await store.setState({ start_block: head, head_block: head, head_hash: hash }) })
       await writeSnapshot(store, dir, head, meta, config.keepSnapshots)
@@ -58,7 +65,7 @@ export async function servePaused(config: Config, log: (msg: string) => void = c
   log('Sync paused; serving ' + candidates[0])
   return { dir: candidates[0]! }
 }
-export type TickContext = { rpc: ArkivRpc; store: Store; dir: string; config: Config; meta: { chainId: number; genesisHash: string; expression: string }; chainHead?: number }
+export type TickContext = { rpc: ArkivRpc; queryRpc?: ArkivRpc; store: Store; dir: string; config: Config; meta: { chainId: number; genesisHash: string; expression: string }; chainHead?: number }
 async function rebuild(ctx: TickContext, head: number): Promise<void> {
   const { rpc, config } = ctx
   const meta = { chainId: await rpc.chainId(), genesisHash: await rpc.genesisHash(), expression: config.expression }
@@ -71,7 +78,7 @@ async function rebuild(ctx: TickContext, head: number): Promise<void> {
   const store = await Store.open(dir, config.expression, meta.chainId, meta.genesisHash)
   try {
     const hash = await rpc.blockHash(head)
-    await backfill(rpc, store, config.expression, head)
+    await runBackfill(config, rpc, ctx.queryRpc ?? rpc, store, head)
     if (await rpc.blockHash(head) !== hash) throw Error('Canonical header changed during backfill')
     await store.setState({ start_block: head, head_block: head, head_hash: hash, snapshot_version: previousVersion })
     await writeSnapshot(store, dir, head, meta, config.keepSnapshots)
@@ -100,7 +107,7 @@ export async function tick(ctx: TickContext): Promise<void> {
     console.log('Checkpoint hash mismatch or legacy checkpoint; building a fresh generation')
     await rebuild(ctx, Math.max(0, to)); return
   }
-  try { await syncBatch(rpc, store, config.expression, state.head_block + 1, to) }
+  try { await syncBatch(rpc, store, config.expression, state.head_block + 1, to, ctx.queryRpc ?? rpc) }
   catch (error) {
     if (!(error instanceof RpcError && error.code === -32006)) throw error
     // Verify the provider is still ahead before treating unavailable state as a retained-range gap.
@@ -122,10 +129,11 @@ if (import.meta.main) {
       const manifest = (await readManifest(dir))!
       serve(config.port, createHandler(dir, () => ({ paused: true, headBlock: manifest.headBlock, lastSnapshot: manifest.snapshotBlock })))
     } else {
-    const rpc = createRpc(config.rpcUrl, { apiKey: config.apiKey, onCost: (cost, quota) => console.log('RPC cost: ' + cost + '; quota used: ' + (quota === null ? 'unknown' : quota + '%')) })
-    const result = await bootstrap(config, rpc)
+    const rpc = createRpc(config.publicRpcUrl)
+    const queryRpc = createRpc(config.rpcUrl, { apiKey: config.apiKey, onCost: (cost, quota) => console.log('RPC cost: ' + cost + '; quota used: ' + (quota === null ? 'unknown' : quota + '%')) })
+    const result = await bootstrap(config, rpc, console.log, queryRpc)
     const state = (await result.store.state())!
-    const ctx: TickContext = { ...result, rpc, config, meta: { chainId: state.chain_id, genesisHash: state.genesis_hash, expression: config.expression } }
+    const ctx: TickContext = { ...result, rpc, queryRpc, config, meta: { chainId: state.chain_id, genesisHash: state.genesis_hash, expression: config.expression } }
     let health: object = { headBlock: state.head_block, headLag: null, lastSnapshot: state.snapshot_block }
     let servingDir = ctx.dir, handler = createHandler(servingDir, () => health)
     serve(config.port, req => {

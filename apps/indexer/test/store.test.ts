@@ -2,8 +2,8 @@ import { test, expect } from 'bun:test'
 import { Store } from '../src/store'
 import { loadConfig, storeDir } from '../src/config'
 import { temp, track, row, rows, hash, expression } from './helpers'
-test('config requires expression and API key, supplies defaults', () => {
-  expect(() => loadConfig({})).toThrow('INDEX_EXPRESSION')
+test('config requires API key, supplies defaults', () => {
+  expect(() => loadConfig({})).toThrow('TIRAMISU_API_KEY')
   expect(() => loadConfig({ INDEX_EXPRESSION: expression })).toThrow('TIRAMISU_API_KEY')
   expect(loadConfig({ INDEX_EXPRESSION: expression, TIRAMISU_API_KEY: 'secret' })).toMatchObject({ confirmations: 3, syncBatchBlocks: 5, snapshotIntervalBlocks: 30, keepSnapshots: 2, port: 8080, dataDir: './data' })
 })
@@ -55,4 +55,11 @@ test('head_hash migration preserves extra sync_state columns', async () => {
   await reopened.setState({ head_block: 105, head_hash: hash })
   expect(await reopened.state()).toMatchObject({ head_block: 105, head_hash: hash })
   expect((await rows(reopened, 'SELECT extra FROM sync_state'))[0]!.extra).toBe('kept')
+})
+test('store identity normalizes blank expressions', async () => {
+  const dir = await temp(), s = await Store.open(dir, '  ', 1, hash)
+  s.close()
+  const reopened = track(await Store.open(dir, '', 1, hash))
+  await reopened.setState({ head_block: 1 })
+  expect((await reopened.state())!.expression).toBe('')
 })

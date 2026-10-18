@@ -27,3 +27,33 @@ test('invalid entity rolls back entire page', async () => {
   await expect(backfill(fake(async () => ({ data: [raw(), {}], blockNumber: 100 })), s, expression, 100)).rejects.toThrow()
   expect((await s.indexedKeys()).size).toBe(0)
 })
+test('key backfill chunks 120 keys, pins rows and omits missing keys', async () => {
+  const { backfillByKeys } = await import('../src/backfill')
+  const keys = Array.from({ length: 120 }, (_, n) => '0x' + n.toString(16).padStart(64, '0'))
+  const s = track(await Store.open(await temp(), '', 1, hash))
+  const query = mock(async () => ({ data: [raw(keys[0])], blockNumber: 100 }))
+  expect(await backfillByKeys(fake(query), s, '', keys, 100)).toBe(3)
+  expect(query).toHaveBeenCalledTimes(3)
+  for (const [text, opts] of query.mock.calls as any) {
+    expect(text).toContain('$key = key(')
+    expect(text).not.toContain('AND')
+    expect(opts).toMatchObject({ atBlock: 100, select: ROW_SELECT })
+  }
+  expect((await s.indexedKeys()).size).toBe(1)
+  expect(await rows(s, 'SELECT * FROM changes')).toHaveLength(0)
+})
+test('logs bootstrap uses public metadata and private keyed queries only', async () => {
+  const { bootstrap } = await import('../src/main')
+  const { loadConfig } = await import('../src/config')
+  const { event } = await import('./events')
+  const logs = fake(async () => { throw Error('public query forbidden') })
+  logs.getLogs = async () => [event(1, 'EntityCreated', 1, 200)]
+  const query = fake(mock(async (text, opts) => {
+    expect(text).toContain('$key = key(')
+    return { data: [], blockNumber: opts.atBlock! }
+  }))
+  query.chainId = async () => { throw Error('private metadata forbidden') }
+  const result = await bootstrap(loadConfig({ TIRAMISU_API_KEY: 'x', DATA_DIR: await temp() }), logs, () => {}, query)
+  track(result.store)
+  expect(query.query).toHaveBeenCalledTimes(1)
+})

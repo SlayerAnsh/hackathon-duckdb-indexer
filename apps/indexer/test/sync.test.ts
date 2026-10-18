@@ -28,3 +28,17 @@ test('header changing during staged reads rolls back batch', async () => {
   expect((await s.state())!.head_block).toBe(100)
   expect(await rows(s, 'SELECT * FROM changes')).toEqual([])
 })
+test('blank expression queries every touched key through private client only', async () => {
+  const s = await setup(), publicRpc = rpc([log(key(1))], [])
+  publicRpc.query = mock(async () => { throw Error('public query forbidden') })
+  const privateRpc = fake(mock(async (text, opts) => {
+    expect(text).toContain('$key = key(')
+    expect(text).not.toContain('AND')
+    return { data: [], blockNumber: opts.atBlock! }
+  }))
+  privateRpc.getLogs = async () => { throw Error('private logs forbidden') }
+  privateRpc.blockHash = async () => { throw Error('private metadata forbidden') }
+  await syncBatch(publicRpc, s, '', 101, 105, privateRpc)
+  expect(privateRpc.query).toHaveBeenCalledTimes(1)
+  expect(publicRpc.query).not.toHaveBeenCalled()
+})

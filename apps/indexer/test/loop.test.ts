@@ -4,7 +4,7 @@ import { bootstrap, tick } from '../src/main'
 import { loadConfig } from '../src/config'
 import { temp, track, fake, hash, expression } from './helpers'
 async function setup() {
-  const config = loadConfig({ INDEX_EXPRESSION: expression, TIRAMISU_API_KEY: 'test', DATA_DIR: await temp() })
+  const config = loadConfig({ BACKFILL_MODE: 'query', INDEX_EXPRESSION: expression, TIRAMISU_API_KEY: 'test', DATA_DIR: await temp() })
   const query = mock(async (_e, o) => ({ data: [], blockNumber: o.atBlock }))
   const rpc = fake(query), result = await bootstrap(config, rpc); track(result.store); query.mockClear()
   return { ...result, rpc, config, meta: { chainId: 7738577, genesisHash: hash, expression } }

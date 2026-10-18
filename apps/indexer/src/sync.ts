@@ -11,7 +11,7 @@ export function touchedFromLogs(logs: RawLog[]): { keys: string[]; createdBy: Ma
   }
   return { keys: [...keys], createdBy }
 }
-export async function syncBatch(rpc: ArkivRpc, store: Store, expression: string, from: number, to: number): Promise<{ queried: number; upserted: number; removed: number }> {
+export async function syncBatch(rpc: ArkivRpc, store: Store, expression: string, from: number, to: number, queryRpc: ArkivRpc = rpc): Promise<{ queried: number; upserted: number; removed: number }> {
   async function logs(start: number, end: number): Promise<RawLog[]> {
     try { return await rpc.getLogs(start, end) }
     catch (error) {
@@ -26,14 +26,14 @@ export async function syncBatch(rpc: ArkivRpc, store: Store, expression: string,
   const { keys, createdBy } = touchedFromLogs(all), indexed = await store.indexedKeys()
   const terms = ownerTerms(expression), owners = new Set([...terms.creators, ...terms.owners])
   const relevant = keys.filter(k => indexed.has(k) || owners.size === 0 || owners.has(createdBy.get(k)!))
-  const queries = keyChunkQueries(expression, relevant)
+  const queries = keyChunkQueries(expression || null, relevant)
   return store.transaction(async () => {
     const returned = new Set<string>()
     let upserted = 0
     for (const query of queries) {
       let cursor: string | undefined
       do {
-        const page = await rpc.query(query, { atBlock: to, limit: 200, select: ROW_SELECT, cursor })
+        const page = await queryRpc.query(query, { atBlock: to, limit: 200, select: ROW_SELECT, cursor })
         if (page.blockNumber !== to) throw Error('Snapshot block mismatch')
         const rows = page.data.map(decodeEntity)
         for (const row of rows) returned.add(row.entity.key)

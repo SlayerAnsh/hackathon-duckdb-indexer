@@ -65,7 +65,7 @@ Pricing guidance should explain whether selection size, page size, and key count
 
 ### Actual
 
-Authenticated `arkiv_query` calls each cost 100 units according to `Arkiv-Cost: 100`. A single key, 50 OR keys, a full 200 row page, and a failing call all had the same observed cost. The cheapest pattern is fewer calls, not fewer rows. Chain wide churn makes a query for each entity event unnecessarily costly.
+Authenticated `arkiv_query` calls each cost 100 units according to `Arkiv-Cost: 100`. A single key, 50 OR keys, a full 200 row page, and a failing call all had the same observed cost. The header alone does not describe monthly quota consumption. Chain wide churn makes a query for each entity event unnecessarily costly.
 
 ### Versions
 
@@ -79,7 +79,7 @@ SDK 0.8.1, viem 2.57.3, Bun 1.3.11, authenticated Tiramisu on 18 October 2026; s
 
 ### Suggested fix
 
-Document flat per call cost, whether failures are charged, and the preferred pattern: pinned 200 row backfill pages, relevance filtering from logs, and batches of up to 50 keys. Payload and verify should be explicit user actions. This project omits the browser live tail to avoid query amplification.
+Document flat per call cost, whether failures are charged, and the preferred pattern: public log replay, relevance filtering from logs, and pinned batches of up to 50 keys. Payload and verify should be explicit user actions. This project omits the browser live tail to avoid query amplification.
 
 ## Monthly quota capacity is not exposed
 
@@ -104,3 +104,12 @@ SDK 0.8.1, viem 2.57.3, Bun 1.3.11, authenticated Tiramisu on 18 October 2026; s
 ### Suggested fix
 
 Expose monthly capacity, remaining units, and reset timestamp in documented headers or a quota endpoint. Keep API credentials server side and log cost and percentage without logging the key. Configure conservative batch intervals until capacity is known.
+
+
+## Public replay and selective monthly quota observations
+
+Measured on Tiramisu on 18 October 2026 with SDK 0.8.1: the flat `Arkiv-Cost: 100` header appeared for both broad scans and keyed queries, while broad 200 row pages consumed about 0.7% of monthly quota per page. Ten keyed lookups of 50 keys with full selection did not move the quota percentage. This observation does not establish that key lookups are permanently free.
+
+Anonymous `eth_getLogs` worked from block zero without an API key or an Arkiv-Cost header. The response advertised `RateLimit: limit=600` per window. Above 20,000 results it returned `-32602` with a helpful message such as `query exceeds max results 20000, retry with the range 725725-731557`. Retry that exact range first, then continue at its end plus one. Without a suggested range, halve the block window. On HTTP 429 obey Retry-After.
+
+To reproduce, compare quota headers before and after broad pinned pages and batches of 50 key predicates, then request anonymous logs over a range large enough to exceed 20,000 results. The default backfill now discovers live keys from public logs and spends backend queries only on keyed row lookups.

@@ -9,7 +9,9 @@ services:
     environment:
       SYNC_PAUSED: ${SYNC_PAUSED:-false}
       TIRAMISU_API_KEY: ${TIRAMISU_API_KEY:-}
-      INDEX_EXPRESSION: ${INDEX_EXPRESSION:?set INDEX_EXPRESSION in .env}
+      INDEX_EXPRESSION: ${INDEX_EXPRESSION:-}
+      PUBLIC_RPC_URL: ${PUBLIC_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
+      BACKFILL_MODE: ${BACKFILL_MODE:-logs}
       ARKIV_RPC_URL: ${ARKIV_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
       DATA_DIR: /data
       PORT: "8080"

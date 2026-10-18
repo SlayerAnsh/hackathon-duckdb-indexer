@@ -6,6 +6,7 @@ export type SyncState = { chain_id: number; genesis_hash: string; expression: st
 export class Store {
   private constructor(public conn: DuckDBConnection, private db: DuckDBInstance, private identity: Pick<SyncState, 'chain_id' | 'genesis_hash' | 'expression'>) {}
   static async open(dir: string, expression: string, chainId: number, genesisHash: string): Promise<Store> {
+    expression = expression.trim()
     await mkdir(dir, { recursive: true })
     const db = await DuckDBInstance.create(join(dir, 'index.duckdb'))
     const conn = await db.connect()

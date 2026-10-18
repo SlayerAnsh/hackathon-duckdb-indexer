@@ -4,12 +4,12 @@ import { loadConfig } from '../src/config'
 import { createHandler } from '../src/http'
 import { temp, fake, expression } from './helpers'
 test('paused config needs no API key and missing store fails without RPC', async () => {
-  const config = loadConfig({ INDEX_EXPRESSION: expression, SYNC_PAUSED: '1', DATA_DIR: await temp() })
+  const config = loadConfig({ BACKFILL_MODE: 'query', INDEX_EXPRESSION: expression, SYNC_PAUSED: '1', DATA_DIR: await temp() })
   expect(config.syncPaused).toBe(true)
   await expect(servePaused(config)).rejects.toThrow('No indexed store found in ' + config.dataDir)
 })
 test('paused serving resolves bootstrap store without RPC', async () => {
-  const config = loadConfig({ INDEX_EXPRESSION: expression, TIRAMISU_API_KEY: 'test', DATA_DIR: await temp() })
+  const config = loadConfig({ BACKFILL_MODE: 'query', INDEX_EXPRESSION: expression, TIRAMISU_API_KEY: 'test', DATA_DIR: await temp() })
   const query = mock(async () => ({ data: [], blockNumber: 100 }))
   const first = await bootstrap(config, fake(query)); first.store.close(); query.mockClear()
   const result = await servePaused({ ...config, syncPaused: true }, () => {})
@@ -20,7 +20,7 @@ test('paused serving resolves bootstrap store without RPC', async () => {
 })
 test('paused serving follows active generation pointer', async () => {
   const { rename, mkdir, writeFile } = await import('node:fs/promises')
-  const config = loadConfig({ INDEX_EXPRESSION: expression, TIRAMISU_API_KEY: 'test', DATA_DIR: await temp() })
+  const config = loadConfig({ BACKFILL_MODE: 'query', INDEX_EXPRESSION: expression, TIRAMISU_API_KEY: 'test', DATA_DIR: await temp() })
   const first = await bootstrap(config, fake(async () => ({ data: [], blockNumber: 100 })))
   first.store.close()
   await rename(first.dir, first.dir + '-g1')

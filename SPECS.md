@@ -96,7 +96,9 @@ arkiv/friction.md   gate 5
 | Variable | Meaning | Default |
 |---|---|---|
 | `ARKIV_RPC_URL` | HTTP RPC | Tiramisu public RPC |
-| `INDEX_EXPRESSION` | Arkiv query expression | required |
+| `INDEX_EXPRESSION` | Optional Arkiv query expression, blank means every entity | empty |
+| `PUBLIC_RPC_URL` | Anonymous logs and chain metadata | Tiramisu public RPC |
+| `BACKFILL_MODE` | Public log replay or legacy query scan | `logs` |
 | `TIRAMISU_API_KEY` | sent as `Authorization: Bearer`, server only | required for active sync |
 | `SYNC_PAUSED` | serve existing store without RPC calls | `false` |
 | `CONFIRMATIONS` | blocks behind head | 3 |
@@ -143,9 +145,12 @@ CREATE TABLE sync_state (
 ### 7.4 Backfill
 
 1. `B0 = head - CONFIRMATIONS`.
-2. Page `arkiv_query(INDEX_EXPRESSION, { atBlock: B0, select: all except payload plus payload if payload_size kept, limit: 200 })` until no cursor.
-3. Upsert entities and replace their attributes in one transaction per page.
-4. Set `start_block = head_block = B0`, then build snapshot v1 (7.6).
+2. Replay native operation logs from block zero through `B0` using `PUBLIC_RPC_URL` without an API key. Commit each adaptive window and its next block checkpoint atomically, deduplicating by block and log index.
+3. Compute live keys in SQL: a creation exists, the latest operation is not deletion, and the latest known expiration exceeds `B0`.
+4. Fetch rows at `B0` in SDK rendered batches of at most 50 keys, with the optional expression. Upsert each chunk in one transaction without change rows. In logs mode the private API key is used only for key lookups, including live sync.
+5. Set `start_block = head_block = B0`, then build snapshot v1 (7.6).
+
+`BACKFILL_MODE=query` retains the legacy paginated expression scan as an explicit option. Public log capacity errors use the suggested retry range when present, otherwise halve the window. HTTP 429 waits for Retry-After. Failed windows preserve the last committed checkpoint.
 
 ### 7.5 Live sync
 

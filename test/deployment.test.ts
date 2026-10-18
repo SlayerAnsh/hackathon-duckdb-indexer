@@ -4,6 +4,9 @@ const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.ur
 
 test('compose keeps data persistent, credentials isolated, and writer opt in', () => {
   const { services: s } = Bun.YAML.parse(read('docker-compose.yml')) as any;
+  expect(s.indexer.environment.PUBLIC_RPC_URL).toContain('PUBLIC_RPC_URL')
+  expect(s.indexer.environment.BACKFILL_MODE).toBe('${BACKFILL_MODE:-logs}')
+  expect(s.indexer.environment.INDEX_EXPRESSION).toBe('${INDEX_EXPRESSION:-}')
   expect(s.indexer.expose).toEqual(['8080']);
   expect(s.indexer.ports).toBeUndefined();
   expect(s.indexer.env_file).toBeUndefined();
