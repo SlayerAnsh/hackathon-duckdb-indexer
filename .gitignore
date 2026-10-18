@@ -9,6 +9,7 @@ dist/
 
 # runtime data
 /data/
+/data-backup/
 *.duckdb
 *.duckdb.wal
 *.parquet
