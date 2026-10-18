@@ -147,6 +147,8 @@ export class IndexDb {
   run(sql: string, maxRows = 1000): Promise<{ columns: string[]; rows: unknown[][]; truncated: boolean }> {
     return this.serial(async () => {
       const reader = await this.queries.send(sql, true)
+      // The Arrow stream exposes its schema only after the first message is read.
+      await reader.open()
       const columns = reader.schema.fields.map(field => field.name)
       const rows: unknown[][] = []
       try {
