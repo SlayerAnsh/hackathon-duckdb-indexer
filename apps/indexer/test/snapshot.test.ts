@@ -10,7 +10,7 @@ test('versioned parquet filters expired entities and attributes; manifest is ren
   expect(await readManifest(dir)).toBeNull()
   await s.upsert([row('expired', 100), row('live', 101)], 100)
   const m = await writeSnapshot(s, dir, 100, meta, 2)
-  expect(m).toEqual({ ...meta, version: 1, snapshotBlock: 100, headBlock: 100, files: { entities: 'snap/v1/entities.parquet', attributes: 'snap/v1/attributes.parquet' }, delta: 'delta.json' })
+  expect(m).toEqual({ ...meta, version: 1, snapshotBlock: 100, headBlock: 100, files: { entities: 'snap/v1/entities.parquet', attributes: 'snap/v1/attributes.parquet' }, delta: 'delta.json', live: 1, pending: 0 })
   for (const file of Object.values(m.files)) expect(await rows(s, "SELECT key FROM read_parquet('" + join(dir, file) + "')")).toEqual([{ key: 'live' }])
   expect(await readManifest(dir)).toEqual(m)
   expect(await readdir(dir)).not.toContain('manifest.json.tmp')

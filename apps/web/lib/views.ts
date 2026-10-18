@@ -1,7 +1,7 @@
 export type Widget = { id: string; title: string; subtitle?: string; sql: string; kind: 'stat' | 'area' | 'bar' | 'stacked-bar' | 'donut' | 'table' | 'histogram'; x?: string; y?: string | string[]; series?: string; span?: 1 | 2 | 3; notInArkivQuery?: string }
 export type View = { id: string; title: string; description: string; widgets: Widget[] }
 const head = '(SELECT block::DOUBLE FROM live_head)'
-const labelled = `WITH labelled AS (SELECT e.*, COALESCE(t.value, p.value, 'unlabelled') AS label FROM entities e LEFT JOIN attributes t ON t.key=e.key AND t.name='type' LEFT JOIN attributes p ON p.key=e.key AND p.name='project')`
+const labelled = `WITH labelled AS (SELECT e.*, COALESCE(t.value, p.value, CASE WHEN e.attrs_pending THEN 'pending' ELSE 'unlabelled' END) AS label FROM entities e LEFT JOIN attributes t ON t.key=e.key AND t.name='type' LEFT JOIN attributes p ON p.key=e.key AND p.name='project')`
 const bucket = `CASE WHEN expires_at::DOUBLE-${head} <= 1800 THEN '0–1 h' WHEN expires_at::DOUBLE-${head} <= 10800 THEN '1–6 h' WHEN expires_at::DOUBLE-${head} <= 43200 THEN '6–24 h' WHEN expires_at::DOUBLE-${head} <= 302400 THEN '1–7 days' ELSE 'Over 7 days' END`
 const bucketOrder = `CASE bucket WHEN '0–1 h' THEN 1 WHEN '1–6 h' THEN 2 WHEN '6–24 h' THEN 3 WHEN '1–7 days' THEN 4 ELSE 5 END`
 const stat = (id: string,title: string,sql: string,reason?: string): Widget => ({id,title,sql,kind:'stat',y:'value',notInArkivQuery:reason})
@@ -14,7 +14,7 @@ export const VIEWS: View[] = [
   stat('expiring','Expiring within 1 hour',`SELECT count(*) AS value FROM entities WHERE expires_at <= ${head}+1800`),
   stat('new','Created in the last hour',`SELECT count(*) AS value FROM entities WHERE created_at >= greatest(0,${head}-1800)`),
   {id:'creations',title:'Creations per hour',subtitle:'Last 24 hours · live entities only',kind:'area',x:'hour',y:'count',span:2,notInArkivQuery:'GROUP BY',sql:`SELECT floor(created_at/1800.0) AS hour, count(*) AS count, ${head} AS head_block FROM entities WHERE created_at >= greatest(0,${head}-43200) GROUP BY hour ORDER BY hour`},
-  {id:'types',title:'Entities by type',subtitle:'Type → project → unlabelled',kind:'donut',x:'type',y:'count',notInArkivQuery:'GROUP BY + JOIN',sql:`${labelled}, counts AS (SELECT label, count(*) AS n FROM labelled GROUP BY label), ranked AS (SELECT *, row_number() OVER (ORDER BY n DESC,label) AS rank FROM counts) SELECT CASE WHEN rank <= 7 THEN label ELSE 'Other' END AS type, sum(n) AS count FROM ranked GROUP BY type ORDER BY count DESC,type`},
+  {id:'types',title:'Entities by type',subtitle:'Type → project → pending or unlabelled',kind:'donut',x:'type',y:'count',notInArkivQuery:'GROUP BY + JOIN',sql:`${labelled}, counts AS (SELECT label, count(*) AS n FROM labelled GROUP BY label), ranked AS (SELECT *, row_number() OVER (ORDER BY n DESC,label) AS rank FROM counts) SELECT CASE WHEN rank <= 7 THEN label ELSE 'Other' END AS type, sum(n) AS count FROM ranked GROUP BY type ORDER BY count DESC,type`},
   {id:'recent',title:'Recently updated entities',kind:'table',span:3,notInArkivQuery:'ORDER BY updated_at',sql:'SELECT key, creator, owner, updated_at, expires_at FROM entities ORDER BY updated_at DESC,key LIMIT 10'},
  ]},
  {id:'expiry',title:'Expiry',description:'Time remaining before live entities disappear. One block is two seconds.',widgets:[

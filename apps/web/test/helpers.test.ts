@@ -27,7 +27,7 @@ test('all tile SQL executes with seeded merge views', async () => {
  const instance = await DuckDBInstance.create(':memory:'); const db = await instance.connect()
  try {
  for (const sql of [...RAW_TABLES_SQL,...MERGE_VIEWS_SQL,...setHeadSql(5000)]) await db.run(sql)
- await db.run("INSERT INTO base_entities VALUES ('a','o','c',100,100,6000,NULL,0),('b','o','c',4000,4000,9000,NULL,0),('c','o','d',4900,4900,10000,NULL,0)")
+ await db.run("INSERT INTO base_entities VALUES ('a','o','c',100,100,6000,NULL,0,false),('b','o','c',4000,4000,9000,NULL,0,false),('c','o','d',4900,4900,10000,NULL,0,false)")
  await db.run("INSERT INTO base_attributes VALUES ('a','type','str','demo',NULL),('b','type','str','demo',NULL)")
  expect(TILES.map(t => t.id)).toEqual(['live','expiring_hour','by_type','created_per_hour','expiry_horizon','top_creators'])
  for (const tile of TILES) await db.run(tile.sql)

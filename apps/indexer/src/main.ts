@@ -6,13 +6,17 @@ import { createHandler, serve } from './http'
 import { createRpc, hasCreatorTerm, RpcError, type ArkivRpc } from '@asi/core'
 import { loadConfig, storeDir, type Config } from './config'
 import { Store } from './store'
-import { replayLiveKeys, replayTarget } from './replay'
-import { backfill, backfillByKeys } from './backfill'
-import { readManifest, writeSnapshot } from './snapshot'
+import { replayDetails, replayLiveKeys, replayTarget, writeLogRows } from './replay'
+import { backfill } from './backfill'
+import { readManifest, refreshManifestCounts, writeSnapshot } from './snapshot'
+import { createFillRpc, createLock, fillTask } from './fill'
 async function runBackfill(config: Config, logsRpc: ArkivRpc, queryRpc: ArkivRpc, store: Store, head: number, log?: (msg: string) => void): Promise<void> {
   if (config.backfillMode === 'logs') {
+    // Publish every live key from log data now; attributes are filled newest first after startup.
     const keys = await replayLiveKeys(logsRpc, store, head, log)
-    await backfillByKeys(queryRpc, store, config.expression, keys, head, log)
+    await replayDetails(logsRpc, store, head, log)
+    const written = await writeLogRows(store, head)
+    log?.('Live keys at block ' + head + ': ' + keys.length + '; written from logs and pending attributes: ' + written)
   } else await backfill(queryRpc, store, config.expression, head, log)
 }
 export async function bootstrap(config: Config, rpc: ArkivRpc, log: (msg: string) => void = console.log, queryRpc: ArkivRpc = rpc): Promise<{ store: Store; dir: string; head: number }> {
@@ -92,6 +96,11 @@ async function rebuild(ctx: TickContext, head: number): Promise<void> {
   ctx.store = store; ctx.dir = dir; ctx.meta = meta
   old.close()
 }
+// Publishes fills between sync batches: the delta carries filled rows, the manifest the remaining count.
+export async function publishFill(store: Store, dir: string): Promise<void> {
+  await writeDelta(store, dir)
+  await refreshManifestCounts(store, dir)
+}
 export async function tick(ctx: TickContext): Promise<void> {
   const { rpc, store, config } = ctx
   const state = await store.state()
@@ -128,14 +137,21 @@ if (import.meta.main) {
     if (config.syncPaused) {
       const { dir } = await servePaused(config)
       const manifest = (await readManifest(dir))!
-      serve(config.port, createHandler(dir, () => ({ paused: true, headBlock: manifest.headBlock, lastSnapshot: manifest.snapshotBlock })))
+      serve(config.port, createHandler(dir, () => ({ paused: true, headBlock: manifest.headBlock, lastSnapshot: manifest.snapshotBlock, live: manifest.live ?? null, pending: manifest.pending ?? null })))
     } else {
     const rpc = createRpc(config.publicRpcUrl)
     const queryRpc = createRpc(config.rpcUrl, { apiKey: config.apiKey, onCost: (cost, quota) => console.log('RPC cost: ' + cost + '; quota used: ' + (quota === null ? 'unknown' : quota + '%')) })
     const result = await bootstrap(config, rpc, console.log, queryRpc)
     const state = (await result.store.state())!
     const ctx: TickContext = { ...result, rpc, queryRpc, config, meta: { chainId: state.chain_id, genesisHash: state.genesis_hash, expression: config.expression } }
-    let health: object = { headBlock: state.head_block, headLag: null, lastSnapshot: state.snapshot_block }
+    let health: object = { headBlock: state.head_block, headLag: null, lastSnapshot: state.snapshot_block, ...await result.store.counts(state.head_block) }
+    const lock = createLock()
+    const refreshHealth = async () => {
+      const latest = (await ctx.store.state())!
+      const counts = await ctx.store.counts(latest.head_block)
+      health = { headBlock: latest.head_block, headLag: ctx.chainHead === undefined ? null : ctx.chainHead - latest.head_block, lastSnapshot: latest.snapshot_block, ...counts }
+      return counts
+    }
     let servingDir = ctx.dir, handler = createHandler(servingDir, () => health)
     serve(config.port, req => {
       if (servingDir !== ctx.dir) { servingDir = ctx.dir; handler = createHandler(servingDir, () => health) }
@@ -147,14 +163,16 @@ if (import.meta.main) {
       if (running) return
       running = true
       try {
-        await tick(ctx)
-        const latest = (await ctx.store.state())!
-        health = { headBlock: latest.head_block, headLag: ctx.chainHead === undefined ? null : ctx.chainHead - latest.head_block, lastSnapshot: latest.snapshot_block }
+        await lock(async () => { await tick(ctx); await refreshHealth() })
       } catch (error) {
         if (error instanceof RpcError && error.status === 429) console.error('RPC rate limited; Retry-After: ' + (error.retryAfter ?? 'unknown'))
         else console.error(error instanceof Error ? error.message : String(error))
       } finally { running = false }
     }, 2000)
+    if (config.fillUseApiKey) console.log('Warning: FILL_USE_API_KEY is true; attribute fills spend the API quota.')
+    const fill = fillTask({ rpc: createFillRpc(config), store: () => ctx.store, expression: config.expression, chunk: config.fillChunk, lock,
+      publish: async () => { await publishFill(ctx.store, ctx.dir); const { live, pending } = await refreshHealth(); console.log('Attributes pending for ' + pending + ' of ' + live + ' live entities') } })
+    setInterval(fill, config.fillIntervalMs)
     }
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))

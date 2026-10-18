@@ -13,8 +13,8 @@ export const ACTIVITY_SQL = `WITH previous AS (
  FROM live_entities l LEFT JOIN previous p ON p.key=l.key
  UNION ALL SELECT key,block,'Deleted' FROM live_tombstones
 )
-SELECT c.key,c.block,c.kind,COALESCE(t.value,p.value,'unlabelled') AS type
-FROM changes c LEFT JOIN attributes t ON t.key=c.key AND t.name='type'
+SELECT c.key,c.block,c.kind,COALESCE(t.value,p.value,CASE WHEN e.attrs_pending THEN 'pending' ELSE 'unlabelled' END) AS type
+FROM changes c LEFT JOIN entities e ON e.key=c.key LEFT JOIN attributes t ON t.key=c.key AND t.name='type'
 LEFT JOIN attributes p ON p.key=c.key AND p.name='project'
 ORDER BY c.block DESC,c.key LIMIT 12`
 export function ActivityFeed({version,head}:{version:number;head?:number}) {

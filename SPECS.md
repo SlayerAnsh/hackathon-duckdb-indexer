@@ -99,6 +99,10 @@ arkiv/friction.md   gate 5
 | `INDEX_EXPRESSION` | Optional Arkiv query expression, blank means every entity | empty |
 | `PUBLIC_RPC_URL` | Anonymous logs and chain metadata | Tiramisu public RPC |
 | `BACKFILL_MODE` | Public log replay or legacy query scan | `logs` |
+| `FILL_RPC_URL` | RPC for attribute fills of pending rows | Tiramisu public RPC |
+| `FILL_USE_API_KEY` | send the API key with fills (spends monthly quota) | `false` |
+| `FILL_CHUNK` | keys per fill query, at most 50 | 50 |
+| `FILL_INTERVAL_MS` | pause between fill queries | 4000 |
 | `TIRAMISU_API_KEY` | sent as `Authorization: Bearer`, server only | required for active sync |
 | `SYNC_PAUSED` | serve existing store without RPC calls | `false` |
 | `CONFIRMATIONS` | blocks behind head | 3 |
@@ -122,6 +126,7 @@ CREATE TABLE entities (
   owner VARCHAR, creator VARCHAR,
   created_at UBIGINT, updated_at UBIGINT, expires_at UBIGINT,
   content_type VARCHAR, creation_flags INTEGER,
+  attrs_pending BOOLEAN DEFAULT false, -- written from log data, attributes not fetched yet
   payload_size INTEGER               -- payload itself stays off SQL
 );
 CREATE TABLE attributes (
@@ -147,8 +152,12 @@ CREATE TABLE sync_state (
 1. `B0 = head - CONFIRMATIONS`.
 2. Replay native operation logs from block zero through `B0` using `PUBLIC_RPC_URL` without an API key. Commit each adaptive window and its next block checkpoint atomically, deduplicating by block and log index.
 3. Compute live keys in SQL: a creation exists, the latest operation is not deletion, and the latest known expiration exceeds `B0`.
-4. Fetch rows at `B0` in SDK rendered batches of at most 50 keys, with the optional expression. Upsert each chunk in one transaction without change rows. In logs mode the private API key is used only for key lookups, including live sync.
-5. Set `start_block = head_block = B0`, then build snapshot v1 (7.6).
+4. The replay also records, per key, the owner and creation flags from `EntityCreated`, the new owner from `OwnershipTransferred`, and the expiry from `EntityCreated` and `ExpiryExtended`. Replay tables persisted before this capture get a second resumable pass over the public logs that only fills owner and flags.
+5. Insert every live key without a fetched row from log data: owner is the latest owner, creator the owner at creation, `created_at` the creation block, `updated_at` the block of the latest event, `expires_at` the latest expiry, `content_type` NULL and `attrs_pending = true`. Fetched rows are never overwritten.
+6. Set `start_block = head_block = B0` and build snapshot v1 (7.6) immediately. No row query is needed before the first snapshot.
+7. After startup a filler runs beside live sync. Every `FILL_INTERVAL_MS` it takes the `FILL_CHUNK` pending keys with the highest `updated_at` (then `created_at`), queries them by key at the indexed head on `FILL_RPC_URL` without the API key, and upserts the returned rows with `attrs_pending = false` and a change row so the next delta carries them. A key that is not returned is dropped when its row expired at the queried block or when a filter expression is set; otherwise it stays pending and moves behind keys not yet tried. HTTP 429 pauses only the filler until Retry-After and is logged once. Keys that live sync fetches, deletes or sweeps in the meantime are no longer pending and are never overwritten by an older fill.
+
+The anonymous budget is about 10,000 units per IP and window (about one hour), at least 100 units per query, so about 100 fills of 50 keys per window. `FILL_USE_API_KEY=true` sends the key with fills and spends the monthly quota instead.
 
 `BACKFILL_MODE=query` retains the legacy paginated expression scan as an explicit option. Public log capacity errors use the suggested retry range when present, otherwise halve the window. HTTP 429 waits for Retry-After. Failed windows preserve the last committed checkpoint.
 
@@ -201,8 +210,10 @@ Contents: latest state for every key in `changes` above the snapshot block. Big 
 { "chainId": 60138453045, "genesisHash": "0x..", "expression": "$creator = 0x..",
   "version": 12, "snapshotBlock": 1200, "headBlock": 1217,
   "files": { "entities": "snap/v12/entities.parquet", "attributes": "snap/v12/attributes.parquet" },
-  "delta": "delta.json" }
+  "delta": "delta.json", "live": 30700, "pending": 18200 }
 ```
+
+`live` counts entities alive at the head and `pending` those still waiting for attributes. The indexer rewrites these two counts after each fill; the browser shows a progress line while `pending` is above zero.
 
 ### 7.9 HTTP (Bun.serve)
 
@@ -211,7 +222,7 @@ Contents: latest state for every key in `changes` above the snapshot block. Big 
 | `/manifest.json` | `no-cache` | ETag |
 | `/delta.json` | `no-cache` | ETag, client polls every 2 s |
 | `/snap/v{n}/*` | `public, max-age=300, immutable` | Range requests, versioned so never rewritten |
-| `/health` | none | head lag, last snapshot |
+| `/health` | none | head lag, last snapshot, live and pending counts |
 
 The indexer is not exposed publicly. The browser reaches it only through the Next.js proxy (9.0), so no CORS headers are needed. Parquet URLs never change content, so range requests from DuckDB WASM can never mix two versions.
 

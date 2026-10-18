@@ -45,27 +45,40 @@ test('CLI configuration errors have no stack trace', async () => {
   const stderr = await new Response(proc.stderr).text()
   expect(await proc.exited).toBe(1); expect(stderr).toContain('TIRAMISU_API_KEY'); expect(stderr).not.toContain(' at ')
 })
-test('logs bootstrap resumes fetched chunks at its original target after restart', async () => {
+test('logs bootstrap reuses the replay, keeps fetched rows and publishes pending rows without queries', async () => {
   const { event } = await import('./events')
   const config = loadConfig({ TIRAMISU_API_KEY: 'x', DATA_DIR: await temp() })
   const logs = fake(async () => { throw Error('public query') })
-  const getLogs = mock(async () => Array.from({ length: 51 }, (_, n) => event(n + 1, 'EntityCreated', 1, 1000)))
+  let crash = true
+  const getLogs = mock(async () => { if (crash) { crash = false; throw Error('replay failed') } return Array.from({ length: 3 }, (_, n) => event(n + 1, 'EntityCreated', n + 1, 1000)) })
   logs.getLogs = getLogs
-  let calls = 0
-  const query = fake(async (_text, opts) => {
-    if (++calls === 2) throw Error('fetch failed')
-    return { data: [raw()], blockNumber: opts.atBlock! }
-  })
-  await expect(bootstrap(config, logs, () => {}, query)).rejects.toThrow('fetch failed')
+  const query = fake(mock(async () => { throw Error('bootstrap must not query') }))
+  await expect(bootstrap(config, logs, () => {}, query)).rejects.toThrow('replay failed')
   logs.blockNumber = async () => 203
-  query.query = mock(async (_text, opts) => {
-    expect(opts.atBlock).toBe(100)
-    return { data: [], blockNumber: opts.atBlock! }
-  })
   const result = await bootstrap(config, logs, () => {}, query); track(result.store)
   expect(result.head).toBe(100)
-  expect(getLogs).toHaveBeenCalledTimes(1)
-  expect(query.query).toHaveBeenCalledTimes(1)
-  expect((await result.store.indexedKeys()).size).toBe(1)
+  expect(query.query).not.toHaveBeenCalled()
+  const manifest = (await readManifest(result.dir))!
+  expect(manifest).toMatchObject({ live: 3, pending: 3, snapshotBlock: 100 })
+  const parquet = await rows(result.store, "SELECT key, attrs_pending, created_at FROM read_parquet('" + result.dir + '/' + manifest.files.entities + "') ORDER BY key")
+  expect(parquet.map(r => [r.attrs_pending, Number(r.created_at)])).toEqual([[true, 1], [true, 2], [true, 3]])
   expect(await rows(result.store, "SELECT table_name FROM information_schema.tables WHERE table_name LIKE 'replay_%'")).toHaveLength(0)
+})
+test('after one fill the delta and manifest carry the filled rows', async () => {
+  const { event } = await import('./events')
+  const { fillPending } = await import('../src/fill')
+  const { publishFill } = await import('../src/main')
+  const config = loadConfig({ TIRAMISU_API_KEY: 'x', DATA_DIR: await temp() })
+  const logs = fake(async () => { throw Error('public query') })
+  logs.getLogs = async () => Array.from({ length: 3 }, (_, n) => event(n + 1, 'EntityCreated', n + 1, 1000))
+  const result = await bootstrap(config, logs, () => {}, logs); track(result.store)
+  const filler = fake(async (text, opts) => ({ data: [...text.matchAll(/key\((0x[0-9a-f]+)\)/g)].slice(0, 1).map(m => raw(m[1])), blockNumber: opts.atBlock! }))
+  expect(await fillPending(filler, result.store, '', { chunk: 1 })).toEqual({ fetched: 1, dropped: 0 })
+  await publishFill(result.store, result.dir)
+  const { readFile } = await import('node:fs/promises')
+  const delta = JSON.parse(await readFile(result.dir + '/delta.json', 'utf8'))
+  expect(delta.entities).toHaveLength(1)
+  expect(delta.entities[0]).toMatchObject({ key: '0x' + '3'.padStart(64, '0'), attrs_pending: false })
+  expect(delta.fromBlock).toBe(101)
+  expect(await readManifest(result.dir)).toMatchObject({ version: 1, live: 3, pending: 2 })
 })

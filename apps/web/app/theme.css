@@ -88,6 +88,7 @@ code,pre,.mono,.hash,.num{font-family:var(--font-mono);font-variant-numeric:tabu
 .hero h1{margin:0;font-size:34px;line-height:1.12;letter-spacing:-.025em;font-weight:650;max-width:20ch}
 .hero p{margin:10px 0 0;color:var(--text-2);font-size:15px;max-width:62ch}
 .hero-cta{display:flex;gap:10px;flex-wrap:wrap}
+.hero .hero-fill{margin:-8px 0 16px;font-size:13px}
 .btn{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--card);font-size:13px;font-weight:500;text-decoration:none;cursor:pointer;white-space:nowrap}
 .btn:hover{border-color:var(--border-strong)}
 .btn-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}

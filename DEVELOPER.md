@@ -40,7 +40,7 @@ All automated tests use fixtures or fakes and need no RPC. The deployment tests 
 
 ## Batch sync
 
-Initial backfill pages the expression at one confirmed block and commits each page, then writes the first snapshot and checkpoint. An interrupted initial backfill is cleared and restarted.
+Initial backfill in the default logs mode replays public logs to one confirmed block (resumable per window), writes every live key from log data with `attrs_pending = true`, then writes the first snapshot and checkpoint. `apps/indexer/src/fill.ts` fills attributes newest first beside live sync; the sync tick and the filler share one store lock, and RPC calls run outside it. Pending state lives in `entities`, so a restart resumes filling where it stopped. `BACKFILL_MODE=query` pages the expression at one confirmed block instead; an interrupted query backfill is cleared and restarted.
 
 A live batch spans the checkpoint plus one through the confirmed chain head. The default `SYNC_BATCH_BLOCKS=5` targets about 10 seconds at a two second block time. Fetch logs from the Arkiv contract in windows of at most 1000 blocks. Deduplicate touched keys and retain indexed keys plus relevant creations allowed by creator or owner terms. Without such terms, retain all touched keys. Query these in chunks of 50 at the batch end using the configured expression. Upsert returned entities and replace all their attributes. Remove keys absent from the response and record tombstones. Sweep `expires_at <= batchEnd` even when no events arrive. Commit the batch and checkpoint together, then atomically publish the latest delta.
 

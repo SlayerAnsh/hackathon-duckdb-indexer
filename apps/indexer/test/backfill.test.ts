@@ -42,18 +42,16 @@ test('key backfill chunks 120 keys, pins rows and omits missing keys', async () 
   expect((await s.indexedKeys()).size).toBe(1)
   expect(await rows(s, 'SELECT * FROM changes')).toHaveLength(0)
 })
-test('logs bootstrap uses public metadata and private keyed queries only', async () => {
+test('logs bootstrap uses public metadata and never queries rows', async () => {
   const { bootstrap } = await import('../src/main')
   const { loadConfig } = await import('../src/config')
   const { event } = await import('./events')
   const logs = fake(async () => { throw Error('public query forbidden') })
   logs.getLogs = async () => [event(1, 'EntityCreated', 1, 200)]
-  const query = fake(mock(async (text, opts) => {
-    expect(text).toContain('$key = key(')
-    return { data: [], blockNumber: opts.atBlock! }
-  }))
+  const query = fake(mock(async () => { throw Error('private query forbidden') }))
   query.chainId = async () => { throw Error('private metadata forbidden') }
   const result = await bootstrap(loadConfig({ TIRAMISU_API_KEY: 'x', DATA_DIR: await temp() }), logs, () => {}, query)
   track(result.store)
-  expect(query.query).toHaveBeenCalledTimes(1)
+  expect(query.query).not.toHaveBeenCalled()
+  expect(await rows(result.store, 'SELECT key, attrs_pending FROM entities')).toEqual([{ key: '0x' + '1'.padStart(64, '0'), attrs_pending: true }])
 })

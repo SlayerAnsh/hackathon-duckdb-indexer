@@ -24,3 +24,13 @@ test('widget errors stay local and previous data stays visible while refreshing'
  const refreshing=renderToStaticMarkup(<WidgetBody widget={widget} query={{loading:true,data:{columns:['result'],rows:[[7]]},ms:2}}/>)
  expect(refreshing).toContain('result');expect(refreshing).toContain('7');expect(refreshing).not.toContain('Waiting')
 })
+
+test('hero shows fill progress only while the manifest has pending entities', async () => {
+ const { Hero, FillProgress } = await import('../components/dash/Hero')
+ const manifest = { chainId: 1, genesisHash: '0x', expression: '', version: 1, snapshotBlock: 1, headBlock: 1, files: { entities: 'e', attributes: 'a' }, delta: 'delta.json' }
+ const html = renderToStaticMarkup(<FillProgress manifest={{ ...manifest, live: 30700, pending: 18200 }}/>)
+ expect(html).toContain('Loading attributes: 18,200 of 30,700 entities pending, newest first')
+ expect(renderToStaticMarkup(<FillProgress manifest={{ ...manifest, live: 30700, pending: 0 }}/>)).toBe('')
+ expect(renderToStaticMarkup(<FillProgress manifest={manifest}/>)).toBe('')
+ expect(typeof Hero).toBe('function')
+})

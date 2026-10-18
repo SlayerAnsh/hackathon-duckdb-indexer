@@ -1,8 +1,10 @@
 const entityColumns = `
   key VARCHAR, owner VARCHAR, creator VARCHAR,
   created_at UBIGINT, updated_at UBIGINT, expires_at UBIGINT,
-  content_type VARCHAR, creation_flags INTEGER
+  content_type VARCHAR, creation_flags INTEGER, attrs_pending BOOLEAN DEFAULT false
 `
+// Column list for inserts that omit attrs_pending (fetched rows are never pending).
+export const ENTITY_INSERT_COLUMNS = 'key, owner, creator, created_at, updated_at, expires_at, content_type, creation_flags'
 const attributeColumns = 'key VARCHAR, name VARCHAR, type VARCHAR, value VARCHAR, num DOUBLE'
 
 export const DELTA_TABLES = ['delta_entities', 'delta_attributes', 'delta_tombstones'] as const
@@ -22,10 +24,10 @@ export const RAW_TABLES_SQL: string[] = [
   'CREATE TABLE IF NOT EXISTS live_head (block UBIGINT)',
 ]
 
-// Rank complete sources before filtering expiry or deletion.
+// Rank complete sources before filtering expiry or deletion. A fetched row beats a pending log row for the same key.
 export const MERGE_VIEWS_SQL: string[] = [
   `CREATE OR REPLACE VIEW ranked_sources AS
-    SELECT *, row_number() OVER (PARTITION BY key ORDER BY updated_at DESC, src DESC, deleted DESC) AS rn FROM (
+    SELECT *, row_number() OVER (PARTITION BY key ORDER BY coalesce(attrs_pending, false), updated_at DESC, src DESC, deleted DESC) AS rn FROM (
       SELECT *, 0 AS src, false AS deleted FROM base_entities
       UNION ALL BY NAME SELECT *, 1 AS src, false AS deleted FROM delta_entities
       UNION ALL BY NAME SELECT key, block AS updated_at, 1 AS src, true AS deleted FROM delta_tombstones
@@ -38,7 +40,7 @@ export const MERGE_VIEWS_SQL: string[] = [
   `CREATE OR REPLACE VIEW attribute_source AS
     SELECT w.key, CASE WHEN w.src = 2 AND EXISTS (SELECT 1 FROM live_pending p WHERE p.key = w.key)
       THEN (SELECT r.src FROM ranked_sources r WHERE r.key = w.key AND r.src < 2
-        ORDER BY r.updated_at DESC, r.src DESC, r.deleted DESC LIMIT 1)
+        ORDER BY coalesce(r.attrs_pending, false), r.updated_at DESC, r.src DESC, r.deleted DESC LIMIT 1)
       ELSE w.src END AS src FROM winner w`,
   `CREATE OR REPLACE VIEW attributes AS
     SELECT a.* EXCLUDE (src) FROM (
@@ -58,5 +60,7 @@ export function loadSnapshotSql(entitiesUrl: string, attributesUrl: string): str
   return [
     `CREATE OR REPLACE TABLE base_entities AS SELECT * FROM read_parquet(${quote(entitiesUrl)})`,
     `CREATE OR REPLACE TABLE base_attributes AS SELECT * FROM read_parquet(${quote(attributesUrl)})`,
+    // Snapshots written before progressive backfill have no attrs_pending column.
+    'ALTER TABLE base_entities ADD COLUMN IF NOT EXISTS attrs_pending BOOLEAN DEFAULT false',
   ]
 }

@@ -1,4 +1,4 @@
-import { LIVE_TABLES, RAW_TABLES_SQL, MERGE_VIEWS_SQL, setHeadSql, loadSnapshotSql, type Delta, type Manifest } from '@asi/core'
+import { ENTITY_INSERT_COLUMNS, LIVE_TABLES, RAW_TABLES_SQL, MERGE_VIEWS_SQL, setHeadSql, loadSnapshotSql, type Delta, type Manifest } from '@asi/core'
 import type { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm'
 import { LiveTail, type LiveStatus } from './live-tail'
 import { createBrowserRpc } from './rpc-browser'
@@ -8,10 +8,10 @@ const literal = (value: string | number | null) => value === null ? 'NULL' : typ
 
 export function applyDeltaSql(delta: Delta): string[] {
   const sql = [...clears]
-  const insert = (table: string, rows: (string | number | null)[][]) => {
-    if (rows.length) sql.push('INSERT INTO ' + table + ' VALUES ' + rows.map(row => '(' + row.map(literal).join(', ') + ')').join(', '))
+  const insert = (table: string, rows: (string | number | null)[][], columns = '') => {
+    if (rows.length) sql.push('INSERT INTO ' + table + columns + ' VALUES ' + rows.map(row => '(' + row.map(literal).join(', ') + ')').join(', '))
   }
-  insert('delta_entities', delta.entities.map(e => [e.key, e.owner, e.creator, e.created_at, e.updated_at, e.expires_at, e.content_type, e.creation_flags]))
+  insert('delta_entities', delta.entities.map(e => [e.key, e.owner, e.creator, e.created_at, e.updated_at, e.expires_at, e.content_type, e.creation_flags]), ' (' + ENTITY_INSERT_COLUMNS + ')')
   insert('delta_attributes', delta.attributes.map(a => [a.key, a.name, a.type, a.value, a.num]))
   insert('delta_tombstones', delta.tombstones.map(t => [t.key, t.block]))
   return sql

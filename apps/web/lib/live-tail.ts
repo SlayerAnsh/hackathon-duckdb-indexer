@@ -1,9 +1,9 @@
-import { ENTITY_EVENTS_ABI, decodeEventLog, createRpc, decodeEntity, keyChunkQueries, ownerTerms, ROW_SELECT, RpcError, type EntityRow, type RawLog } from '@asi/core'
+import { ENTITY_EVENTS_ABI, ENTITY_INSERT_COLUMNS, decodeEventLog, createRpc, decodeEntity, keyChunkQueries, ownerTerms, ROW_SELECT, RpcError, type EntityRow, type RawLog } from '@asi/core'
 
 export type LiveChange = { kind: 'upsert'; entity: Partial<EntityRow> & { key: string; updated_at: number }; needsAttributes: boolean } | { kind: 'tombstone'; key: string; block: number }
 export type LiveStatus = { block: number; pending: number; budget: 'ok' | 'exhausted'; retryAt?: number }
 const literal = (v: unknown): string => v === null || v === undefined ? 'NULL' : typeof v === 'number' ? String(v) : "'" + String(v).replaceAll("'", "''") + "'"
-const entityValues = (e: Partial<EntityRow>) => [e.key, e.owner, e.creator, e.created_at, e.updated_at, e.expires_at, e.content_type, e.creation_flags].map(literal).join(', ')
+const entityValues = (e: Partial<EntityRow>) => [e.key, e.owner, e.creator, e.created_at, e.updated_at, e.expires_at, e.content_type, e.creation_flags].map(literal).join(', ') + (e.attrs_pending ? ', true' : ', false')
 function decode(log: RawLog) {
   return decodeEventLog({ abi: ENTITY_EVENTS_ABI, topics: log.topics as [`0x${string}`, ...`0x${string}`[]], data: log.data as `0x${string}` })
 }
@@ -85,7 +85,7 @@ export class LiveTail {
           sql.push(`INSERT INTO live_tombstones VALUES (${literal(key)}, ${change.block})`, `DELETE FROM live_attributes WHERE key = ${literal(key)}`, `DELETE FROM live_pending WHERE key = ${literal(key)}`)
           pending.delete(key)
         } else {
-          sql.push(`INSERT INTO live_entities VALUES (${entityValues(change.entity)})`)
+          sql.push(`INSERT INTO live_entities (${ENTITY_INSERT_COLUMNS}, attrs_pending) VALUES (${entityValues(change.entity)})`)
           if (change.needsAttributes) {
             pending.add(key)
             sql.push(`DELETE FROM live_pending WHERE key = ${literal(key)}`, `INSERT INTO live_pending VALUES (${literal(key)})`)
@@ -111,7 +111,7 @@ export class LiveTail {
           const row = rows.get(key)
           if (!row) sql.push(`INSERT INTO live_tombstones VALUES (${literal(key)}, ${head})`)
           else {
-            sql.push(`INSERT INTO live_entities VALUES (${entityValues(row.entity)})`)
+            sql.push(`INSERT INTO live_entities (${ENTITY_INSERT_COLUMNS}, attrs_pending) VALUES (${entityValues(row.entity)})`)
             for (const a of row.attributes) sql.push(`INSERT INTO live_attributes VALUES (${[a.key, a.name, a.type, a.value, a.num].map(literal).join(', ')})`)
           }
         }

@@ -6,6 +6,8 @@ test('compose keeps data persistent, credentials isolated, and writer opt in', (
   const { services: s } = Bun.YAML.parse(read('docker-compose.yml')) as any;
   expect(s.indexer.environment.PUBLIC_RPC_URL).toContain('PUBLIC_RPC_URL')
   expect(s.indexer.environment.BACKFILL_MODE).toBe('${BACKFILL_MODE:-logs}')
+  expect(s.indexer.environment.FILL_USE_API_KEY).toBe('${FILL_USE_API_KEY:-false}')
+  expect(s.indexer.environment.FILL_RPC_URL).toContain('FILL_RPC_URL')
   expect(s.indexer.environment.INDEX_EXPRESSION).toBe('${INDEX_EXPRESSION:-}')
   expect(s.indexer.expose).toEqual(['8080']);
   expect(s.indexer.ports).toBeUndefined();

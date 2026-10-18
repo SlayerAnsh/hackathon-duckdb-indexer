@@ -12,6 +12,10 @@ services:
       INDEX_EXPRESSION: ${INDEX_EXPRESSION:-}
       PUBLIC_RPC_URL: ${PUBLIC_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
       BACKFILL_MODE: ${BACKFILL_MODE:-logs}
+      FILL_RPC_URL: ${FILL_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
+      FILL_USE_API_KEY: ${FILL_USE_API_KEY:-false}
+      FILL_CHUNK: ${FILL_CHUNK:-50}
+      FILL_INTERVAL_MS: ${FILL_INTERVAL_MS:-4000}
       ARKIV_RPC_URL: ${ARKIV_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
       DATA_DIR: /data
       PORT: "8080"

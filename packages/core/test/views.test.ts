@@ -14,8 +14,8 @@ async function run(statements: readonly string[]) {
 async function rows(sql: string) {
   return (await conn.runAndReadAll(sql)).getRowObjects()
 }
-async function entity(source: 'base' | 'delta' | 'live', key = 'a', expiry = 200, updated = 10) {
-  await conn.run(`INSERT INTO ${source}_entities VALUES (${quote(key)}, 'owner', 'creator', 1, ${updated}, ${expiry}, NULL, 0)`)
+async function entity(source: 'base' | 'delta' | 'live', key = 'a', expiry = 200, updated = 10, pending = false) {
+  await conn.run(`INSERT INTO ${source}_entities VALUES (${quote(key)}, 'owner', 'creator', 1, ${updated}, ${expiry}, NULL, 0, ${pending})`)
 }
 async function attr(source: 'base' | 'delta' | 'live', name = 'status', value = 'open', key = 'a') {
   await conn.run(`INSERT INTO ${source}_attributes VALUES (${quote(key)}, ${quote(name)}, 'str', ${quote(value)}, NULL)`)
@@ -37,7 +37,7 @@ test('base only preserves public columns and attributes', async () => {
   await entity('base'); await attr('base')
   expect(await rows('SELECT * FROM entities')).toEqual([{
     key: 'a', owner: 'owner', creator: 'creator', created_at: 1n,
-    updated_at: 10n, expires_at: 200n, content_type: null, creation_flags: 0,
+    updated_at: 10n, expires_at: 200n, content_type: null, creation_flags: 0, attrs_pending: false,
   }])
   expect(await rows('SELECT * FROM attributes')).toEqual([
     { key: 'a', name: 'status', type: 'str', value: 'open', num: null },
@@ -160,4 +160,27 @@ test('log-only transfer preserves attributes from a newer delta after rollover',
     await tail.tick(30)
     expect(await rows('SELECT value FROM attributes')).toEqual([{ value: 'current' }])
   } finally { globalThis.fetch = original }
+})
+
+test('pending base rows show with attrs_pending and no attributes until a fill arrives', async () => {
+  await entity('base', 'a', 200, 30, true); await entity('base', 'b')
+  expect(await rows('SELECT key, attrs_pending FROM entities ORDER BY key')).toEqual([{ key: 'a', attrs_pending: true }, { key: 'b', attrs_pending: false }])
+  expect(await rows('SELECT * FROM attributes')).toEqual([])
+  // A fill wins over the log row even when the log row saw a later event block.
+  await entity('delta', 'a', 200, 20); await attr('delta', 'status', 'filled')
+  expect(await rows("SELECT attrs_pending, updated_at FROM entities WHERE key = 'a'")).toEqual([{ attrs_pending: false, updated_at: 20n }])
+  expect(await rows('SELECT value FROM attributes')).toEqual([{ value: 'filled' }])
+})
+test('older snapshots without attrs_pending load as not pending', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'views-old'))
+  try {
+    const entities = join(dir, 'entities.parquet'), attributes = join(dir, 'attributes.parquet')
+    await entity('base')
+    await conn.run(`COPY (SELECT * EXCLUDE (attrs_pending) FROM base_entities) TO ${quote(entities)} (FORMAT parquet)`)
+    await conn.run(`COPY base_attributes TO ${quote(attributes)} (FORMAT parquet)`)
+    await run(loadSnapshotSql(entities, attributes))
+    expect(await rows('SELECT key, attrs_pending FROM entities')).toEqual([{ key: 'a', attrs_pending: false }])
+    await entity('base', 'b', 200, 10, true)
+    expect(await rows("SELECT attrs_pending FROM entities WHERE key = 'b'")).toEqual([{ attrs_pending: true }])
+  } finally { await rm(dir, { recursive: true, force: true }) }
 })

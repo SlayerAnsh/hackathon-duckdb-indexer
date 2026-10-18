@@ -19,6 +19,8 @@ export class Store {
         CREATE TABLE IF NOT EXISTS sync_state (chain_id UBIGINT, genesis_hash VARCHAR, expression VARCHAR, start_block UBIGINT, head_block UBIGINT, snapshot_version INTEGER, snapshot_block UBIGINT);
         CREATE TABLE IF NOT EXISTS store_identity (chain_id UBIGINT, genesis_hash VARCHAR, expression VARCHAR);`)
       await conn.run('ALTER TABLE sync_state ADD COLUMN IF NOT EXISTS head_hash VARCHAR')
+      // Rows written from log data wait for their attributes; fetched rows are never pending.
+      await conn.run('ALTER TABLE entities ADD COLUMN IF NOT EXISTS attrs_pending BOOLEAN DEFAULT false')
       const saved = (await conn.runAndReadAll('SELECT * FROM store_identity')).getRowObjects()[0]
       if (saved && saved.expression !== expression) throw Error(`Stored expression "${saved.expression}" differs from configured "${expression}" at ${dir}. Delete the store or restore the expression.`)
       if (saved && (Number(saved.chain_id) !== chainId || saved.genesis_hash !== genesisHash)) throw Error('Chain identity mismatch at ' + dir)
@@ -42,7 +44,7 @@ export class Store {
 
   async upsert(rows: { entity: EntityRow; attributes: AttributeRow[] }[], changeBlock: number | null): Promise<void> {
     for (const { entity: e, attributes } of rows) {
-      await this.conn.run('INSERT OR REPLACE INTO entities VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [e.key, e.owner, e.creator, e.created_at, e.updated_at, e.expires_at, e.content_type, e.creation_flags], [T.VARCHAR, T.VARCHAR, T.VARCHAR, T.UBIGINT, T.UBIGINT, T.UBIGINT, T.VARCHAR, T.INTEGER])
+      await this.conn.run('INSERT OR REPLACE INTO entities (key, owner, creator, created_at, updated_at, expires_at, content_type, creation_flags, attrs_pending) VALUES (?, ?, ?, ?, ?, ?, ?, ?, false)', [e.key, e.owner, e.creator, e.created_at, e.updated_at, e.expires_at, e.content_type, e.creation_flags], [T.VARCHAR, T.VARCHAR, T.VARCHAR, T.UBIGINT, T.UBIGINT, T.UBIGINT, T.VARCHAR, T.INTEGER])
       await this.conn.run('DELETE FROM attributes WHERE key = ?', [e.key])
       for (const a of attributes) await this.conn.run('INSERT INTO attributes VALUES (?, ?, ?, ?, ?)', [e.key, a.name, a.type, a.value, a.num], [T.VARCHAR, T.VARCHAR, T.VARCHAR, T.VARCHAR, T.DOUBLE])
       if (changeBlock !== null) await this.conn.run('INSERT INTO changes VALUES (?, ?, ?)', [changeBlock, e.key, false], [T.UBIGINT, T.VARCHAR, T.BOOLEAN])
@@ -63,11 +65,16 @@ export class Store {
     await this.remove(keys, head)
     return keys.length
   }
+  async counts(head: number): Promise<{ live: number; pending: number }> {
+    const row = (await this.conn.runAndReadAll('SELECT count(*) AS live, count(*) FILTER (WHERE attrs_pending) AS pending FROM entities WHERE expires_at > ?', [head], [T.UBIGINT])).getRowObjects()[0]!
+    return { live: Number(row.live), pending: Number(row.pending) }
+  }
   async transaction<T>(fn: () => Promise<T>): Promise<T> {
     await this.conn.run('BEGIN TRANSACTION')
     try { const result = await fn(); await this.conn.run('COMMIT'); return result }
     catch (error) { await this.conn.run('ROLLBACK'); throw error }
   }
   private closed = false
+  get isClosed(): boolean { return this.closed }
   close(): void { if (this.closed) return; this.closed = true; this.conn.closeSync(); this.db.closeSync() }
 }
