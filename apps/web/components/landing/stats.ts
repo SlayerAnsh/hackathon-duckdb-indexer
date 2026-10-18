@@ -1,17 +1,22 @@
-// One query for every landing figure, so the hero shows a single measured time.
+// One query per landing figure, so each figure shows its own measured time and the hero shows their average.
 // The windows match the Overview stat widgets in lib/views.ts (1800 blocks is one hour).
-export const LANDING_STATS_SQL = `WITH h AS (SELECT block::DOUBLE AS head FROM live_head)
-SELECT count(*) AS live,
- count(DISTINCT creator) AS creators,
- count(*) FILTER (WHERE expires_at::DOUBLE <= h.head + 1800) AS expiring,
- count(*) FILTER (WHERE created_at::DOUBLE >= greatest(0, h.head - 1800)) AS created
-FROM entities, h`
-
 export type LandingStats = { live: number; creators: number; expiring: number; created: number }
 
-export function readLandingStats(data?: { columns: string[]; rows: unknown[][] }): LandingStats | undefined {
+export const FIGURE_SQL: Record<keyof LandingStats, string> = {
+ live: 'SELECT count(*) AS value FROM entities',
+ creators: 'SELECT count(DISTINCT creator) AS value FROM entities',
+ expiring: 'SELECT count(*) AS value FROM entities WHERE expires_at::DOUBLE <= (SELECT block::DOUBLE FROM live_head) + 1800',
+ created: 'SELECT count(*) AS value FROM entities WHERE created_at::DOUBLE >= greatest(0, (SELECT block::DOUBLE FROM live_head) - 1800)',
+}
+
+export function readFigure(data?: { columns: string[]; rows: unknown[][] }): number | undefined {
  const row = data?.rows[0]
  if (!data || !row) return undefined
- const get = (name: keyof LandingStats) => { const v = row[data.columns.indexOf(name)]; return v === null || v === undefined ? 0 : Number(v) }
- return { live: get('live'), creators: get('creators'), expiring: get('expiring'), created: get('created') }
+ const v = row[data.columns.indexOf('value')]
+ return v === null || v === undefined ? 0 : Number(v)
+}
+
+export function averageMs(times: (number | undefined)[]): number | undefined {
+ const measured = times.filter((t): t is number => t !== undefined)
+ return measured.length ? measured.reduce((a, b) => a + b, 0) / measured.length : undefined
 }

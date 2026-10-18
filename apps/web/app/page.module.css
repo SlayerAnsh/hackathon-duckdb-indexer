@@ -1,5 +1,5 @@
 /* Landing page rhythm. Sections are separated on the 8 px scale: 96 desktop, 64 phone. */
-.main{display:flex;flex-direction:column;gap:96px;padding-bottom:96px}
+.main{display:flex;flex-direction:column;gap:96px;padding-bottom:96px;overflow-x:clip}
 .feed :global(.sec){padding:0}
 .feed :global(.sec-h){margin-bottom:24px}
 .feed :global(.sec-h h2){font-size:24px;letter-spacing:-.02em}

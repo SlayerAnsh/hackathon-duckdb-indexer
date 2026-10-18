@@ -1,7 +1,7 @@
 /* Landing page. Spacing uses the 8 px scale (8, 16, 24, 32, 48, 64, 96) and the tokens in app/theme.css. */
 
 /* Hero: about 70% of the viewport, content centred vertically. */
-.hero{min-height:70vh;min-height:70svh;display:flex;flex-direction:column;justify-content:center;gap:48px;padding:64px 0 0}
+.hero{position:relative;isolation:isolate;min-height:70vh;min-height:70svh;display:flex;flex-direction:column;justify-content:center;gap:48px;padding:64px 0 0}
 .heroGrid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:64px;align-items:center}
 .intro{min-width:0}
 .eyebrow{margin:0 0 16px;font:600 12px/1.5 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
@@ -94,3 +94,25 @@
  .aboutBody{gap:32px}
  .how li{grid-template-columns:32px minmax(0,1fr)}
 }
+
+/* Animated hero backdrop: a full bleed grid that drifts slowly, with a soft accent light sweeping
+   across its lines. Both layers fade out toward the edges so the content stays calm and readable. */
+.hero::before,.hero::after{content:"";position:absolute;z-index:-1;top:-56px;bottom:-48px;left:calc(50% - 50vw);right:calc(50% - 50vw);pointer-events:none;
+ -webkit-mask-image:radial-gradient(ellipse 70% 75% at 50% 40%,#000 30%,transparent 78%);mask-image:radial-gradient(ellipse 70% 75% at 50% 40%,#000 30%,transparent 78%)}
+.hero::before{
+ background-image:linear-gradient(to right,var(--grid) 1px,transparent 1px),linear-gradient(to bottom,var(--grid) 1px,transparent 1px);
+ background-size:48px 48px;opacity:.75;animation:gridDrift 28s linear infinite}
+.hero::after{
+ background:radial-gradient(circle 280px at var(--sx,30%) var(--sy,35%),var(--accent) 0%,transparent 70%);
+ -webkit-mask-image:linear-gradient(to right,#000 1px,transparent 1px),linear-gradient(to bottom,#000 1px,transparent 1px);mask-image:linear-gradient(to right,#000 1px,transparent 1px),linear-gradient(to bottom,#000 1px,transparent 1px);
+ -webkit-mask-size:48px 48px;mask-size:48px 48px;opacity:.55;animation:gridDrift 28s linear infinite,sweep 16s ease-in-out infinite alternate}
+@property --sx{syntax:'<percentage>';inherits:false;initial-value:30%}
+@property --sy{syntax:'<percentage>';inherits:false;initial-value:35%}
+@keyframes gridDrift{from{background-position:0 0;-webkit-mask-position:0 0;mask-position:0 0}to{background-position:48px 48px;-webkit-mask-position:48px 48px;mask-position:48px 48px}}
+@keyframes sweep{0%{--sx:18%;--sy:30%}50%{--sx:62%;--sy:62%}100%{--sx:84%;--sy:28%}}
+@media (prefers-reduced-motion:reduce){.hero::before,.hero::after{animation:none}}
+
+/* Per figure run time and their average. */
+.figuresWrap{display:flex;flex-direction:column;gap:16px;min-width:0}
+.figureMs{margin:4px 0 0;font:500 12px/1.5 var(--font-mono);color:var(--text-3)}
+.avg{margin:0;font-size:13px;color:var(--text-2);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
