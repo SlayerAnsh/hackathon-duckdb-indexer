@@ -85,3 +85,42 @@ test('successful query replaces attributes and deletion drops pending during bac
   expect(queries).toBe(2)
   expect(statuses.at(-1)).toMatchObject({ pending: 0, budget: 'exhausted', block: 4 })
 })
+
+test('live log apply refreshes public rows and preserves attributes on transfer', async () => {
+  const { DuckDBInstance } = await import('../../../packages/core/node_modules/@duckdb/node-api')
+  const { RAW_TABLES_SQL, MERGE_VIEWS_SQL, MATERIALIZE_SQL, setHeadSql } = await import('@asi/core')
+  const instance = await DuckDBInstance.create(':memory:'); const conn = await instance.connect()
+  const apply = async (statements: string[]) => { for (const sql of statements) await conn.run(sql) }
+  try {
+    await apply([...RAW_TABLES_SQL, ...MERGE_VIEWS_SQL, ...setHeadSql(1)])
+    await conn.run(`INSERT INTO base_entities VALUES ('${key}','${owner}','${owner}',1,1,999,NULL,0,false)`)
+    await conn.run(`INSERT INTO base_attributes VALUES ('${key}','status','str','open',NULL)`)
+    await apply(MATERIALIZE_SQL)
+    globalThis.fetch = (async (_url: unknown, init: RequestInit) => {
+      const { method } = JSON.parse(String(init.body))
+      return Response.json({ result: method === 'eth_blockNumber' ? '0x2' : [{ ...log('OwnershipTransferred'), blockNumber: '0x2', logIndex: '0x0' }] })
+    }) as typeof fetch
+    const tail = new LiveTail({ rpcUrl: 'http://fake', expression: '$expiresAt > u64(0)', apply, known: async () => row, onStatus: () => {} })
+    await tail.tick(2)
+    expect((await conn.runAndReadAll('SELECT owner FROM entities')).getRowObjects()).toEqual([{ owner: next }])
+    expect((await conn.runAndReadAll('SELECT value FROM attributes')).getRowObjects()).toEqual([{ value: 'open' }])
+  } finally { conn.closeSync(); instance.closeSync() }
+})
+
+test('all previous attributes are captured before any raw writes in a multi-key batch', async () => {
+  const second = ('0x' + '44'.repeat(32)) as `0x${string}`
+  let statements: string[] = []
+  globalThis.fetch = (async (_url: unknown, init: RequestInit) => {
+    const { method } = JSON.parse(String(init.body))
+    return Response.json({ result: method === 'eth_blockNumber' ? '0x2' : [key, second].map(k => ({
+      ...log('OwnershipTransferred'), topics: encodeEventTopics({ abi: ENTITY_EVENTS_ABI, eventName: 'OwnershipTransferred', args: { entityKey: k, previousOwner: owner, newOwner: next } }),
+      blockNumber: '0x2', logIndex: '0x0',
+    })) })
+  }) as typeof fetch
+  await new LiveTail({ rpcUrl: 'http://fake', expression: '$expiresAt > u64(0)',
+    apply: async sql => { statements = sql }, known: async k => ({ ...row, key: k }), onStatus: () => {},
+  }).tick(2)
+  const firstWrite = statements.findIndex(sql => /^(DELETE|INSERT) /.test(sql))
+  expect(firstWrite).toBeGreaterThan(0)
+  expect(statements.slice(firstWrite).some(sql => sql.includes('AS SELECT * FROM attributes'))).toBe(false)
+})

@@ -1,4 +1,4 @@
-import { ENTITY_INSERT_COLUMNS, LIVE_TABLES, RAW_TABLES_SQL, MERGE_VIEWS_SQL, setHeadSql, loadSnapshotSql, type Delta, type Manifest } from '@asi/core'
+import { ENTITY_INSERT_COLUMNS, LIVE_TABLES, RAW_TABLES_SQL, MERGE_VIEWS_SQL, MATERIALIZE_SQL, setHeadSql, loadSnapshotSql, type Delta, type Manifest } from '@asi/core'
 import type { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm'
 import { LiveTail, type LiveStatus } from './live-tail'
 import { createBrowserRpc } from './rpc-browser'
@@ -14,7 +14,7 @@ export function applyDeltaSql(delta: Delta): string[] {
   insert('delta_entities', delta.entities.map(e => [e.key, e.owner, e.creator, e.created_at, e.updated_at, e.expires_at, e.content_type, e.creation_flags]), ' (' + ENTITY_INSERT_COLUMNS + ')')
   insert('delta_attributes', delta.attributes.map(a => [a.key, a.name, a.type, a.value, a.num]))
   insert('delta_tombstones', delta.tombstones.map(t => [t.key, t.block]))
-  return sql
+  return [...sql, ...MATERIALIZE_SQL]
 }
 
 export function chainCheck(m: Manifest, chainId: number, genesisHash: string): { ok: boolean; reason?: string } {
@@ -103,7 +103,7 @@ export class IndexDb {
       const check = chainCheck(manifest, chain, genesis)
       if (this.state.manifest?.version !== manifest.version) {
         this.tail?.stop(); this.tail = undefined
-        await this.transaction([...loadSnapshotSql(this.origin + '/data/' + manifest.files.entities, this.origin + '/data/' + manifest.files.attributes), ...clears, ...LIVE_TABLES.map(table => `DELETE FROM ${table}`)])
+        await this.transaction([...loadSnapshotSql(this.origin + '/data/' + manifest.files.entities, this.origin + '/data/' + manifest.files.attributes), ...clears, ...LIVE_TABLES.map(table => `DELETE FROM ${table}`), ...MATERIALIZE_SQL])
         this.etag = null
         this.state = { ...this.state, deltaTo: undefined }
       }

@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test'
 import { DuckDBInstance } from '../../../packages/core/node_modules/@duckdb/node-api'
-import { RAW_TABLES_SQL, MERGE_VIEWS_SQL, setHeadSql } from '@asi/core'
+import { RAW_TABLES_SQL, MERGE_VIEWS_SQL, MATERIALIZE_SQL, setHeadSql } from '@asi/core'
 import { ACTIVITY_SQL } from '../components/dash/ActivityFeed'
 import { VIEWS, DEFAULT_SQL } from '../lib/views'
 import { OLDEST_SQL } from '../lib/heights'
@@ -10,31 +10,42 @@ test('every widget executes on populated and empty public views with declared co
   for (const sql of [...RAW_TABLES_SQL,...MERGE_VIEWS_SQL,...setHeadSql(50000)]) await db.run(sql)
   for (let i=0;i<12;i++) {
    await db.run(`INSERT INTO base_entities VALUES ('key${i}','owner${i%2}','creator${i%3}',${49000+i*50},${49100+i*50},${50100+i*3000},NULL,0,false)`)
+  for (const sql of MATERIALIZE_SQL) await db.run(sql)
    await db.run(`INSERT INTO base_attributes VALUES ('key${i}','type','str','type${i%3}',NULL),('key${i}','status','str','open',NULL),('key${i}','priority','u64','${i%3}',${i%3})`)
+  for (const sql of MATERIALIZE_SQL) await db.run(sql)
   }
   await db.run(DEFAULT_SQL)
   await db.run(ACTIVITY_SQL)
   const byType = VIEWS[0].widgets.find(w=>w.id==='types')!
   await db.run("INSERT INTO base_entities VALUES ('project-only','o','c',49000,49000,90000,NULL,0,false),('no-label','o','c',49000,49000,90000,NULL,0,false)")
+  for (const sql of MATERIALIZE_SQL) await db.run(sql)
   await db.run("INSERT INTO base_attributes VALUES ('project-only','project','str','loadtest',NULL)")
+  for (const sql of MATERIALIZE_SQL) await db.run(sql)
   const types = (await db.runAndReadAll(byType.sql)).getRowObjects()
   expect(types.find(r=>r.type==='unlabelled')?.count).toBe(BigInt(1))
   expect(types.find(r=>r.type==='loadtest')?.count).toBe(BigInt(1))
   await db.run("INSERT INTO base_entities VALUES ('waiting','o','c',49000,49000,90000,NULL,0,true)")
+  for (const sql of MATERIALIZE_SQL) await db.run(sql)
   const withPending = (await db.runAndReadAll(byType.sql)).getRowObjects()
   expect(withPending.find(r=>r.type==='pending')?.count).toBe(BigInt(1))
   expect(withPending.find(r=>r.type==='unlabelled')?.count).toBe(BigInt(1))
   await db.run("DELETE FROM base_entities WHERE key='waiting'")
+  for (const sql of MATERIALIZE_SQL) await db.run(sql)
   expect((await db.runAndReadAll(DEFAULT_SQL)).getRowObjects()).toHaveLength(0)
   await db.run("INSERT INTO base_entities VALUES ('ticket','o','c',49000,49000,90000,NULL,0,false),('comment','o','c',49000,49000,90000,NULL,0,false)")
+  for (const sql of MATERIALIZE_SQL) await db.run(sql)
   await db.run("INSERT INTO base_attributes VALUES ('ticket','type','str','ticket',NULL),('ticket','status','str','open',NULL),('ticket','priority','u64','1',1),('comment','type','str','comment',NULL),('comment','ticket','key','ticket',NULL)")
+  for (const sql of MATERIALIZE_SQL) await db.run(sql)
   const tickets=(await db.runAndReadAll(DEFAULT_SQL)).getRowObjects()
   expect(tickets).toHaveLength(1); expect(tickets[0].comments).toBe(BigInt(1))
   await db.run("INSERT INTO live_entities VALUES ('key0','new-owner','creator0',49000,50001,100000,NULL,0,false)")
+  for (const sql of MATERIALIZE_SQL) await db.run(sql)
   await db.run("INSERT INTO live_tombstones VALUES ('key1',50002)")
+  for (const sql of MATERIALIZE_SQL) await db.run(sql)
   const changes=(await db.runAndReadAll(ACTIVITY_SQL)).getRowObjects()
   expect(changes.map(r=>r.kind)).toEqual(['Deleted','Transferred'])
   for (let i=0;i<15;i++) await db.run(`INSERT INTO live_tombstones VALUES ('deleted${i}',${50003+i})`)
+  for (const sql of MATERIALIZE_SQL) await db.run(sql)
   const limited=(await db.runAndReadAll(ACTIVITY_SQL)).getRowObjects()
   expect(limited).toHaveLength(12)
   expect(limited[0].key).toBe('deleted14')
@@ -46,8 +57,11 @@ test('every widget executes on populated and empty public views with declared co
   for (const empty of [false,true]) {
    if(empty) {
     await db.run('DELETE FROM base_entities')
+  for (const sql of MATERIALIZE_SQL) await db.run(sql)
     await db.run('DELETE FROM live_entities')
+  for (const sql of MATERIALIZE_SQL) await db.run(sql)
     await db.run('DELETE FROM live_tombstones')
+  for (const sql of MATERIALIZE_SQL) await db.run(sql)
    }
    for (const widget of VIEWS.flatMap(v=>v.widgets)) {
     const result = await db.runAndReadAll(widget.sql)
@@ -64,13 +78,17 @@ test('oldest complete block is genesis without pending rows and newest pending u
   for (const sql of [...RAW_TABLES_SQL,...MERGE_VIEWS_SQL,...setHeadSql(50000)]) await db.run(sql)
   expect(await oldest()).toBe(0)
   await db.run("INSERT INTO base_entities VALUES ('done','o','c',100,49000,90000,NULL,0,false)")
+  for (const sql of MATERIALIZE_SQL) await db.run(sql)
   expect(await oldest()).toBe(0)
   await db.run("INSERT INTO base_entities VALUES ('p1','o','c',100,300,90000,NULL,0,true),('p2','o','c',100,700,90000,NULL,0,true),('gone','o','c',100,900,40000,NULL,0,true)")
+  for (const sql of MATERIALIZE_SQL) await db.run(sql)
   expect(await oldest()).toBe(701)
   // A fetched delta row for p2 outranks its pending snapshot row.
   await db.run("INSERT INTO delta_entities VALUES ('p2','o','c',100,700,90000,NULL,0,false)")
+  for (const sql of MATERIALIZE_SQL) await db.run(sql)
   expect(await oldest()).toBe(301)
   await db.run("INSERT INTO delta_entities VALUES ('p1','o','c',100,300,90000,NULL,0,false)")
+  for (const sql of MATERIALIZE_SQL) await db.run(sql)
   expect(await oldest()).toBe(0)
  } finally { db.closeSync(); instance.closeSync() }
 })

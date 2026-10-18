@@ -255,25 +255,22 @@ The indexer is not exposed publicly. The browser reaches it only through the Nex
 The backend may serve an existing store with `SYNC_PAUSED=true`, making no RPC calls and requiring no API key. Missing stores fail startup clearly. The optional API key is used only by the keyed backend modes (7.1), is unused by default, and never reaches the browser.
 6. Poll `eth_blockNumber` every 2 s and store it as `live_head`.
 
-Public views (the only names shown in autocomplete docs):
+The merge runs once per data change into plain tables `merged_entities` and `merged_attributes`. Internal views retain the complete source ranking and pending attribute fallback. A fetched row wins over a pending row; otherwise the newest updated block wins, with live winning ties. Attribute sets come from the winning source, with previous base or delta attributes retained for live pending keys.
+
+Snapshot loads, delta replacements, live tail applies and live table clears refresh both merged tables in the same transaction and serial section as their raw writes. Console and dashboard queries use that serial queue too, so they cannot observe a partially refreshed merge. Head updates alone do not refresh the merged tables.
+
+Public views (the only names shown in autocomplete docs) apply expiry at query time:
 
 ```sql
 CREATE VIEW entities AS
-SELECT * EXCLUDE (rn, deleted, src) FROM (
-  SELECT *, row_number() OVER (PARTITION BY key ORDER BY updated_at DESC, src DESC) rn
-  FROM (
-    SELECT *, false deleted, 0 src FROM base_entities
-    UNION ALL BY NAME SELECT *, false, 1 FROM delta_entities
-    UNION ALL BY NAME SELECT key, block updated_at, true, 1 FROM delta_tombstones
-    UNION ALL BY NAME SELECT *, false, 2 FROM live_entities
-    UNION ALL BY NAME SELECT key, block updated_at, true, 2 FROM live_tombstones))
-WHERE rn = 1 AND NOT deleted AND expires_at > getvariable('live_head');
+SELECT * FROM merged_entities
+WHERE expires_at > (SELECT block FROM live_head);
 
 CREATE VIEW attributes AS
-SELECT a.* FROM newest_attributes a JOIN entities USING (key);
+SELECT a.* FROM merged_attributes a JOIN entities e ON e.key = a.key;
 ```
 
-`newest_attributes` takes all attributes of a key from the source (base, delta, live) that won in `entities`, so a patch that removes an attribute removes it here too. The exact SQL is left to the implementation plan, and it needs unit tests for: patch, delete, delete then recreate, extend, leave filter, expire.
+The public columns, including `entities.attrs_pending`, stay unchanged. Even a head change with no data change immediately hides expired entities and their attributes. A patch that removes an attribute removes it from the materialized attribute set too.
 
 A demo wide view (for example `tickets`) is a `PIVOT` over `attributes` for one `type`, defined in the browser, so no extra Parquet file is needed.
 

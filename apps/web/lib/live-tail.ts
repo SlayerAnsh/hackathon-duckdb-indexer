@@ -1,4 +1,4 @@
-import { ENTITY_EVENTS_ABI, ENTITY_INSERT_COLUMNS, decodeEventLog, createRpc, decodeEntity, keyChunkQueries, ownerTerms, ROW_SELECT, RpcError, type EntityRow, type RawLog } from '@asi/core'
+import { MATERIALIZE_SQL, ENTITY_EVENTS_ABI, ENTITY_INSERT_COLUMNS, decodeEventLog, createRpc, decodeEntity, keyChunkQueries, ownerTerms, ROW_SELECT, RpcError, type EntityRow, type RawLog } from '@asi/core'
 
 export type LiveChange = { kind: 'upsert'; entity: Partial<EntityRow> & { key: string; updated_at: number }; needsAttributes: boolean } | { kind: 'tombstone'; key: string; block: number }
 export type LiveStatus = { block: number; pending: number; budget: 'ok' | 'exhausted'; retryAt?: number }
@@ -69,15 +69,16 @@ export class LiveTail {
       }
       const changes = changesFromLogs(logs.filter(log => relevant.has(decode(log).args.entityKey.toLowerCase())), key => known.get(key))
       const sql: string[] = []
+      // Capture every carried attribute set from the last committed merge before any raw writes.
+      const carry = changes.flatMap(change => change.kind === 'upsert' && !change.needsAttributes && !this.pending.has(change.entity.key) ? [change.entity.key] : [])
+      if (carry.length) sql.push(`CREATE OR REPLACE TEMP TABLE live_previous_attributes AS SELECT * FROM attributes WHERE key IN (${carry.map(literal).join(', ')})`)
       const pending = new Set(this.pending)
       for (const change of changes) {
         const key = change.kind === 'upsert' ? change.entity.key : change.key
         if (change.kind === 'upsert' && !change.needsAttributes && !this.pending.has(key)) {
           sql.push(
-            `CREATE OR REPLACE TEMP TABLE live_previous_attributes AS SELECT * FROM attributes WHERE key = ${literal(key)}`,
             `DELETE FROM live_attributes WHERE key = ${literal(key)}`,
-            'INSERT INTO live_attributes SELECT * FROM live_previous_attributes',
-            'DROP TABLE live_previous_attributes',
+            `INSERT INTO live_attributes SELECT * FROM live_previous_attributes WHERE key = ${literal(key)}`,
           )
         }
         for (const table of ['live_entities', 'live_tombstones']) sql.push(`DELETE FROM ${table} WHERE key = ${literal(key)}`)
@@ -92,8 +93,9 @@ export class LiveTail {
           }
         }
       }
+      if (carry.length) sql.push('DROP TABLE live_previous_attributes')
       if (!active()) return
-      await this.opts.apply(sql)
+      if (sql.length) await this.opts.apply([...sql, ...MATERIALIZE_SQL])
       this.pending = pending; this.block = end
     }
     if (!active()) return
@@ -115,7 +117,7 @@ export class LiveTail {
             for (const a of row.attributes) sql.push(`INSERT INTO live_attributes VALUES (${[a.key, a.name, a.type, a.value, a.num].map(literal).join(', ')})`)
           }
         }
-        await this.opts.apply(sql)
+        if (sql.length) await this.opts.apply([...sql, ...MATERIALIZE_SQL])
         keys.forEach(key => this.pending.delete(key)); this.retryAt = 0
       } catch (error) {
         if (!(error instanceof RpcError && error.status === 429)) throw error

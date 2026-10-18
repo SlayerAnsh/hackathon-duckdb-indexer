@@ -3,7 +3,7 @@ import { DuckDBInstance, type DuckDBConnection } from '@duckdb/node-api'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { RAW_TABLES_SQL, MERGE_VIEWS_SQL, DELTA_TABLES, setHeadSql, loadSnapshotSql } from '../src/views'
+import { RAW_TABLES_SQL, MERGE_VIEWS_SQL, MATERIALIZE_SQL, DELTA_TABLES, setHeadSql, loadSnapshotSql } from '../src/views'
 
 let db: DuckDBInstance
 let conn: DuckDBConnection
@@ -16,9 +16,11 @@ async function rows(sql: string) {
 }
 async function entity(source: 'base' | 'delta' | 'live', key = 'a', expiry = 200, updated = 10, pending = false) {
   await conn.run(`INSERT INTO ${source}_entities VALUES (${quote(key)}, 'owner', 'creator', 1, ${updated}, ${expiry}, NULL, 0, ${pending})`)
+  await run(MATERIALIZE_SQL)
 }
 async function attr(source: 'base' | 'delta' | 'live', name = 'status', value = 'open', key = 'a') {
   await conn.run(`INSERT INTO ${source}_attributes VALUES (${quote(key)}, ${quote(name)}, 'str', ${quote(value)}, NULL)`)
+  await run(MATERIALIZE_SQL)
 }
 async function expectHidden() {
   expect(await rows('SELECT * FROM entities')).toEqual([])
@@ -70,6 +72,7 @@ test('patch can remove every attribute', async () => {
 test('tombstone hides entity and attributes after deletion or leaving filter', async () => {
   await entity('base'); await attr('base')
   await conn.run("INSERT INTO delta_tombstones VALUES ('a', 30)")
+  await run(MATERIALIZE_SQL)
   await expectHidden()
 })
 test('recreated key represented by delta entity replaces base', async () => {
@@ -113,6 +116,7 @@ test('loadSnapshotSql round trip replaces tables and escapes quotes', async () =
     await conn.run(`COPY base_attributes TO ${quote(attributes)} (FORMAT parquet)`)
     await entity('base', 'old'); await attr('base', 'status', 'old', 'old')
     await run(loadSnapshotSql(entities, attributes))
+    await run(MATERIALIZE_SQL)
     expect(await rows('SELECT key FROM entities')).toEqual([{ key: 'a' }])
     expect(await rows('SELECT value FROM attributes')).toEqual([{ value: 'open' }])
   } finally { await rm(dir, { recursive: true, force: true }) }
@@ -123,19 +127,23 @@ test('live wins ties, newer delta wins rollover, pending preserves previous attr
   await entity('delta', 'a', 200, 20); await attr('delta', 'status', 'delta')
   await entity('live', 'a', 200, 20)
   await conn.run("INSERT INTO live_pending VALUES ('a')")
+  await run(MATERIALIZE_SQL)
   expect(await rows('SELECT src FROM winner')).toEqual([{ src: 2 }])
   expect(await rows('SELECT value FROM attributes')).toEqual([{ value: 'delta' }])
   await conn.run('UPDATE delta_entities SET updated_at = 30')
+  await run(MATERIALIZE_SQL)
   expect(await rows('SELECT src FROM winner')).toEqual([{ src: 1 }])
 })
 test('live tombstone hides base and delta', async () => {
   await entity('base'); await entity('delta')
   await conn.run("INSERT INTO live_tombstones VALUES ('a', 30)")
+  await run(MATERIALIZE_SQL)
   await expectHidden()
 })
 test('pending live keeps base attributes', async () => {
   await entity('base'); await attr('base'); await entity('live', 'a', 200, 20)
   await conn.run("INSERT INTO live_pending VALUES ('a')")
+  await run(MATERIALIZE_SQL)
   expect(await rows('SELECT value FROM attributes')).toEqual([{ value: 'open' }])
 })
 test('log-only transfer preserves attributes from a newer delta after rollover', async () => {
@@ -179,8 +187,33 @@ test('older snapshots without attrs_pending load as not pending', async () => {
     await conn.run(`COPY (SELECT * EXCLUDE (attrs_pending) FROM base_entities) TO ${quote(entities)} (FORMAT parquet)`)
     await conn.run(`COPY base_attributes TO ${quote(attributes)} (FORMAT parquet)`)
     await run(loadSnapshotSql(entities, attributes))
+    await run(MATERIALIZE_SQL)
     expect(await rows('SELECT key, attrs_pending FROM entities')).toEqual([{ key: 'a', attrs_pending: false }])
     await entity('base', 'b', 200, 10, true)
     expect(await rows("SELECT attrs_pending FROM entities WHERE key = 'b'")).toEqual([{ attrs_pending: true }])
   } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test('materialized output equals the original merge across mixed sources and heads', async () => {
+  const { OLD_MERGE_VIEWS_SQL } = await import('./old-views')
+  for (let i = 0; i < 90; i++) {
+    const key = 'mixed' + i
+    await entity('base', key, i % 9 === 0 ? 100 : 300, 10, i % 7 === 0)
+    await attr('base', 'status', 'base', key)
+    if (i % 2 === 0) { await entity('delta', key, 300, 20); await attr('delta', 'status', 'delta', key) }
+    if (i % 3 === 0) { await entity('live', key, 300, 30); await attr('live', 'status', 'live', key) }
+    if (i % 3 === 0) await conn.run(`INSERT INTO live_pending VALUES ('${key}')`)
+    if (i % 11 === 0) await conn.run(`INSERT INTO delta_tombstones VALUES ('${key}', 40)`)
+    if (i % 13 === 0) await conn.run(`INSERT INTO live_tombstones VALUES ('${key}', 40)`)
+  }
+  for (const head of [99, 100, 299, 300]) {
+    await run(setHeadSql(head))
+    await run(OLD_MERGE_VIEWS_SQL)
+    const expectedEntities = await rows('SELECT * FROM entities ORDER BY key')
+    const expectedAttributes = await rows('SELECT * FROM attributes ORDER BY key, name')
+    await run(MERGE_VIEWS_SQL)
+    await run(MATERIALIZE_SQL)
+    expect(await rows('SELECT * FROM entities ORDER BY key')).toEqual(expectedEntities)
+    expect(await rows('SELECT * FROM attributes ORDER BY key, name')).toEqual(expectedAttributes)
+  }
 })
