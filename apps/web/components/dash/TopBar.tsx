@@ -9,6 +9,7 @@ export const NAV_ITEMS = [
  { href: '/', label: 'Overview' },
  { href: '/showcase', label: 'Showcase' },
  { href: '/playground', label: 'Playground' },
+ { href: '/about', label: 'About' },
 ] as const
 
 export function isActiveRoute(pathname: string | null, href: string): boolean {
@@ -24,13 +25,14 @@ export function PageNav({ pathname }: { pathname: string | null }) {
  })}</nav>
 }
 
-export function TopBar({ state }: { state: IndexState }) {
+// Without index state (static pages such as /about) the bar omits the index status chip and status bar.
+export function TopBar({ state }: { state?: IndexState }) {
  const pathname = usePathname()
  return <><header className="top"><div className="wrap top-in">
   <Link className="brand" href="/"><span className="brand-mark">A</span><span>Arkiv <b>SQL</b></span></Link>
   <PageNav pathname={pathname}/>
   <span className="top-sp"/>
-  <TopStateChip state={state}/>
+  {state && <TopStateChip state={state}/>}
   <ThemeToggle/>
- </div></header><StatusBar state={state}/></>
+ </div></header>{state && <StatusBar state={state}/>}</>
 }

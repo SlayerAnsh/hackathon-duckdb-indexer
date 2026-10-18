@@ -38,7 +38,7 @@ test('average query time ignores figures that have not been measured yet', () =>
 })
 
 test('nav marks exactly the active route', () => {
- expect(NAV_ITEMS.map(i => i.href)).toEqual(['/', '/showcase', '/playground'])
+ expect(NAV_ITEMS.map(i => i.href)).toEqual(['/', '/showcase', '/playground', '/about'])
  expect(isActiveRoute('/', '/')).toBe(true)
  expect(isActiveRoute('/showcase', '/')).toBe(false)
  expect(isActiveRoute('/showcase', '/showcase')).toBe(true)
