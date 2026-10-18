@@ -1,5 +1,6 @@
-import { RAW_TABLES_SQL, MERGE_VIEWS_SQL, setHeadSql, loadSnapshotSql, type Delta, type Manifest } from '@asi/core'
+import { LIVE_TABLES, RAW_TABLES_SQL, MERGE_VIEWS_SQL, setHeadSql, loadSnapshotSql, type Delta, type Manifest } from '@asi/core'
 import type { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm'
+import { LiveTail, type LiveStatus } from './live-tail'
 import { createBrowserRpc } from './rpc-browser'
 
 const clears = ['DELETE FROM delta_entities', 'DELETE FROM delta_attributes', 'DELETE FROM delta_tombstones']
@@ -24,7 +25,7 @@ export function chainCheck(m: Manifest, chainId: number, genesisHash: string): {
 
 export type IndexState = {
   status: 'loading' | 'ready' | 'error'; error?: string; manifest?: Manifest
-  deltaTo?: number; liveHead?: number; chainOk?: boolean
+  liveTail?: LiveStatus; deltaTo?: number; liveHead?: number; chainOk?: boolean
 }
 
 export class IndexDb {
@@ -33,11 +34,12 @@ export class IndexDb {
   private timer?: ReturnType<typeof setTimeout>
   private generation = 0
   private queue: Promise<unknown> = Promise.resolve()
+  private tail?: LiveTail
   private etag: string | null = null
   private manifestAt = 0
   private rpc: ReturnType<typeof createBrowserRpc>
 
-  private constructor(private origin: string, rpcUrl: string, private connection: AsyncDuckDBConnection, private queries: AsyncDuckDBConnection) {
+  private constructor(private origin: string, private rpcUrl: string, private connection: AsyncDuckDBConnection, private queries: AsyncDuckDBConnection) {
     this.rpc = createBrowserRpc(rpcUrl)
   }
 
@@ -95,7 +97,8 @@ export class IndexDb {
       const [chain, genesis] = await Promise.all([this.rpc.chainId(), this.rpc.genesisHash()])
       const check = chainCheck(manifest, chain, genesis)
       if (this.state.manifest?.version !== manifest.version) {
-        await this.transaction([...loadSnapshotSql(this.origin + '/data/' + manifest.files.entities, this.origin + '/data/' + manifest.files.attributes), ...clears])
+        this.tail?.stop(); this.tail = undefined
+        await this.transaction([...loadSnapshotSql(this.origin + '/data/' + manifest.files.entities, this.origin + '/data/' + manifest.files.attributes), ...clears, ...LIVE_TABLES.map(table => `DELETE FROM ${table}`)])
         this.etag = null
         this.state = { ...this.state, deltaTo: undefined }
       }
@@ -114,6 +117,21 @@ export class IndexDb {
       await this.transaction(applyDeltaSql(delta))
       this.etag = response.headers.get('etag')
       this.state = { ...this.state, deltaTo: delta.toBlock }
+    }
+    if (!this.tail && this.state.chainOk && this.state.deltaTo !== undefined) {
+      const tail = new LiveTail({
+        rpcUrl: this.rpcUrl, expression: this.state.manifest!.expression,
+        apply: sql => this.serial(async () => { if (this.tail === tail) await this.transaction(sql) }),
+        known: key => this.serial(async () => {
+          const result = await this.connection.query("SELECT * FROM entities WHERE key = " + literal(key))
+          const row = result.toArray()[0]?.toJSON()
+          if (!row) return undefined
+          return { ...row, created_at: Number(row.created_at), updated_at: Number(row.updated_at), expires_at: Number(row.expires_at), creation_flags: Number(row.creation_flags) } as import('@asi/core').EntityRow
+        }),
+        onStatus: liveTail => { if (this.tail === tail) { this.state = { ...this.state, liveTail }; this.listener?.({ ...this.state }) } },
+      })
+      this.tail = tail
+      tail.start(this.state.deltaTo + 1)
     }
     const liveHead = await this.rpc.blockNumber()
     await this.transaction(setHeadSql(liveHead))
@@ -139,6 +157,7 @@ export class IndexDb {
   }
 
   stop(): void {
+    this.tail?.stop(); this.tail = undefined
     this.generation++
     clearTimeout(this.timer)
     this.listener = undefined

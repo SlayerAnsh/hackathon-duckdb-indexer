@@ -70,7 +70,9 @@ flowchart TD
   Writer[Optional Bun demo writer] -->|SDK writes| RPC
 ```
 
-This follows SPECS §6 with batched live sync and no browser live tail. The browser polls the delta and chain head. See [schema and queries](arkiv/schema.md), [provider friction](arkiv/friction.md), and [developer guide](DEVELOPER.md).
+Freshness comes from a browser live tail on the public RPC endpoint without an API key. Logs update local rows, while creations and patches fetch attributes in batches of 50 at most once every 20 seconds. On anonymous budget exhaustion, attribute fetches wait until Retry-After while log updates continue. The status bar shows the live block, pending keys and budget state.
+
+Set `SYNC_PAUSED=true` to serve an existing snapshot and delta without any backend RPC calls. An existing indexed store is required; an empty data directory causes startup to fail clearly. The API key is required only for active backend sync and never reaches the browser. See [schema and queries](arkiv/schema.md), [provider friction](arkiv/friction.md), and [developer guide](DEVELOPER.md).
 
 ## Expiry
 

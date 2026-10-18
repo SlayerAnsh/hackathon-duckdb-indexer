@@ -14,10 +14,10 @@ async function run(statements: readonly string[]) {
 async function rows(sql: string) {
   return (await conn.runAndReadAll(sql)).getRowObjects()
 }
-async function entity(source: 'base' | 'delta', key = 'a', expiry = 200, updated = 10) {
+async function entity(source: 'base' | 'delta' | 'live', key = 'a', expiry = 200, updated = 10) {
   await conn.run(`INSERT INTO ${source}_entities VALUES (${quote(key)}, 'owner', 'creator', 1, ${updated}, ${expiry}, NULL, 0)`)
 }
-async function attr(source: 'base' | 'delta', name = 'status', value = 'open', key = 'a') {
+async function attr(source: 'base' | 'delta' | 'live', name = 'status', value = 'open', key = 'a') {
   await conn.run(`INSERT INTO ${source}_attributes VALUES (${quote(key)}, ${quote(name)}, 'str', ${quote(value)}, NULL)`)
 }
 async function expectHidden() {
@@ -116,4 +116,48 @@ test('loadSnapshotSql round trip replaces tables and escapes quotes', async () =
     expect(await rows('SELECT key FROM entities')).toEqual([{ key: 'a' }])
     expect(await rows('SELECT value FROM attributes')).toEqual([{ value: 'open' }])
   } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test('live wins ties, newer delta wins rollover, pending preserves previous attributes', async () => {
+  await entity('base'); await attr('base')
+  await entity('delta', 'a', 200, 20); await attr('delta', 'status', 'delta')
+  await entity('live', 'a', 200, 20)
+  await conn.run("INSERT INTO live_pending VALUES ('a')")
+  expect(await rows('SELECT src FROM winner')).toEqual([{ src: 2 }])
+  expect(await rows('SELECT value FROM attributes')).toEqual([{ value: 'delta' }])
+  await conn.run('UPDATE delta_entities SET updated_at = 30')
+  expect(await rows('SELECT src FROM winner')).toEqual([{ src: 1 }])
+})
+test('live tombstone hides base and delta', async () => {
+  await entity('base'); await entity('delta')
+  await conn.run("INSERT INTO live_tombstones VALUES ('a', 30)")
+  await expectHidden()
+})
+test('pending live keeps base attributes', async () => {
+  await entity('base'); await attr('base'); await entity('live', 'a', 200, 20)
+  await conn.run("INSERT INTO live_pending VALUES ('a')")
+  expect(await rows('SELECT value FROM attributes')).toEqual([{ value: 'open' }])
+})
+test('log-only transfer preserves attributes from a newer delta after rollover', async () => {
+  const { LiveTail } = await import('../../../apps/web/lib/live-tail')
+  const { encodeEventTopics } = await import('viem')
+  const { ENTITY_EVENTS_ABI } = await import('../src/events')
+  const key = ('0x' + '11'.repeat(32)) as `0x${string}`
+  const owner = ('0x' + '22'.repeat(20)) as `0x${string}`
+  await entity('live', key, 200, 10); await attr('live', 'status', 'old', key)
+  await entity('delta', key, 200, 20); await attr('delta', 'status', 'current', key)
+  const original = globalThis.fetch
+  globalThis.fetch = (async (_url: unknown, init: RequestInit) => {
+    const { method } = JSON.parse(String(init.body))
+    return Response.json({ result: method === 'eth_blockNumber' ? '0x1e' : [{
+      topics: encodeEventTopics({ abi: ENTITY_EVENTS_ABI, eventName: 'OwnershipTransferred', args: { entityKey: key, previousOwner: owner, newOwner: owner } }),
+      data: '0x', blockNumber: '0x1e', logIndex: '0x0', transactionHash: '0x01',
+    }] })
+  }) as typeof fetch
+  try {
+    const tail = new LiveTail({ rpcUrl: 'http://fake', expression: '$expiresAt > u64(0)', apply: run,
+      known: async () => ({ ...(await rows('SELECT * FROM entities'))[0], key, updated_at: 20 } as any), onStatus: () => {} })
+    await tail.tick(30)
+    expect(await rows('SELECT value FROM attributes')).toEqual([{ value: 'current' }])
+  } finally { globalThis.fetch = original }
 })

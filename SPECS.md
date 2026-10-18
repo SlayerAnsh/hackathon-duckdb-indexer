@@ -97,7 +97,8 @@ arkiv/friction.md   gate 5
 |---|---|---|
 | `ARKIV_RPC_URL` | HTTP RPC | Tiramisu public RPC |
 | `INDEX_EXPRESSION` | Arkiv query expression | required |
-| `TIRAMISU_API_KEY` | sent as `Authorization: Bearer` | required |
+| `TIRAMISU_API_KEY` | sent as `Authorization: Bearer`, server only | required for active sync |
+| `SYNC_PAUSED` | serve existing store without RPC calls | `false` |
 | `CONFIRMATIONS` | blocks behind head | 3 |
 | `SYNC_BATCH_BLOCKS` | blocks per live sync batch | 5 |
 | `SNAPSHOT_INTERVAL_BLOCKS` | blocks between snapshots | 30 (one minute) |
@@ -215,7 +216,9 @@ The indexer is not exposed publicly. The browser reaches it only through the Nex
 2. Fetch the manifest. Check `chainId` and genesis hash against the RPC, and show a banner on mismatch.
 3. Import the snapshot into tables `base_entities` and `base_attributes` (data is small, so full import, no lazy views).
 4. Poll `delta.json` with `If-None-Match`. On change, replace `delta_entities`, `delta_attributes`, `delta_tombstones`.
-5. P1: `watchEntityEvents({ fromBlock: delta.toBlock + 1 })` in the browser. Per block, re-query touched keys with the expression at that block, exactly as in 7.5, into `live_*` tables. Applied rows older than the loaded version are skipped by the merge.
+5. Freshness comes from the browser live tail on the public RPC without an API key, starting at `delta.toBlock + 1`. Poll logs every four seconds in windows of 1,000 blocks. Apply deletes, expiry extensions and transfers from logs. Creations and patches enter `live_pending`; fetch attributes with expression scoped batches of at most 50 keys, at most once every 20 seconds. Use the indexed key and creation owner relevance prefilter from 7.5. HTTP 429 pauses attribute fetching until Retry-After while log updates continue. Failed requests never delete rows. Live rows compete with delta and base by updated block, with live winning ties. Pending rows keep previous attributes. Clear live tables on snapshot version change.
+
+The backend may serve an existing store with `SYNC_PAUSED=true`, making no RPC calls and requiring no API key. Missing stores fail startup clearly. The private API key is used only for active backend sync and never reaches the browser.
 6. Poll `eth_blockNumber` every 2 s and store it as `live_head`.
 
 Public views (the only names shown in autocomplete docs):

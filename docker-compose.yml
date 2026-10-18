@@ -7,7 +7,8 @@ services:
     # Bind mount so the index is visible in the repo. On Dokploy set INDEX_DATA_PATH=../files/data so redeploys keep it.
     volumes: ["${INDEX_DATA_PATH:-./data}:/data"]
     environment:
-      TIRAMISU_API_KEY: ${TIRAMISU_API_KEY:?set TIRAMISU_API_KEY in .env}
+      SYNC_PAUSED: ${SYNC_PAUSED:-false}
+      TIRAMISU_API_KEY: ${TIRAMISU_API_KEY:-}
       INDEX_EXPRESSION: ${INDEX_EXPRESSION:?set INDEX_EXPRESSION in .env}
       ARKIV_RPC_URL: ${ARKIV_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
       DATA_DIR: /data

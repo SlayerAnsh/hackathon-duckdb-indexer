@@ -38,6 +38,26 @@ export async function bootstrap(config: Config, rpc: ArkivRpc, log: (msg: string
     return { store, dir, head }
   } catch (error) { store.close(); throw error }
 }
+export async function servePaused(config: Config, log: (msg: string) => void = console.log): Promise<{ dir: string }> {
+  const candidates: string[] = []
+  let entries: string[] = []
+  try { entries = await readdir(config.dataDir) }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
+  for (const entry of entries.filter(name => /^\d+-0x[0-9a-f]+$/i.test(name))) {
+    const base = join(config.dataDir, entry)
+    let dir = base
+    try {
+      const generation = JSON.parse(await readFile(join(base, 'active-generation.json'), 'utf8'))
+      if (!Number.isSafeInteger(generation) || generation < 1) throw Error('Invalid active generation')
+      dir += '-g' + generation
+    } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
+    if (await readManifest(dir)) candidates.push(dir)
+  }
+  if (!candidates.length) throw Error('No indexed store found in ' + config.dataDir)
+  if (candidates.length !== 1) throw Error('Multiple indexed stores found in ' + config.dataDir)
+  log('Sync paused; serving ' + candidates[0])
+  return { dir: candidates[0]! }
+}
 export type TickContext = { rpc: ArkivRpc; store: Store; dir: string; config: Config; meta: { chainId: number; genesisHash: string; expression: string }; chainHead?: number }
 async function rebuild(ctx: TickContext, head: number): Promise<void> {
   const { rpc, config } = ctx
@@ -97,6 +117,11 @@ export async function tick(ctx: TickContext): Promise<void> {
 if (import.meta.main) {
   try {
     const config = loadConfig(process.env)
+    if (config.syncPaused) {
+      const { dir } = await servePaused(config)
+      const manifest = (await readManifest(dir))!
+      serve(config.port, createHandler(dir, () => ({ paused: true, headBlock: manifest.headBlock, lastSnapshot: manifest.snapshotBlock })))
+    } else {
     const rpc = createRpc(config.rpcUrl, { apiKey: config.apiKey, onCost: (cost, quota) => console.log('RPC cost: ' + cost + '; quota used: ' + (quota === null ? 'unknown' : quota + '%')) })
     const result = await bootstrap(config, rpc)
     const state = (await result.store.state())!
@@ -121,6 +146,7 @@ if (import.meta.main) {
         else console.error(error instanceof Error ? error.message : String(error))
       } finally { running = false }
     }, 2000)
+    }
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))
     process.exitCode = 1
