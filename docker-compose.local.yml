@@ -1,0 +1,4 @@
+# Local override: publish the web app on the host. Not used by Dokploy, which routes through Traefik.
+services:
+  web:
+    ports: ["3000:3000"]

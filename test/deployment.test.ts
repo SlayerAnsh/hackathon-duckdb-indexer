@@ -13,7 +13,8 @@ test('compose keeps data persistent, credentials isolated, and writer opt in', (
   expect(volumes).toHaveProperty('index-data');
   expect(s.indexer.healthcheck.test.join(' ')).toContain("fetch('http://localhost:8080/health')");
   expect(s.web.depends_on.indexer.condition).toBe('service_healthy');
-  expect(s.web.ports).toEqual(['3000:3000']);
+  expect(s.web.ports).toBeUndefined();
+  expect(s.web.expose).toEqual(['3000']);
   expect(s.web.environment.INDEXER_URL).toBe('http://indexer:8080');
   expect(s.web.environment).toHaveProperty('NEXT_PUBLIC_TIRAMISU_RPC_URL');
   expect(s.web.build.args.NEXT_PUBLIC_TIRAMISU_RPC_URL).toBe(s.web.environment.NEXT_PUBLIC_TIRAMISU_RPC_URL);

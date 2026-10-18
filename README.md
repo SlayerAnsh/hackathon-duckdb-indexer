@@ -21,10 +21,17 @@ INDEX_EXPRESSION='$creator = addr(0x1f61c3cac1612c020f64739b128c5f198939c8cd)'
 ```
 
 ```sh
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 ```
 
-Open http://localhost:3000 after the initial backfill and indexer health check complete. Only port 3000 is published. TLS and a public domain belong in the host proxy in front of that port.
+Open http://localhost:3000 after the initial backfill and indexer health check complete. The base `docker-compose.yml` publishes no host ports; the local override publishes port 3000.
+
+### Deploy with Dokploy
+
+1. Create a Docker Compose application from this repository, compose path `./docker-compose.yml`, and keep Isolated Deployments enabled.
+2. In the Environment tab set `TIRAMISU_API_KEY`, `INDEX_EXPRESSION` (single quoted, as above), and for the demo writer `DEMO_PRIVATE_KEY`, `DEMO_AGENT_ADDRESSES` and `COMPOSE_PROFILES=demo`. Dokploy writes these to the `.env` file next to the compose file, and the compose file reads them with `${VAR}` references.
+3. In the Domains tab add your domain for service `web`, container port `3000`, with HTTPS. Dokploy adds the Traefik labels at deploy time. The indexer stays internal.
+4. Deploy, then open `https://<domain>/data/health` to check the indexer.
 
 For synthetic writes, also fill `DEMO_PRIVATE_KEY` with the funded demo wallet's testnet signing key and `DEMO_AGENT_ADDRESSES` with the two comma separated agent addresses below, then run:
 

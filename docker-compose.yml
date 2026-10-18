@@ -25,7 +25,7 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         NEXT_PUBLIC_TIRAMISU_RPC_URL: ${NEXT_PUBLIC_TIRAMISU_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
-    ports: ["3000:3000"]
+    expose: ["3000"]
     environment:
       INDEXER_URL: http://indexer:8080
       NEXT_PUBLIC_TIRAMISU_RPC_URL: ${NEXT_PUBLIC_TIRAMISU_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
