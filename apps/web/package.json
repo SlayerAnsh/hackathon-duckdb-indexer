@@ -10,6 +10,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@arkiv-network/sdk": "0.8.1",
     "@asi/core": "workspace:*",
     "@codemirror/lang-sql": "^6.10.0",
     "@duckdb/duckdb-wasm": "^1.33.1-dev57.0",
@@ -17,7 +18,8 @@
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "viem": "^2.57.3"
   },
   "devDependencies": {
     "@types/node": "^20",

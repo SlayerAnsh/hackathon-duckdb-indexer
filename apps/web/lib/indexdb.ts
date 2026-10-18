@@ -144,7 +144,7 @@ export class IndexDb {
     this.listener = undefined
   }
 
-  run(sql: string): Promise<{ columns: string[]; rows: unknown[][]; truncated: boolean }> {
+  run(sql: string, maxRows = 1000): Promise<{ columns: string[]; rows: unknown[][]; truncated: boolean }> {
     return this.serial(async () => {
       const reader = await this.queries.send(sql, true)
       const columns = reader.schema.fields.map(field => field.name)
@@ -152,7 +152,7 @@ export class IndexDb {
       try {
         for await (const batch of reader) {
           for (let i = 0; i < batch.numRows; i++) {
-            if (rows.length === 1000) {
+            if (rows.length === maxRows) {
               await this.cancel()
               return { columns, rows, truncated: true }
             }

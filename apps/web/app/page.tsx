@@ -1,69 +1,16 @@
-import Image from "next/image";
-import styles from "./page.module.css";
-
-export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.tsx</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+'use client'
+import { useEffect, useState } from 'react'
+import { useIndex } from '../lib/use-index'
+import { readHash, writeHash } from '../lib/hash-state'
+import { StatusBar } from '../components/StatusBar'
+import { Dashboard } from '../components/Dashboard'
+import { SqlEditor } from '../components/SqlEditor'
+import { ResultsTable, type QueryResult } from '../components/ResultsTable'
+import { ChangesFeed } from '../components/ChangesFeed'
+export default function Page() {
+ const { db,state } = useIndex(); const [sql,setSql] = useState('SELECT * FROM entities'); const [result,setResult] = useState<QueryResult | null>(null); const [resultSql,setResultSql] = useState(''); const [revision,setRevision] = useState(0); const [running,setRunning] = useState(false); const [error,setError] = useState('')
+ const [rpcUrl,setRpcUrl] = useState(process.env.NEXT_PUBLIC_TIRAMISU_RPC_URL ?? 'https://rpc.tiramisu.db-chain.testnet.arkiv.network')
+ useEffect(() => { const restore = () => { const saved = readHash(); if (saved) setSql(saved) }; restore(); window.addEventListener('hashchange',restore); return () => window.removeEventListener('hashchange',restore) }, [])
+ async function run() { if (!db || running) return; setRunning(true); setError(''); writeHash(sql); try { const next = await db.run(sql); setResult(next); setRevision(n => n + 1); setResultSql(sql) } catch(e) { setError(e instanceof Error ? e.message : String(e)) } finally { setRunning(false) } }
+ return <main><StatusBar state={state}/><label>Verification and changes RPC URL <input type="url" value={rpcUrl} onChange={e => setRpcUrl(e.target.value)}/></label>{db && <><Dashboard db={db} block={state.deltaTo} onSql={s => { setSql(s); document.getElementById('sql-editor')?.scrollIntoView({ behavior: 'smooth' }) }}/><SqlEditor db={db} value={sql} onChange={setSql} onRun={() => void run()} running={running} error={error}/>{result && <ResultsTable key={revision + ':' + rpcUrl} result={result} db={db} sql={resultSql} rpcUrl={rpcUrl}/>}<ChangesFeed db={db} rpcUrl={rpcUrl}/></>}</main>
 }
