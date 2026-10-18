@@ -1,0 +1,1 @@
+export function Footer() { return <footer className="foot"><div className="wrap"><p>✓ Expiry is enforced at the live chain head. Entities disappear from SQL when their expiry block is reached.</p><nav aria-label="Dashboard sections"><a href="#showcase">Showcase</a><a href="#console">Console</a><a href="#activity">Latest changes</a></nav></div></footer> }

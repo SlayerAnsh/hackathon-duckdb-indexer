@@ -1,0 +1,1 @@
+export function EventPill({kind}:{kind:string}) {return <span className={'pill pill-'+kind.toLowerCase()}>{kind==='Created'?'+':kind==='Deleted'?'×':kind==='Extended'?'◷':kind==='Transferred'?'⇄':'✎'} {kind}</span>}

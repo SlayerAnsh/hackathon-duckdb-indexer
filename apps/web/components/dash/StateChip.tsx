@@ -1,0 +1,1 @@
+export function StateChip({state,label}:{state:string;label?:string}) { return <span className={'state state-'+state}><span aria-hidden="true">{state==='live'?'✓':state==='disk'?'▤':state==='unknown'?'○':'◷'}</span>{label??state}{state==='live'&&<span className="pulse"/>}</span> }

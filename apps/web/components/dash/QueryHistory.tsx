@@ -1,0 +1,3 @@
+import { formatMs } from '../../lib/format'
+export type HistoryEntry={sql:string;ms:number;rows:number}
+export function QueryHistory({entries,onSelect}:{entries:HistoryEntry[];onSelect:(s:string)=>void}) { return <aside className="history" aria-label="Query history"><h4>◷ History</h4>{!entries.length&&<p className="empty" style={{padding:'0 14px'}}>Queries you run appear here.</p>}<ul>{entries.map((entry,i)=><li key={i}><button onClick={()=>onSelect(entry.sql)} title={entry.sql}><span className="h-q">{entry.sql.replace(/\s+/g,' ')}</span><span className="h-m">ϟ {formatMs(entry.ms)} · {entry.rows} rows</span></button></li>)}</ul></aside> }

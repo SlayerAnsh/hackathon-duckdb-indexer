@@ -1,0 +1,3 @@
+'use client'
+import { useState } from 'react'
+export function SqlBlock({sql}:{sql:string}) { const [message,setMessage]=useState('Copy');return <div className="sqlpane"><pre><code>{sql.split(/('[^']*'|\b(?:SELECT|FROM|WHERE|JOIN|LEFT|ON|GROUP|BY|ORDER|AS|WITH|CASE|WHEN|THEN|ELSE|END|LIMIT|OVER|PARTITION|DESC|ASC|AND|OR|DISTINCT|IS|NOT|NULL)\b)/gi).map((part,i)=><span key={i} className={part.startsWith("'")?'sx-str':/^[A-Z ]+$/.test(part)?'sx-kw':undefined}>{part}</span>)}</code></pre><button className="copy" onClick={async()=>{try{await navigator.clipboard.writeText(sql);setMessage('Copied')}catch{setMessage('Copy unavailable')}}}>{message}</button></div> }

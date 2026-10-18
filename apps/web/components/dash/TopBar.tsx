@@ -1,0 +1,4 @@
+import type { IndexState } from '../../lib/indexdb'
+import { HeightsCluster } from './HeightsCluster'
+import { ThemeToggle } from './ThemeToggle'
+export function TopBar({state}:{state:IndexState}) { const m=state.manifest;return <header className="top"><div className="wrap"><a className="brand" href="#"><span className="brand-mark">A</span><span>Arkiv <b>SQL</b></span></a><span className="pill-chain">Tiramisu <span className="mono">{m?.chainId??'…'}</span></span><HeightsCluster state={state}/>{m&&<><span className="quiet-chip snap">snapshot v{m.version}</span><span className="quiet-chip">{!m.expression.trim()?'all entities':/\$creator\b/.test(m.expression)?'$creator filtered':'filtered'}</span>{m.expression&&<span className="expr" title={m.expression}>{m.expression}</span>}</>}<span className="top-sp"/><ThemeToggle/></div></header> }

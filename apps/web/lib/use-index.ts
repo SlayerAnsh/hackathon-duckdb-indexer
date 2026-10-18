@@ -7,12 +7,13 @@ let db: IndexDb | null = null
 let pending: Promise<IndexDb> | null = null
 let state: IndexState = { status: 'loading' }
 const listeners = new Set<() => void>()
-const notify = () => { for (const listener of listeners) listener() }
+let version = 0
+const notify = () => { version++; for (const listener of listeners) listener() }
 
-export function useIndex(): { db: IndexDb | null; state: IndexState } {
-  const [value, setValue] = useState<{ db: IndexDb | null; state: IndexState }>({ db: null, state: { status: 'loading' } })
+export function useIndex(): { db: IndexDb | null; state: IndexState; version: number } {
+  const [value, setValue] = useState<{ db: IndexDb | null; state: IndexState; version: number }>({ db: null, state: { status: 'loading' }, version: 0 })
   useEffect(() => {
-    const update = () => setValue({ db, state })
+    const update = () => setValue({ db, state, version })
     listeners.add(update)
     update()
     if (!pending) {
