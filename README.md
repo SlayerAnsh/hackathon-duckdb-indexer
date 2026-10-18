@@ -29,7 +29,7 @@ Open http://localhost:3000 after the initial backfill and indexer health check c
 ### Deploy with Dokploy
 
 1. Create a Docker Compose application from this repository, compose path `./docker-compose.yml`, and keep Isolated Deployments enabled.
-2. In the Environment tab set `TIRAMISU_API_KEY`, `INDEX_EXPRESSION` (single quoted, as above), and for the demo writer `DEMO_PRIVATE_KEY`, `DEMO_AGENT_ADDRESSES` and `COMPOSE_PROFILES=demo`. Dokploy writes these to the `.env` file next to the compose file, and the compose file reads them with `${VAR}` references.
+2. In the Environment tab set `TIRAMISU_API_KEY`, `INDEX_EXPRESSION` (single quoted, as above), and for the demo writer `DEMO_PRIVATE_KEY`, `DEMO_AGENT_ADDRESSES` and `COMPOSE_PROFILES=demo`, plus `INDEX_DATA_PATH=../files/data` so the index survives redeploys (Dokploy keeps `../files` between deployments). Dokploy writes these to the `.env` file next to the compose file, and the compose file reads them with `${VAR}` references.
 3. In the Domains tab add your domain for service `web`, container port `3000`, with HTTPS. Dokploy adds the Traefik labels at deploy time. The indexer stays internal.
 4. Deploy, then open `https://<domain>/data/health` to check the indexer.
 

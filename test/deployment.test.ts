@@ -3,14 +3,13 @@ import { readFileSync } from 'node:fs';
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
 test('compose keeps data persistent, credentials isolated, and writer opt in', () => {
-  const { services: s, volumes } = Bun.YAML.parse(read('docker-compose.yml')) as any;
+  const { services: s } = Bun.YAML.parse(read('docker-compose.yml')) as any;
   expect(s.indexer.expose).toEqual(['8080']);
   expect(s.indexer.ports).toBeUndefined();
   expect(s.indexer.env_file).toBeUndefined();
   expect(s.indexer.environment.TIRAMISU_API_KEY).toContain('TIRAMISU_API_KEY');
   expect(JSON.stringify(s.indexer)).not.toContain('DEMO_PRIVATE_KEY');
-  expect(s.indexer.volumes).toContain('index-data:/data');
-  expect(volumes).toHaveProperty('index-data');
+  expect(s.indexer.volumes).toContain('${INDEX_DATA_PATH:-./data}:/data');
   expect(s.indexer.healthcheck.test.join(' ')).toContain("fetch('http://localhost:8080/health')");
   expect(s.web.depends_on.indexer.condition).toBe('service_healthy');
   expect(s.web.ports).toBeUndefined();

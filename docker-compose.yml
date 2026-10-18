@@ -4,7 +4,8 @@ services:
       context: .
       dockerfile: apps/indexer/Dockerfile
     expose: ["8080"]
-    volumes: ["index-data:/data"]
+    # Bind mount so the index is visible in the repo. On Dokploy set INDEX_DATA_PATH=../files/data so redeploys keep it.
+    volumes: ["${INDEX_DATA_PATH:-./data}:/data"]
     environment:
       TIRAMISU_API_KEY: ${TIRAMISU_API_KEY:?set TIRAMISU_API_KEY in .env}
       INDEX_EXPRESSION: ${INDEX_EXPRESSION:?set INDEX_EXPRESSION in .env}
@@ -44,5 +45,3 @@ services:
       DEMO_AGENT_ADDRESSES: ${DEMO_AGENT_ADDRESSES:-}
     restart: unless-stopped
 
-volumes:
-  index-data:
