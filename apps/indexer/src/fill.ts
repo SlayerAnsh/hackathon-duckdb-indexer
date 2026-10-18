@@ -27,7 +27,7 @@ export function retryAt(retryAfter: string | null, now: number): number {
   return Number.isFinite(date) && date > now ? date : now + 60000
 }
 
-const ensureMisses = (store: Store) => store.conn.run('CREATE TABLE IF NOT EXISTS fill_misses(key VARCHAR PRIMARY KEY, misses INTEGER)')
+export const ensureMisses = (store: Store) => store.conn.run('CREATE TABLE IF NOT EXISTS fill_misses(key VARCHAR PRIMARY KEY, misses INTEGER)')
 
 export async function fillPending(rpc: ArkivRpc, store: Store, expression: string, opts: { chunk?: number; lock?: Lock; now?: () => number } = {}): Promise<FillResult> {
   const lock: Lock = opts.lock ?? (fn => fn()), now = opts.now ?? Date.now
@@ -59,9 +59,10 @@ export async function fillPending(rpc: ArkivRpc, store: Store, expression: strin
   return lock(async () => {
     if (store.isClosed) return { fetched: 0, dropped: 0 }
     const state = (await store.state())!
-    // Live sync may have fetched, removed or re-fetched a key while the query ran; only rows still pending are written.
+    // Live sync may have fetched, removed or changed a key while the query ran. Only rows still pending and
+    // untouched since the queried block are written; a newer patch, transfer or extension waits for a fresh fill.
     const placeholders = keys.map(() => '?').join(', ')
-    const still = (await store.conn.runAndReadAll(`SELECT key, expires_at FROM entities WHERE attrs_pending AND key IN (${placeholders})`, keys)).getRowObjects()
+    const still = (await store.conn.runAndReadAll(`SELECT key, expires_at FROM entities WHERE attrs_pending AND updated_at <= ? AND key IN (${placeholders})`, [atBlock, ...keys], [T.UBIGINT, ...keys.map(() => T.VARCHAR)])).getRowObjects()
     // Keep fills after the published snapshot so the next delta carries them.
     const changeBlock = Math.max(state.head_block, state.snapshot_block + 1)
     let fetched = 0, dropped = 0

@@ -41,9 +41,9 @@ test('missing snapshot after checkpoint is repaired without querying', async () 
   expect(query).not.toHaveBeenCalled()
 })
 test('CLI configuration errors have no stack trace', async () => {
-  const proc = Bun.spawn(['bun', 'apps/indexer/src/main.ts'], { env: { ...process.env, SYNC_PAUSED: 'false', INDEX_EXPRESSION: '', TIRAMISU_API_KEY: '' }, stdout: 'pipe', stderr: 'pipe' })
+  const proc = Bun.spawn(['bun', 'apps/indexer/src/main.ts'], { env: { ...process.env, SYNC_PAUSED: 'false', BACKFILL_MODE: 'query', INDEX_EXPRESSION: '', TIRAMISU_API_KEY: '' }, stdout: 'pipe', stderr: 'pipe' })
   const stderr = await new Response(proc.stderr).text()
-  expect(await proc.exited).toBe(1); expect(stderr).toContain('TIRAMISU_API_KEY'); expect(stderr).not.toContain(' at ')
+  expect(await proc.exited).toBe(1); expect(stderr).toContain('BACKFILL_MODE=query requires TIRAMISU_API_KEY'); expect(stderr).not.toContain(' at ')
 })
 test('logs bootstrap reuses the replay, keeps fetched rows and publishes pending rows without queries', async () => {
   const { event } = await import('./events')

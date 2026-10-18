@@ -2,9 +2,9 @@ import { test, expect } from 'bun:test'
 import { Store } from '../src/store'
 import { loadConfig, storeDir } from '../src/config'
 import { temp, track, row, rows, hash, expression } from './helpers'
-test('config requires API key, supplies defaults', () => {
-  expect(() => loadConfig({})).toThrow('TIRAMISU_API_KEY')
-  expect(() => loadConfig({ INDEX_EXPRESSION: expression })).toThrow('TIRAMISU_API_KEY')
+test('config needs no API key by default, supplies defaults', () => {
+  expect(loadConfig({}).apiKey).toBe('')
+  expect(() => loadConfig({ INDEX_EXPRESSION: expression, BACKFILL_MODE: 'query' })).toThrow('TIRAMISU_API_KEY')
   expect(loadConfig({ INDEX_EXPRESSION: expression, TIRAMISU_API_KEY: 'secret' })).toMatchObject({ confirmations: 3, syncBatchBlocks: 5, snapshotIntervalBlocks: 30, keepSnapshots: 2, port: 8080, dataDir: './data' })
 })
 test('store identity directory', () => {

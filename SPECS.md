@@ -101,9 +101,10 @@ arkiv/friction.md   gate 5
 | `BACKFILL_MODE` | Public log replay or legacy query scan | `logs` |
 | `FILL_RPC_URL` | RPC for attribute fills of pending rows | Tiramisu public RPC |
 | `FILL_USE_API_KEY` | send the API key with fills (spends monthly quota) | `false` |
+| `SYNC_USE_API_KEY` | keyed live sync: key lookups on `ARKIV_RPC_URL` (spends monthly quota) | `false` |
 | `FILL_CHUNK` | keys per fill query, at most 50 | 50 |
 | `FILL_INTERVAL_MS` | pause between fill queries | 4000 |
-| `TIRAMISU_API_KEY` | sent as `Authorization: Bearer`, server only | required for active sync |
+| `TIRAMISU_API_KEY` | sent as `Authorization: Bearer`, server only; optional | empty (unused) |
 | `SYNC_PAUSED` | serve existing store without RPC calls | `false` |
 | `CONFIRMATIONS` | blocks behind head | 3 |
 | `SYNC_BATCH_BLOCKS` | blocks per live sync batch | 5 |
@@ -113,6 +114,8 @@ arkiv/friction.md   gate 5
 | `PORT` | HTTP port | 8080 |
 
 Warn at startup when `INDEX_EXPRESSION` contains no `$creator` term, because user attributes can be written by anyone.
+
+The API key is never sent by default. Only `BACKFILL_MODE=query`, `SYNC_USE_API_KEY=true` and `FILL_USE_API_KEY=true` send it; each requires `TIRAMISU_API_KEY` and startup fails with a clear message without it (unless `SYNC_PAUSED`). Startup logs `API key not used` or a warning naming the flags that enable it. No RPC client is constructed with the key unless one of these flags is set. Measured live rate on Tiramisu: about 2,800 distinct keys touched per hour (4,011 events per 1,800 blocks); keyed live sync at that rate would use roughly 25 to 35 percent of the monthly quota per day, while the anonymous budget allows about 100 queries of up to 50 keys per hour.
 
 ### 7.2 Store identity
 
@@ -163,7 +166,22 @@ The anonymous budget is about 10,000 units per IP and window (about one hour), a
 
 ### 7.5 Live sync
 
-Runs every `SYNC_BATCH_BLOCKS` blocks (default 5, about 10 seconds):
+Runs every `SYNC_BATCH_BLOCKS` blocks (default 5, about 10 seconds). By default (logs mode without `SYNC_USE_API_KEY`) sync is keyless:
+
+1. `to = chainHead - CONFIRMATIONS`, `from = head_block + 1`. Skip when fewer than `SYNC_BATCH_BLOCKS` blocks are ready.
+2. Fetch and decode logs as in step 2 below, then apply them in block and log order from log data alone, with no `arkiv_query`:
+   * `EntityCreated` (passing the creator or owner prefilter of step 3): insert a log row with owner, creator, `created_at = updated_at = block`, `expires_at`, flags, `content_type NULL`, `attrs_pending = true`.
+   * `EntityPatched`: keep the row and its attributes, set `attrs_pending = true` and `updated_at`.
+   * `ExpiryExtended`: set `expires_at` and `updated_at`.
+   * `OwnershipTransferred`: set `owner` and `updated_at`; with a non empty expression also set `attrs_pending = true` so the filler rechecks the filter.
+   * `EntityDeleted`: remove the row and its attributes with a tombstone.
+   * Events for keys without a row are ignored.
+3. Every changed key gets `changes(to, key, false)`, so the delta carries it. Expiry sweep, hash checks and the checkpoint commit work as below, in one transaction.
+4. The filler (7.4 step 7) fetches attributes for pending keys newest first, so new and patched keys come first. It writes a fetched row only if the row is still pending and its `updated_at` is not newer than the block it queried; otherwise the key stays pending and is fetched again at a newer block. A re-fetch replaces all attributes.
+
+Limitation: with a filter expression that has no `$creator` or `$owner` term, keyless sync cannot see an existing entity that starts matching through a patch, nor one transferred into a `$owner` filter. Use `SYNC_USE_API_KEY=true` for such filters.
+
+Keyed sync (`SYNC_USE_API_KEY=true` or `BACKFILL_MODE=query`):
 
 1. `to = chainHead - CONFIRMATIONS`, `from = head_block + 1`. Skip when `to < from`.
 2. `eth_getLogs` on `ARKIV_ADDRESS` for `[from, to]`, split into windows of at most 1,000 blocks. Decode with the SDK `ENTITY_EVENTS_ABI`. The entity key is topic 1. For `EntityCreated` the owner is topic 2.
@@ -234,7 +252,7 @@ The indexer is not exposed publicly. The browser reaches it only through the Nex
 4. Poll `delta.json` with `If-None-Match`. On change, replace `delta_entities`, `delta_attributes`, `delta_tombstones`.
 5. Freshness comes from the browser live tail on the public RPC without an API key, starting at `delta.toBlock + 1`. Poll logs every four seconds in windows of 1,000 blocks. Apply deletes, expiry extensions and transfers from logs. Creations and patches enter `live_pending`; fetch attributes with expression scoped batches of at most 50 keys, at most once every 20 seconds. Use the indexed key and creation owner relevance prefilter from 7.5. HTTP 429 pauses attribute fetching until Retry-After while log updates continue. Failed requests never delete rows. Live rows compete with delta and base by updated block, with live winning ties. Pending rows keep previous attributes. Clear live tables on snapshot version change.
 
-The backend may serve an existing store with `SYNC_PAUSED=true`, making no RPC calls and requiring no API key. Missing stores fail startup clearly. The private API key is used only for active backend sync and never reaches the browser.
+The backend may serve an existing store with `SYNC_PAUSED=true`, making no RPC calls and requiring no API key. Missing stores fail startup clearly. The optional API key is used only by the keyed backend modes (7.1), is unused by default, and never reaches the browser.
 6. Poll `eth_blockNumber` every 2 s and store it as `live_head`.
 
 Public views (the only names shown in autocomplete docs):

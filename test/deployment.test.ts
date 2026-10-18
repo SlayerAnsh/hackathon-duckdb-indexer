@@ -12,7 +12,8 @@ test('compose keeps data persistent, credentials isolated, and writer opt in', (
   expect(s.indexer.expose).toEqual(['8080']);
   expect(s.indexer.ports).toBeUndefined();
   expect(s.indexer.env_file).toBeUndefined();
-  expect(s.indexer.environment.TIRAMISU_API_KEY).toContain('TIRAMISU_API_KEY');
+  expect(s.indexer.environment.TIRAMISU_API_KEY).toBe('${TIRAMISU_API_KEY:-}');
+  expect(s.indexer.environment.SYNC_USE_API_KEY).toBe('${SYNC_USE_API_KEY:-false}');
   expect(JSON.stringify(s.indexer)).not.toContain('DEMO_PRIVATE_KEY');
   expect(s.indexer.volumes).toContain('${INDEX_DATA_PATH:-./data}:/data');
   expect(s.indexer.healthcheck.test.join(' ')).toContain("fetch('http://localhost:8080/health')");
@@ -62,7 +63,7 @@ test('images use locked workspace installs and the standalone runtime layout', (
   const ignore = read('.dockerignore');
   for (const value of ['**/node_modules', '**/.next', '.env', '.env.*', '.git', 'data']) expect(ignore).toContain(value);
   const env = read('.env.example');
-  for (const value of ['TIRAMISU_API_KEY=', 'INDEX_EXPRESSION=', 'DEMO_PRIVATE_KEY=', 'DEMO_AGENT_ADDRESSES=', 'NEXT_PUBLIC_TIRAMISU_RPC_URL=']) expect(env).toContain(value);
+  for (const value of ['TIRAMISU_API_KEY=', 'SYNC_USE_API_KEY=false', 'FILL_USE_API_KEY=false', 'INDEX_EXPRESSION=', 'DEMO_PRIVATE_KEY=', 'DEMO_AGENT_ADDRESSES=', 'NEXT_PUBLIC_TIRAMISU_RPC_URL=']) expect(env).toContain(value);
 });
 
 test('submission docs cover demo identity, schema, expiry, and observed friction', () => {
@@ -71,7 +72,8 @@ test('submission docs cover demo identity, schema, expiry, and observed friction
   const schema = read('arkiv/schema.md');
   for (const value of ['ticket', 'comment', 'heartbeat', 'title', 'status', 'priority', 'assignee', 'project', 'u64', 'addr', 'atBlock', '50', 'payload', 'verify', '600']) expect(schema).toContain(value);
   const friction = read('arkiv/friction.md');
-  for (const value of ['ANON_COST_LIMITED', '429', '-32004', '100', 'Arkiv-Quota-Used-Percent']) expect(friction).toContain(value);
+  for (const value of ['ANON_COST_LIMITED', '429', '-32004', '100', 'Arkiv-Quota-Used-Percent', '2,800', '4,011']) expect(friction).toContain(value);
+  for (const value of ['SYNC_USE_API_KEY', 'API key not used']) expect(readme).toContain(value);
   expect((friction.match(/### Expected/g) ?? []).length).toBe(4);
   expect(read('LICENSE')).toContain('MIT License');
   expect(read('LICENSE')).toContain('2026 Anshudhar');

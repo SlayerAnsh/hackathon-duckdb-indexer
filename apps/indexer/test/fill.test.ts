@@ -101,3 +101,37 @@ test('fill client sends no API key unless FILL_USE_API_KEY is true', async () =>
     expect(headers).toEqual([use ? 'Bearer secret' : null])
   }
 })
+test('a patched key re-fetched by the filler replaces its stale attributes', async () => {
+  const s = await pendingStore(0)
+  const { row } = await import('./helpers')
+  const old = row(key(1), 1000)
+  await s.upsert([{ entity: { ...old.entity, updated_at: 90 }, attributes: [...old.attributes, { key: key(1), name: 'gone', type: 'str', value: 'y', num: null }] }], null)
+  await s.conn.run(`UPDATE entities SET attrs_pending = true, updated_at = 95 WHERE key = '${key(1)}'`)
+  const query = mock(async (text: string, opts: any) => ({ data: returned(keysIn(text)), blockNumber: opts.atBlock }))
+  expect(await fillPending(fake(query), s, '')).toEqual({ fetched: 1, dropped: 0 })
+  expect(await rows(s, 'SELECT name, value FROM attributes')).toEqual([{ name: 'type', value: 'x' }])
+  expect(await rows(s, 'SELECT attrs_pending FROM entities')).toEqual([{ attrs_pending: false }])
+})
+test('a key patched again while its fill query is in flight stays pending and is fetched again later', async () => {
+  const s = await pendingStore(1)
+  await s.setState({ head_hash: hash })
+  const { syncLogs } = await import('../src/sync')
+  const { event } = await import('./events')
+  const lock = createLock()
+  const chain = fake(async () => { throw Error('sync must not query') })
+  chain.getLogs = async () => [event(1, 'EntityPatched', 103)]
+  let calls = 0
+  const query = mock(async (text: string, opts: any) => {
+    // The RPC answers for the picked block, then live sync applies a newer patch before the fill writes.
+    if (++calls === 1) await lock(() => syncLogs(chain, s, '', 101, 105))
+    return { data: returned(keysIn(text)).map(e => ({ ...e, updatedAt: '0x' + opts.atBlock.toString(16), attributes: [{ name: 'type', type: 'str', value: 'at ' + opts.atBlock }] }) as RpcEntity), blockNumber: opts.atBlock }
+  })
+  expect(await fillPending(fake(query), s, '', { lock })).toEqual({ fetched: 0, dropped: 0 })
+  expect(query.mock.calls[0]![1]).toMatchObject({ atBlock: 100 })
+  expect((await rows(s, 'SELECT attrs_pending, updated_at FROM entities')).map(r => [r.attrs_pending, Number(r.updated_at)])).toEqual([[true, 103]])
+  expect(await rows(s, 'SELECT * FROM attributes')).toEqual([])
+  expect(await fillPending(fake(query), s, '', { lock })).toEqual({ fetched: 1, dropped: 0 })
+  expect(query.mock.calls[1]![1]).toMatchObject({ atBlock: 105 })
+  expect(await rows(s, 'SELECT value FROM attributes')).toEqual([{ value: 'at 105' }])
+  expect(await rows(s, 'SELECT attrs_pending FROM entities')).toEqual([{ attrs_pending: false }])
+})

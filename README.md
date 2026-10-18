@@ -8,13 +8,13 @@ Built during 9 to 18 October 2026. Tracks: Open Source and Security. Licensed un
 
 ## Quick start
 
-Requires Docker with Compose v2, access to Tiramisu, and a Tiramisu API key.
+Requires Docker with Compose v2 and access to Tiramisu. No API key is needed: by default the indexer uses only the public RPC and never sends a key.
 
 ```sh
 cp .env.example .env
 ```
 
-Fill `TIRAMISU_API_KEY` in `.env`. Leave `INDEX_EXPRESSION` blank to index every entity, or set it to this demo expression. Keep the single quotes so Compose preserves the dollar sign:
+Leave `TIRAMISU_API_KEY` empty unless you opt into a keyed mode (see Indexer RPC usage). Leave `INDEX_EXPRESSION` blank to index every entity, or set it to this demo expression. Keep the single quotes so Compose preserves the dollar sign:
 
 ```dotenv
 INDEX_EXPRESSION='$creator = addr(0x1f61c3cac1612c020f64739b128c5f198939c8cd)'
@@ -29,7 +29,7 @@ Open http://localhost:3000 after the initial backfill and indexer health check c
 ### Deploy with Dokploy
 
 1. Create a Docker Compose application from this repository, compose path `./docker-compose.yml`, and keep Isolated Deployments enabled.
-2. In the Environment tab set `TIRAMISU_API_KEY`, `INDEX_EXPRESSION` (single quoted, as above), and for the demo writer `DEMO_PRIVATE_KEY`, `DEMO_AGENT_ADDRESSES` and `COMPOSE_PROFILES=demo`, plus `INDEX_DATA_PATH=../files/data` so the index survives redeploys (Dokploy keeps `../files` between deployments). Dokploy writes these to the `.env` file next to the compose file, and the compose file reads them with `${VAR}` references.
+2. In the Environment tab set `INDEX_EXPRESSION` (single quoted, as above), optionally `TIRAMISU_API_KEY` for a keyed mode, and for the demo writer `DEMO_PRIVATE_KEY`, `DEMO_AGENT_ADDRESSES` and `COMPOSE_PROFILES=demo`, plus `INDEX_DATA_PATH=../files/data` so the index survives redeploys (Dokploy keeps `../files` between deployments). Dokploy writes these to the `.env` file next to the compose file, and the compose file reads them with `${VAR}` references.
 3. In the Domains tab add your domain for service `web`, container port `3000`, with HTTPS. Dokploy adds the Traefik labels at deploy time. The indexer stays internal.
 4. Deploy, then open `https://<domain>/data/health` to check the indexer.
 
@@ -72,7 +72,7 @@ flowchart TD
 
 Freshness comes from a browser live tail on the public RPC endpoint without an API key. Logs update local rows, while creations and patches fetch attributes in batches of 50 at most once every 20 seconds. On anonymous budget exhaustion, attribute fetches wait until Retry-After while log updates continue. The status bar shows the live block, pending keys and budget state.
 
-Set `SYNC_PAUSED=true` to serve an existing snapshot and delta without any backend RPC calls. An existing indexed store is required; an empty data directory causes startup to fail clearly. The API key is required only for active backend sync and never reaches the browser. See [schema and queries](arkiv/schema.md), [provider friction](arkiv/friction.md), and [developer guide](DEVELOPER.md).
+Set `SYNC_PAUSED=true` to serve an existing snapshot and delta without any backend RPC calls. An existing indexed store is required; an empty data directory causes startup to fail clearly. The API key is optional, is sent only by the keyed modes below, and never reaches the browser. See [schema and queries](arkiv/schema.md), [provider friction](arkiv/friction.md), and [developer guide](DEVELOPER.md).
 
 ## Expiry
 
@@ -84,4 +84,10 @@ Demo video: TODO. Record less than 3 minutes showing the dashboard, a JOIN and G
 
 Future work includes Parquet expiry buckets, DataFusion, DuckLake, and server side SQL. These are outside the current browser SQL design.
 
-Backfill defaults to `BACKFILL_MODE=logs`. It replays native operation logs from `PUBLIC_RPC_URL` without credentials, computes live keys at the confirmed block, writes every live entity from log data (owner, creator, blocks, expiry, flags) and publishes a snapshot right away. Attributes are then filled progressively, newest entities first, by key lookups on the anonymous public RPC budget (`FILL_RPC_URL`), and each fill reaches the browser through the delta. Until its fill arrives an entity has `attrs_pending = true` and no attribute rows; the dashboard shows how many are still pending and groups them as `pending`. A 429 from the anonymous budget pauses only the filler until Retry-After. Set `FILL_USE_API_KEY=true` to fill with the API key, which spends the monthly quota. Live sync uses the same public log and private key lookup split. `BACKFILL_MODE=query` explicitly opts into the legacy filtered query scan, which can consume substantial monthly quota.
+Backfill defaults to `BACKFILL_MODE=logs`. It replays native operation logs from `PUBLIC_RPC_URL` without credentials, computes live keys at the confirmed block, writes every live entity from log data (owner, creator, blocks, expiry, flags) and publishes a snapshot right away. Attributes are then filled progressively, newest entities first, by key lookups on the anonymous public RPC budget (`FILL_RPC_URL`), and each fill reaches the browser through the delta. Until its fill arrives an entity has `attrs_pending = true` and no attribute rows; the dashboard shows how many are still pending and groups them as `pending`. A 429 from the anonymous budget pauses only the filler until Retry-After. Set `FILL_USE_API_KEY=true` to fill with the API key, which spends the monthly quota. `BACKFILL_MODE=query` explicitly opts into the legacy filtered query scan, which can consume substantial monthly quota.
+
+### Indexer RPC usage
+
+By default the indexer never sends the API key, and startup logs `API key not used`. Live sync reads only public `eth_getLogs` and block headers and applies each event from log data: a creation inserts a row with `attrs_pending = true`, a patch keeps the row and its previous attributes but marks it pending again, an expiry extension or ownership transfer updates the row in place, and a deletion removes it. The filler then fetches attributes for pending keys on the anonymous budget, newest first, so fresh creations and patches come before the remaining backfill. On Tiramisu about 2,800 distinct keys change per hour, so keyed live sync would spend roughly 25 to 35 percent of the monthly quota per day.
+
+Three explicit settings send the key, and each requires `TIRAMISU_API_KEY` (startup fails with a clear message otherwise) and logs a warning: `SYNC_USE_API_KEY=true` restores keyed live sync (key lookups on `ARKIV_RPC_URL` at the batch block), `FILL_USE_API_KEY=true` sends the key with fills, and `BACKFILL_MODE=query` uses the legacy query scan and keyed live sync. With a filter expression that has no `$creator` or `$owner` term, keyless sync cannot see an existing entity that starts matching through a patch; use `SYNC_USE_API_KEY=true` for that case.

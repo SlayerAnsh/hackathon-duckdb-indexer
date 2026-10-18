@@ -113,3 +113,11 @@ Measured on Tiramisu on 18 October 2026 with SDK 0.8.1: the flat `Arkiv-Cost: 10
 Anonymous `eth_getLogs` worked from block zero without an API key or an Arkiv-Cost header. The response advertised `RateLimit: limit=600` per window. Above 20,000 results it returned `-32602` with a helpful message such as `query exceeds max results 20000, retry with the range 725725-731557`. Retry that exact range first, then continue at its end plus one. Without a suggested range, halve the block window. On HTTP 429 obey Retry-After.
 
 To reproduce, compare quota headers before and after broad pinned pages and batches of 50 key predicates, then request anonymous logs over a range large enough to exceed 20,000 results. The default backfill now discovers live keys from public logs and spends backend queries only on keyed row lookups.
+
+## Keyed live sync does not fit the monthly quota
+
+Measured on Tiramisu on 18 October 2026: 4,011 entity events in 1,800 blocks (about one hour), touching about 2,800 distinct keys per hour. Keyed live sync looks those keys up in chunks of at most 50 at every batch block, and at that rate it would spend roughly 25 to 35 percent of the monthly quota per day, so the quota would last about three to four days. The anonymous budget allows about 100 queries of up to 50 keys per hour (about 5,000 keys), which covers the live change rate with room left for the backfill.
+
+The indexer therefore never sends the API key by default (decision of 18 October 2026). Live sync applies creations, patches, extensions, transfers and deletions straight from public `eth_getLogs`, and only attribute values come from anonymous keyed lookups, newest first. A patch event carries no attribute values, so patched entities briefly keep their previous attributes until the filler fetches them again. `SYNC_USE_API_KEY=true` restores keyed sync for deployments with a larger quota.
+
+Suggested fix: emit changed attribute values (or a content hash) in `EntityPatched` and `EntityCreated` logs, or offer an unmetered changes feed, so mirrors can stay current without a metered query per changed key.

@@ -1,6 +1,6 @@
 import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { syncBatch } from './sync'
+import { syncBatch, syncLogs } from './sync'
 import { writeDelta } from './delta'
 import { createHandler, serve } from './http'
 import { createRpc, hasCreatorTerm, RpcError, type ArkivRpc } from '@asi/core'
@@ -10,6 +10,23 @@ import { replayDetails, replayLiveKeys, replayTarget, writeLogRows } from './rep
 import { backfill } from './backfill'
 import { readManifest, refreshManifestCounts, writeSnapshot } from './snapshot'
 import { createFillRpc, createLock, fillTask } from './fill'
+// The API key is sent only when one of these explicit opt ins is set; loadConfig requires the key for each.
+function keyFlags(config: Config): string[] {
+  return [config.backfillMode === 'query' ? 'BACKFILL_MODE=query' : '', config.syncUseApiKey ? 'SYNC_USE_API_KEY=true' : '', config.fillUseApiKey ? 'FILL_USE_API_KEY=true' : ''].filter(Boolean)
+}
+const keyedSync = (config: Config) => config.backfillMode === 'query' || config.syncUseApiKey
+export function keyUsage(config: Config): string {
+  const flags = keyFlags(config)
+  if (!flags.length) return 'API key not used: live sync applies public logs and attributes fill on the anonymous RPC budget' + (config.apiKey ? ' (TIRAMISU_API_KEY is set but ignored)' : '') + '.'
+  return 'Warning: API key enabled by ' + flags.join(', ') + '; ' + [keyedSync(config) ? 'live sync key lookups' : '', config.fillUseApiKey ? 'attribute fills' : ''].filter(Boolean).join(' and ') + ' spend the monthly quota.'
+}
+// Builds every RPC client. Only clients for an enabled opt in carry the API key; by default none does.
+export function createClients(config: Config, fetchImpl?: typeof fetch): { rpc: ArkivRpc; queryRpc?: ArkivRpc; fillRpc: ArkivRpc } {
+  const fetchOpt = fetchImpl ? { fetchImpl } : {}
+  const rpc = createRpc(config.publicRpcUrl, fetchOpt)
+  const queryRpc = keyedSync(config) ? createRpc(config.rpcUrl, { ...fetchOpt, apiKey: config.apiKey, onCost: (cost, quota) => console.log('RPC cost: ' + cost + '; quota used: ' + (quota === null ? 'unknown' : quota + '%')) }) : undefined
+  return { rpc, ...(queryRpc ? { queryRpc } : {}), fillRpc: createFillRpc(config, fetchImpl) }
+}
 async function runBackfill(config: Config, logsRpc: ArkivRpc, queryRpc: ArkivRpc, store: Store, head: number, log?: (msg: string) => void): Promise<void> {
   if (config.backfillMode === 'logs') {
     // Publish every live key from log data now; attributes are filled newest first after startup.
@@ -117,7 +134,10 @@ export async function tick(ctx: TickContext): Promise<void> {
     console.log('Checkpoint hash mismatch or legacy checkpoint; building a fresh generation')
     await rebuild(ctx, Math.max(0, to)); return
   }
-  try { await syncBatch(rpc, store, config.expression, state.head_block + 1, to, ctx.queryRpc ?? rpc) }
+  try {
+    if (keyedSync(config)) await syncBatch(rpc, store, config.expression, state.head_block + 1, to, ctx.queryRpc ?? rpc)
+    else await syncLogs(rpc, store, config.expression, state.head_block + 1, to)
+  }
   catch (error) {
     if (!(error instanceof RpcError && error.code === -32006)) throw error
     // Verify the provider is still ahead before treating unavailable state as a retained-range gap.
@@ -139,8 +159,8 @@ if (import.meta.main) {
       const manifest = (await readManifest(dir))!
       serve(config.port, createHandler(dir, () => ({ paused: true, headBlock: manifest.headBlock, lastSnapshot: manifest.snapshotBlock, live: manifest.live ?? null, pending: manifest.pending ?? null })))
     } else {
-    const rpc = createRpc(config.publicRpcUrl)
-    const queryRpc = createRpc(config.rpcUrl, { apiKey: config.apiKey, onCost: (cost, quota) => console.log('RPC cost: ' + cost + '; quota used: ' + (quota === null ? 'unknown' : quota + '%')) })
+    console.log(keyUsage(config))
+    const { rpc, queryRpc, fillRpc } = createClients(config)
     const result = await bootstrap(config, rpc, console.log, queryRpc)
     const state = (await result.store.state())!
     const ctx: TickContext = { ...result, rpc, queryRpc, config, meta: { chainId: state.chain_id, genesisHash: state.genesis_hash, expression: config.expression } }
@@ -169,8 +189,7 @@ if (import.meta.main) {
         else console.error(error instanceof Error ? error.message : String(error))
       } finally { running = false }
     }, 2000)
-    if (config.fillUseApiKey) console.log('Warning: FILL_USE_API_KEY is true; attribute fills spend the API quota.')
-    const fill = fillTask({ rpc: createFillRpc(config), store: () => ctx.store, expression: config.expression, chunk: config.fillChunk, lock,
+    const fill = fillTask({ rpc: fillRpc, store: () => ctx.store, expression: config.expression, chunk: config.fillChunk, lock,
       publish: async () => { await publishFill(ctx.store, ctx.dir); const { live, pending } = await refreshHealth(); console.log('Attributes pending for ' + pending + ' of ' + live + ' live entities') } })
     setInterval(fill, config.fillIntervalMs)
     }
