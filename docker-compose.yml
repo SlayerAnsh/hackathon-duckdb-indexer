@@ -1,0 +1,48 @@
+services:
+  indexer:
+    build:
+      context: .
+      dockerfile: apps/indexer/Dockerfile
+    expose: ["8080"]
+    volumes: ["index-data:/data"]
+    environment:
+      TIRAMISU_API_KEY: ${TIRAMISU_API_KEY:?set TIRAMISU_API_KEY in .env}
+      INDEX_EXPRESSION: ${INDEX_EXPRESSION:?set INDEX_EXPRESSION in .env}
+      ARKIV_RPC_URL: ${ARKIV_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
+      DATA_DIR: /data
+      PORT: "8080"
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:8080/health').then(r=>process.exit(r.ok?0:1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_TIRAMISU_RPC_URL: ${NEXT_PUBLIC_TIRAMISU_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
+    ports: ["3000:3000"]
+    environment:
+      INDEXER_URL: http://indexer:8080
+      NEXT_PUBLIC_TIRAMISU_RPC_URL: ${NEXT_PUBLIC_TIRAMISU_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
+    depends_on:
+      indexer:
+        condition: service_healthy
+    restart: unless-stopped
+
+  demo-writer:
+    build:
+      context: .
+      dockerfile: apps/demo-writer/Dockerfile
+    profiles: ["demo"]
+    environment:
+      DEMO_PRIVATE_KEY: ${DEMO_PRIVATE_KEY:-}
+      DEMO_AGENT_ADDRESSES: ${DEMO_AGENT_ADDRESSES:-}
+    restart: unless-stopped
+
+volumes:
+  index-data:

@@ -3,7 +3,7 @@ import { IndexDb } from '../lib/indexdb'
 test('display caps rows while full export reads all rows', async () => {
  const run = async (cap?: number) => {
  const batch = { numRows: 1002, getChildAt: () => ({ get: (i: number) => BigInt(i) }) }
- const reader = { schema: { fields: [{ name: 'n' }] }, async *[Symbol.asyncIterator]() { yield batch }, cancel: async () => {} }
+ const reader = { schema: { fields: [{ name: 'n' }] }, async *[Symbol.asyncIterator]() { yield batch }, cancel: async () => {}, open: async function () { return this } }
  const fake = { serial: (fn: () => unknown) => fn(), queries: { send: async () => reader }, cancel: async () => {} }
  return IndexDb.prototype.run.call(fake as never, 'SELECT 1', cap)
  }
