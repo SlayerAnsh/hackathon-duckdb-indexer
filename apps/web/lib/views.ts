@@ -13,7 +13,7 @@ export const VIEWS: View[] = [
   stat('owners-count','Distinct owners','SELECT count(DISTINCT owner) AS value FROM entities','COUNT DISTINCT'),
   stat('expiring','Expiring within 1 hour',`SELECT count(*) AS value FROM entities WHERE expires_at <= ${head}+1800`),
   stat('new','Created in the last hour',`SELECT count(*) AS value FROM entities WHERE created_at >= greatest(0,${head}-1800)`),
-  {id:'creations',title:'Creations per hour',subtitle:'Last 24 hours · live entities only',kind:'area',x:'hour',y:'count',span:2,notInArkivQuery:'GROUP BY',sql:`SELECT floor(created_at/1800.0) AS hour, count(*) AS count FROM entities WHERE created_at >= greatest(0,${head}-43200) GROUP BY hour ORDER BY hour`},
+  {id:'creations',title:'Creations per hour',subtitle:'Last 24 hours · live entities only',kind:'area',x:'hour',y:'count',span:2,notInArkivQuery:'GROUP BY',sql:`SELECT floor(created_at/1800.0) AS hour, count(*) AS count, ${head} AS head_block FROM entities WHERE created_at >= greatest(0,${head}-43200) GROUP BY hour ORDER BY hour`},
   {id:'types',title:'Entities by type',subtitle:'Type → project → unlabelled',kind:'donut',x:'type',y:'count',notInArkivQuery:'GROUP BY + JOIN',sql:`${labelled}, counts AS (SELECT label, count(*) AS n FROM labelled GROUP BY label), ranked AS (SELECT *, row_number() OVER (ORDER BY n DESC,label) AS rank FROM counts) SELECT CASE WHEN rank <= 7 THEN label ELSE 'Other' END AS type, sum(n) AS count FROM ranked GROUP BY type ORDER BY count DESC,type`},
   {id:'recent',title:'Recently updated entities',kind:'table',span:3,notInArkivQuery:'ORDER BY updated_at',sql:'SELECT key, creator, owner, updated_at, expires_at FROM entities ORDER BY updated_at DESC,key LIMIT 10'},
  ]},

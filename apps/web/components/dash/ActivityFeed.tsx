@@ -16,8 +16,8 @@ export const ACTIVITY_SQL = `WITH previous AS (
 SELECT c.key,c.block,c.kind,COALESCE(t.value,p.value,'unlabelled') AS type
 FROM changes c LEFT JOIN attributes t ON t.key=c.key AND t.name='type'
 LEFT JOIN attributes p ON p.key=c.key AND p.name='project'
-ORDER BY c.block DESC,c.key LIMIT 20`
+ORDER BY c.block DESC,c.key LIMIT 12`
 export function ActivityFeed({version,head}:{version:number;head?:number}) {
  const q=useTimedQuery(ACTIVITY_SQL,version)
- return <section className="sec" id="activity" aria-labelledby="activity-h"><div className="sec-h"><h2 id="activity-h">Latest changes</h2><p>Current changes in the browser live overlay.</p></div><div className="feed">{q.error?<p className="error" style={{padding:16}}>{q.error}</p>:!q.data?.rows.length?<p className="empty" style={{padding:16}}>No rows yet</p>:<ul>{q.data.rows.map((r,i)=><li className="ev" key={String(r[0])+':'+i}><EventPill kind={String(r[2])}/><span className="ev-k hash" title={String(r[0])}>{shortHex(String(r[0]))}</span><span className="ev-t"><TypeTag value={String(r[3])}/></span><span className="ev-d">live overlay</span><span className="ev-b num">{Number(r[1]).toLocaleString()}</span><span className="ev-a num">{head===undefined?'…':blockAge(Number(r[1]),head)}</span></li>)}</ul>}</div></section>
+ return <section className="sec" id="activity" aria-labelledby="activity-h"><div className="sec-h"><h2 id="activity-h">Latest changes</h2><p>Current changes in the browser live overlay.</p></div><div className="feed">{q.error?<p className="error" style={{padding:16}}>{q.error}</p>:!q.data?.rows.length?<p className="empty" style={{padding:16}}>No rows yet</p>:<ul>{q.data.rows.map((r,i)=><li className="ev" key={String(r[0])+':'+i}><EventPill kind={String(r[2])}/><span className="ev-k hash" title={String(r[0])}>{shortHex(String(r[0]))}</span><span className="ev-t" title={String(r[3])}><TypeTag value={String(r[3])}/></span><span className="ev-d"/><span className="ev-b num">{Number(r[1]).toLocaleString()}</span><span className="ev-a num">{head===undefined?'…':blockAge(Number(r[1]),head)}</span></li>)}</ul>}</div></section>
 }

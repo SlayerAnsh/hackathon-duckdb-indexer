@@ -9,8 +9,7 @@ export function useTimedQuery(sql: string, version: number): TimedResult {
   if(!db || !state.manifest) return
   let active = true
   setResult(previous=>({...previous,loading:true,error:undefined}))
-  const start = performance.now()
-  void db.run(sql, Infinity).then(data=>{ if(active) setResult({data,ms:performance.now()-start,loading:false}) }).catch(error=>{ if(active) setResult(previous=>({...previous,error:error instanceof Error?error.message:String(error),loading:false})) })
+  void db.run(sql, Infinity).then(data=>{ if(active) setResult({data,ms:data.elapsedMs,loading:false}) }).catch(error=>{ if(active) setResult(previous=>({...previous,error:error instanceof Error?error.message:String(error),loading:false})) })
   return ()=>{active=false}
  },[db,sql,version,state.manifest?.version])
  return result

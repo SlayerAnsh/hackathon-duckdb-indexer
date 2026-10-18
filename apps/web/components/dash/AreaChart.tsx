@@ -2,7 +2,7 @@
 import { ResponsiveContainer, AreaChart as AreaPlot, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, PieChart, Pie, Cell, Label } from 'recharts'
 import type { Widget } from '../../lib/views'
 import type { TableData } from './DataTable'
-import { compact, shortHex } from '../../lib/format'
+import { compact, shortHex, hourBucketLabel } from '../../lib/format'
 
 const colors = Array.from({ length: 8 }, (_, i) => `var(--c${i + 1})`)
 export type ChartProps = { widget: Widget; data: TableData }
@@ -15,6 +15,10 @@ export function QueryChart({ widget, data }: ChartProps) {
  let rows: Record<string, string | number>[] = data.rows.map(row => Object.fromEntries(
   data.columns.map((c, i) => [c, y.includes(c) ? numeric(row[i]) : String(row[i] ?? '')])
  ))
+ if (widget.id === 'creations') {
+  const now = Date.now()
+  rows = rows.map(row => ({ ...row, [x]: hourBucketLabel(Number(row[x]), Number(row.head_block), now) }))
+ }
  let keys = y
  if (widget.series) {
   keys = [...new Set(rows.map(r => String(r[widget.series!])))]

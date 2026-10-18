@@ -8,3 +8,9 @@ export function compact(n: number) {
  for(const [scale,suffix] of [[1e9,'b'],[1e6,'m'],[1e3,'k']] as const) if(Math.abs(n)>=scale) return (n/scale).toFixed(1).replace(/\.0$/,'')+suffix
  return Number.isInteger(n) ? String(n) : n.toFixed(1)
 }
+
+// Approximate a block bucket's local clock time using the result's live head.
+export function hourBucketLabel(hour: number, head: number, now = Date.now()) {
+ const date = new Date(now + (hour * 1800 - head) * 2000)
+ return `${String(date.getHours()).padStart(2, '0')}:00`
+}

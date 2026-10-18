@@ -163,8 +163,9 @@ export class IndexDb {
     this.listener = undefined
   }
 
-  run(sql: string, maxRows = 1000): Promise<{ columns: string[]; rows: unknown[][]; truncated: boolean }> {
+  run(sql: string, maxRows = 1000): Promise<{ columns: string[]; rows: unknown[][]; truncated: boolean; elapsedMs: number }> {
     return this.serial(async () => {
+      const start = performance.now()
       const reader = await this.queries.send(sql, true)
       // The Arrow stream exposes its schema only after the first message is read.
       await reader.open()
@@ -174,13 +175,14 @@ export class IndexDb {
         for await (const batch of reader) {
           for (let i = 0; i < batch.numRows; i++) {
             if (rows.length === maxRows) {
+              const elapsedMs = performance.now() - start
               await this.cancel()
-              return { columns, rows, truncated: true }
+              return { columns, rows, truncated: true, elapsedMs }
             }
             rows.push(columns.map((_, j) => batch.getChildAt(j)?.get(i)))
           }
         }
-        return { columns, rows, truncated: false }
+        return { columns, rows, truncated: false, elapsedMs: performance.now() - start }
       } finally {
         await reader.cancel()
       }

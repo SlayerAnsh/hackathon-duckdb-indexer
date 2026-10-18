@@ -31,3 +31,31 @@ test('genesis mismatch has reason', () => {
   expect(chainCheck(manifest, 1, '0xdef').ok).toBe(false)
   expect(chainCheck(manifest, 1, '0xdef').reason).toMatch(/genesis/i)
 })
+
+test('run excludes queued wait and measures send through last batch', async () => {
+ const { IndexDb } = await import('../lib/indexdb')
+ const { spyOn } = await import('bun:test')
+ let now = 0
+ const clock = spyOn(performance, 'now').mockImplementation(() => now)
+ let release!: () => void
+ const queue = new Promise<void>(resolve => { release = resolve })
+ const reader = {
+  schema: { fields: [{ name: 'value' }] },
+  async open() { now += 2 },
+  async *[Symbol.asyncIterator]() {
+   now += 3
+   yield { numRows: 1, getChildAt: () => ({ get: () => 42 }) }
+   now += 4
+  },
+  async cancel() { now += 100 },
+ }
+ const db = Object.assign(Object.create(IndexDb.prototype), {
+  queue, queries: { async send() { now += 1; return reader } },
+ }) as import('../lib/indexdb').IndexDb
+ try {
+  const pending = db.run('SELECT 42')
+  now += 500
+  release()
+  expect(await pending).toEqual({ columns: ['value'], rows: [[42]], truncated: false, elapsedMs: 10 })
+ } finally { clock.mockRestore() }
+})

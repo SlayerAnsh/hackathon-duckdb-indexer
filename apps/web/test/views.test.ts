@@ -28,6 +28,13 @@ test('every widget executes on populated and empty public views with declared co
   await db.run("INSERT INTO live_tombstones VALUES ('key1',50002)")
   const changes=(await db.runAndReadAll(ACTIVITY_SQL)).getRowObjects()
   expect(changes.map(r=>r.kind)).toEqual(['Deleted','Transferred'])
+  for (let i=0;i<15;i++) await db.run(`INSERT INTO live_tombstones VALUES ('deleted${i}',${50003+i})`)
+  const limited=(await db.runAndReadAll(ACTIVITY_SQL)).getRowObjects()
+  expect(limited).toHaveLength(12)
+  expect(limited[0].key).toBe('deleted14')
+  const creations=VIEWS[0].widgets.find(w=>w.id==='creations')!
+  const hours=(await db.runAndReadAll(creations.sql)).getRowObjects()
+  expect(Number(hours[0].head_block)).toBe(50000)
   const ids = VIEWS.flatMap(v=>v.widgets.map(w=>w.id)); expect(new Set(ids).size).toBe(ids.length)
   expect(VIEWS.map(v=>v.id)).toEqual(['overview','expiry','creators','attributes','activity'])
   for (const empty of [false,true]) {
