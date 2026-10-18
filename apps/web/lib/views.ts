@@ -33,7 +33,8 @@ export const VIEWS: View[] = [
  { id:'overview', title:'Overview', description:'The live dataset at a glance. Every result is computed in this tab.', widgets:[
   stat('live','Live entities',`SELECT count(*) AS value, ${head} AS total FROM entities`,undefined,{kind:'total',text:'at head block {n}'}),
   stat('creators-count','Distinct creators','SELECT count(DISTINCT creator) AS value, count(*) AS total FROM entities','COUNT DISTINCT',{kind:'ratio',text:'{n} entities per creator'}),
-  stat('ownership-transfers','Ownership transfers','SELECT count(*) FILTER (WHERE owner <> creator) AS value, count(*) AS total FROM entities',undefined,ofLive),
+  // Known: attributes fetched. The rest are indexed from logs and wait for the newest first fill.
+  stat('known','Known entities','SELECT count(*) FILTER (WHERE NOT attrs_pending) AS value, count(*) AS total FROM entities',undefined,ofLive),
   stat('owners-count','Distinct owners','SELECT count(DISTINCT owner) AS value, count(*) AS total FROM entities','COUNT DISTINCT',{kind:'ratio',text:'{n} entities per owner'}),
   stat('expiring','Expiring within 1 hour',`SELECT count(*) FILTER (WHERE expires_at <= ${head}+1800) AS value, count(*) AS total FROM entities`,undefined,ofLive),
   stat('new','Created in the last hour',`SELECT count(*) FILTER (WHERE created_at >= greatest(0,${head}-1800)) AS value, count(*) AS total FROM entities`,undefined,ofLive),

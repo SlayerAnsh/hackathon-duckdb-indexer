@@ -117,3 +117,10 @@ test('oldest complete block is genesis without pending rows and newest pending u
   expect(await oldest()).toBe(0)
  } finally { db.closeSync(); instance.closeSync() }
 })
+
+test('overview counts known entities: live rows whose attributes are fetched', () => {
+ const known = VIEWS[0].widgets.find(w => w.id === 'known')
+ expect(known?.title).toBe('Known entities')
+ expect(known?.sql).toContain('NOT attrs_pending')
+ expect(VIEWS[0].widgets.some(w => w.id === 'ownership-transfers')).toBe(false)
+})

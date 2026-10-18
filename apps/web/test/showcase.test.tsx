@@ -76,7 +76,7 @@ test('widget card footer links to the playground with the encoded SQL', async ()
 
 test('stat card renders label, value, context note and meter from the measured row', async () => {
  const { WidgetBody } = await import('../components/dash/WidgetCard')
- const widget = VIEWS[0].widgets.find(x => x.id === 'ownership-transfers')!
+ const widget = VIEWS[0].widgets.find(x => x.id === 'known')!
  const html = renderToStaticMarkup(<WidgetBody widget={widget} query={{ loading: false, ms: 2, data: { columns: ['value', 'total'], rows: [[11, 30]] } }}/>)
  expect(html).toContain('>11<')
  expect(html).toContain('36.7% of live entities')
