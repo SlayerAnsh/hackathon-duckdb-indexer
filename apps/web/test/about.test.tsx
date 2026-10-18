@@ -1,7 +1,6 @@
 import { test, expect } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import AboutPage from '../app/about/page'
-import { EXPIRY_SECONDS } from '../../demo-writer/src/plan'
 import { Story } from '../components/landing/Story'
 import { Footer } from '../components/dash/Footer'
 
@@ -20,7 +19,9 @@ test('about copy uses no dash punctuation and no unverified live tail API', () =
  expect(html).not.toContain('watchEntityEvents')
 })
 
-test('expiry infographic matches the demo writer lifetimes', () => {
+// Loaded at runtime: the web Docker image type checks tests but does not ship apps/demo-writer
+test('expiry infographic matches the demo writer lifetimes', async () => {
+ const { EXPIRY_SECONDS } = await import(new URL('../../demo-writer/src/plan.ts', import.meta.url).href)
  expect(EXPIRY_SECONDS).toEqual({ ticket: 604800, comment: 86400, heartbeat: 600 })
  for (const label of ['10 min', '1 day', '7 days']) expect(text).toContain(label)
 })
