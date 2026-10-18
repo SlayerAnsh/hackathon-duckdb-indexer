@@ -104,7 +104,7 @@ export class LiveTail {
       const keys = [...this.pending].slice(0, 50)
       this.lastQuery = now
       try {
-        const page = await this.rpc.query(keyChunkQueries(this.opts.expression, keys)[0]!, { atBlock: head, select: ROW_SELECT, limit: 50 })
+        const page = await this.rpc.query(keyChunkQueries(this.opts.expression || null, keys)[0]!, { atBlock: head, select: ROW_SELECT, limit: 50 })
         if (!active()) return
         const rows = new Map(page.data.map(raw => { const row = decodeEntity(raw); return [row.entity.key, row] }))
         const sql: string[] = []

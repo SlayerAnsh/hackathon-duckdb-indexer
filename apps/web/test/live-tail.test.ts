@@ -62,6 +62,18 @@ test('successful attribute fetches throttle and foreign creations are excluded',
   await new LiveTail({ ...options, expression: '$creator = addr(' + next + ')' }).tick(3)
   expect(queries).toBe(2); expect(sql).toEqual([])
 })
+test('blank manifest expression sends key-only query without "()" prefix', async () => {
+  const sent: string[] = []
+  globalThis.fetch = (async (_url: unknown, init: RequestInit) => {
+    const { method, params } = JSON.parse(String(init.body))
+    if (method === 'arkiv_query') { sent.push(params[0]); return Response.json({ result: { data: [], blockNumber: '0x2' } }) }
+    return Response.json({ result: method === 'eth_blockNumber' ? '0x2' : [log('EntityCreated', 2)].map(l => ({ ...l, blockNumber: '0x2', logIndex: '0x0' })) })
+  }) as typeof fetch
+  await new LiveTail({ rpcUrl: 'http://fake', expression: '', apply: async () => {}, known: async () => undefined, onStatus: () => {}, now: () => 0 }).tick(2)
+  expect(sent).toHaveLength(1)
+  expect(sent[0]).toContain('$key')
+  expect(sent[0]).not.toContain('()')
+})
 test('successful query replaces attributes and deletion drops pending during backoff', async () => {
   let head = 2, now = 0, queries = 0
   const sql: string[] = [], statuses: LiveStatus[] = []
