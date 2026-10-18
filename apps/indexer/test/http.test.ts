@@ -1,7 +1,13 @@
 import { test, expect } from 'bun:test'
 import { mkdir, writeFile } from 'node:fs/promises'
-import { createHandler } from '../src/http'
+import { bootstrappingHandler, createHandler } from '../src/http'
 import { temp } from './helpers'
+test('HTTP bootstrap health and path allowlist', async () => {
+  const handle = bootstrappingHandler(), req = (p: string) => handle(new Request('http://local' + p))
+  const health = await req('/health'); expect(health.status).toBe(200); expect(health.headers.get('cache-control')).toBe('no-store'); expect(await health.json()).toEqual({ bootstrapping: true, headBlock: null, headLag: null, lastSnapshot: null })
+  for (const p of ['/manifest.json', '/delta.json', '/snap/v1/entities.parquet', '/snap/v2/attributes.parquet']) expect((await req(p)).status).toBe(503)
+  for (const p of ['/unknown', '/index.duckdb', '/snap/v1/no.parquet']) expect((await req(p)).status).toBe(404)
+})
 test('HTTP files, conditional requests, ranges, health and path allowlist', async () => {
   const dir = await temp(); await mkdir(dir + '/snap/v1', { recursive: true })
   await writeFile(dir + '/manifest.json', '{}'); await writeFile(dir + '/delta.json', '{}')

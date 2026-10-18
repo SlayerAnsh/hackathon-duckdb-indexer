@@ -1,5 +1,12 @@
 import { open } from 'node:fs/promises'
 import { join } from 'node:path'
+export function bootstrappingHandler(): (req: Request) => Promise<Response> {
+  return async req => {
+    const path = new URL(req.url).pathname
+    if (path === '/health') return Response.json({ bootstrapping: true, headBlock: null, headLag: null, lastSnapshot: null }, { headers: { 'cache-control': 'no-store' } })
+    return new Response(null, { status: path === '/manifest.json' || path === '/delta.json' || /^\/snap\/v\d+\/(entities|attributes)\.parquet$/.test(path) ? 503 : 404 })
+  }
+}
 export function createHandler(dir: string, health: () => object): (req: Request) => Promise<Response> {
   return async req => {
     const path = new URL(req.url).pathname

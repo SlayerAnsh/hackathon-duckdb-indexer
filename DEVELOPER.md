@@ -57,7 +57,7 @@ Both paths sweep `expires_at <= batchEnd` even when no events arrive, check the 
 
 ## Snapshots, HTTP and browser
 
-Every `SNAPSHOT_INTERVAL_BLOCKS` (default 30) the indexer publishes new versioned Parquet files with live rows and atomically replaces the manifest. It keeps `KEEP_SNAPSHOTS` (default two) versions and prunes older ones. Snapshot file paths must end in `.parquet` because DuckDB COPY without partitioning writes a file, not a directory. The internal HTTP server on port 8080 serves `/health`, `/manifest.json`, `/delta.json` and `/snap/v<n>/{entities,attributes}.parquet` with Range and ETag support.
+Every `SNAPSHOT_INTERVAL_BLOCKS` (default 30) the indexer publishes new versioned Parquet files with live rows and atomically replaces the manifest. It keeps `KEEP_SNAPSHOTS` (default two) versions and prunes older ones. Snapshot file paths must end in `.parquet` because DuckDB COPY without partitioning writes a file, not a directory. The internal HTTP server on port 8080 serves `/health`, `/manifest.json`, `/delta.json` and `/snap/v<n>/{entities,attributes}.parquet` with Range and ETag support. During bootstrap, `/health` returns 200 with `bootstrapping: true` and null block and snapshot fields while data paths return 503 until bootstrap completes.
 
 The web proxy (`apps/web/lib/proxy.ts`) forwards only those paths with Range and conditional request headers. When `DATA_DIR` is set and the indexer is unreachable or returns 502, 503 or 504, it serves the same files from disk with `x-served-by: disk`; without `DATA_DIR` it returns 502.
 

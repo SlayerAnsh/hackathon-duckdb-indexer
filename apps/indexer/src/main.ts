@@ -2,7 +2,7 @@ import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { syncBatch, syncLogs } from './sync'
 import { writeDelta } from './delta'
-import { createHandler, serve } from './http'
+import { bootstrappingHandler, createHandler, serve } from './http'
 import { createRpc, hasCreatorTerm, RpcError, type ArkivRpc } from '@asi/core'
 import { loadConfig, storeDir, type Config } from './config'
 import { Store } from './store'
@@ -152,6 +152,7 @@ export async function tick(ctx: TickContext): Promise<void> {
   }
 }
 if (import.meta.main) {
+  let server: ReturnType<typeof serve> | undefined
   try {
     const config = loadConfig(process.env)
     if (config.syncPaused) {
@@ -161,6 +162,8 @@ if (import.meta.main) {
     } else {
     console.log(keyUsage(config))
     const { rpc, queryRpc, fillRpc } = createClients(config)
+    let handle = bootstrappingHandler()
+    server = serve(config.port, req => handle(req))
     const result = await bootstrap(config, rpc, console.log, queryRpc)
     const state = (await result.store.state())!
     const ctx: TickContext = { ...result, rpc, queryRpc, config, meta: { chainId: state.chain_id, genesisHash: state.genesis_hash, expression: config.expression } }
@@ -173,10 +176,10 @@ if (import.meta.main) {
       return counts
     }
     let servingDir = ctx.dir, handler = createHandler(servingDir, () => health)
-    serve(config.port, req => {
+    handle = req => {
       if (servingDir !== ctx.dir) { servingDir = ctx.dir; handler = createHandler(servingDir, () => health) }
       return handler(req)
-    })
+    }
     console.log('Indexed through block ' + result.head + ' at ' + result.dir)
     let running = false
     setInterval(async () => {
@@ -194,6 +197,7 @@ if (import.meta.main) {
     setInterval(fill, config.fillIntervalMs)
     }
   } catch (error) {
+    server?.stop()
     console.error(error instanceof Error ? error.message : String(error))
     process.exitCode = 1
   }
