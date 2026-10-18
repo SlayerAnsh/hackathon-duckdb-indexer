@@ -1,1 +1,9 @@
-export function WhySqlStrip({onView}:{onView:(id:string)=>void}) { return <div className="why"><span>Beyond arkiv_query</span><ul>{[['creators','JOIN','connect entities'],['attributes','GROUP BY','aggregate anything'],['expiry','ORDER BY','sort any attribute'],['activity','OVER','window functions']].map(([view,clause,label])=><li key={view}><a href="#showcase" onClick={()=>onView(view)}><code>{clause}</code>{label}</a></li>)}</ul></div> }
+import Link from 'next/link'
+// Clauses arkiv_query cannot express, each linking to the showcase view that uses it.
+export const WHY_SQL = [
+ { view: 'creators', clause: 'JOIN', label: 'connect entities' },
+ { view: 'attributes', clause: 'GROUP BY', label: 'aggregate anything' },
+ { view: 'expiry', clause: 'ORDER BY', label: 'sort any attribute' },
+ { view: 'activity', clause: 'OVER', label: 'window functions' },
+] as const
+export function WhySqlStrip({ className }: { className?: string }) { return <ul className={'why-list ' + (className ?? '')} aria-label="Beyond arkiv_query">{WHY_SQL.map(w => <li key={w.view}><Link href={`/showcase?view=${w.view}`}><code>{w.clause}</code>{w.label}</Link></li>)}</ul> }
