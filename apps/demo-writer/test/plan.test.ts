@@ -29,6 +29,15 @@ test('ineligible comment and assignment choices safely fall back', () => {
   expect(nextAction(state, () => 0.8).kind).toBe('open_ticket');
 });
 
+test('assigned active tickets allow comments but never status patches or reassignment', () => {
+  for (const status of ['open', 'pending'] as const) {
+    const state = { tickets: [{ key: 'assigned', status, assignee: 'agent' }], agents: ['agent'] };
+    expect(nextAction(state, () => 0.3).kind).toBe('comment');
+    expect(nextAction(state, () => 0.65).kind).toBe('open_ticket');
+    expect(nextAction(state, () => 0.8).kind).toBe('open_ticket');
+  }
+});
+
 test('seeded output is reproducible and weight boundaries are exact', () => {
   const state = { tickets: [{ key: 'a', status: 'open' as const, assignee: null }], agents: ['agent'] };
   const a = mulberry32(9), b = mulberry32(9);

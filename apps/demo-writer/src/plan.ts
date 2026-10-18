@@ -24,11 +24,11 @@ export function nextAction(state: { tickets: Ticket[]; agents: string[] }, rand:
     priority: 1 + Math.floor(rand() * 3), comment: 'Synthetic support request for the demo console.' });
   if (!state.tickets.length) return open();
   const choice = rand() * 100;
-  // Ownership has left the writer after assignment, so only unassigned tickets are mutable.
+  // Only unassigned tickets allow patches; permissionless extension keeps comments eligible after transfer.
   const owned = state.tickets.filter(t => t.assignee === null);
   if (choice < 25) return open();
   if (choice < 60) {
-    const tickets = owned.filter(t => t.status !== 'closed');
+    const tickets = state.tickets.filter(t => t.status !== 'closed');
     return tickets.length ? { kind: 'comment', ticket: pick(tickets).key, text: 'Synthetic diagnostic check completed.' } : open();
   }
   if (choice < 75) return owned.length

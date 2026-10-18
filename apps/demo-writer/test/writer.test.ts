@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { ExpirationTime } from '@arkiv-network/sdk';
 import { addr, key, u64 } from '@arkiv-network/sdk/attr';
+import { nextAction } from '../src/plan';
 import { perform, type WriterClient, type WriterState } from '../src/writer';
 
 const ticket = `0x${'11'.repeat(32)}` as const;
@@ -27,6 +28,8 @@ test('opening uses one atomic batch with predicted salts and typed relationship'
   await perform(client, { kind: 'open_ticket', title: 'Blue widget', priority: 2, comment: 'Synthetic' }, state);
   expect(calls.map(c => c.method)).toEqual(['batch']);
   const [a, b] = calls[0]!.data.creates;
+  expect(a.flags).toEqual({ permissionlessExtension: true });
+  expect(b.flags).toBeUndefined();
   expect(a.attributes).toEqual({ type: 'ticket', project: 'arkiv-sql-indexer-demo', title: 'Blue widget', status: 'open', priority: u64(2) });
   expect(a.salt).toBe(1n);
   expect(b.salt).toBe(2n);
@@ -46,6 +49,23 @@ test('comments renew ticket and heartbeat has short expiry', async () => {
   expect(calls[1]!.data).toEqual({ entityKey: ticket, expires: ExpirationTime.fromSeconds(604800) });
   expect(calls[2]!.data.expires).toEqual(ExpirationTime.fromSeconds(600));
   expect(calls[2]!.data.attributes).toEqual({ type: 'heartbeat', project: 'arkiv-sql-indexer-demo' });
+  expect(calls[0]!.data.flags).toBeUndefined();
+  expect(calls[2]!.data.flags).toBeUndefined();
+});
+
+test('after assignment the planner still comments and the writer extends without patching', async () => {
+  const { client, state, calls } = fixture();
+  state.tickets.push({ key: ticket, status: 'open', assignee: null });
+  await perform(client, { kind: 'assign', ticket, agent }, state);
+  expect(state.tickets[0]!.assignee).toBe(agent);
+  calls.length = 0;
+  const action = nextAction(state, () => 0.3);
+  expect(action).toEqual({ kind: 'comment', ticket, text: 'Synthetic diagnostic check completed.' });
+  await perform(client, action, state);
+  expect(calls.map(c => c.method)).toEqual(['create', 'extend']);
+  expect(calls[0]!.data.attributes.ticket).toEqual(key(ticket));
+  expect(calls[0]!.data.flags).toBeUndefined();
+  expect(calls[1]!.data).toEqual({ entityKey: ticket, expires: ExpirationTime.fromSeconds(604800) });
 });
 
 test('status patches preserve attributes and assignment patches before transfer', async () => {

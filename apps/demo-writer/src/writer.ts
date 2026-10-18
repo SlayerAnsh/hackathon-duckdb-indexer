@@ -36,7 +36,7 @@ export async function perform(client: WriterClient, action: Action, state: Write
         if (!client.account) throw new Error('Writer account is required');
         const [parent, child] = await client.predictEntityKeys({ owner: client.account.address, count: 2 });
         const result = await client.executeBatch({ creates: [
-          { ...contents('ticket'), salt: parent.salt, attributes: { type: 'ticket', project,
+          { ...contents('ticket'), flags: { permissionlessExtension: true }, salt: parent.salt, attributes: { type: 'ticket', project,
             title: action.title, status: 'open', priority: u64(action.priority) } },
           { ...contents('comment', action.comment), salt: child.salt,
             attributes: { type: 'comment', project, ticket: key(parent.key) } },
