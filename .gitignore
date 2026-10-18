@@ -8,7 +8,7 @@ dist/
 *.tsbuildinfo
 
 # runtime data
-data/
+/data/
 *.duckdb
 *.duckdb.wal
 *.parquet
