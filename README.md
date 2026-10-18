@@ -2,7 +2,7 @@
 
 Open source analytics for Arkiv, aimed at developers. A Bun indexer mirrors Arkiv into versioned Parquet snapshots plus a JSON delta, so any app, script or AI agent can query every live entity in milliseconds with plain SQL, without paging `arkiv_query` (200 results per page, no JOIN, GROUP BY or ORDER BY on attributes) and without hitting RPC rate limits. One `docker compose up` gives you your own read only Arkiv data API over HTTP, and a Next.js app runs full SQL over the same files in DuckDB WASM in the visitor's tab. Expiry is honored everywhere: a row disappears the moment its expiry block passes. No API key is needed by default, and a `$creator` filter turns "who wrote this" into the trust boundary. A synthetic support desk writer shows batch creates, patches, lease style extensions, ownership transfers and expiring data.
 
-* Live app: `<LIVE_URL>`
+* Live app: https://arkiv-sql.dokploy.anshudhar.dev
 * Demo video: `<VIDEO_URL>`
 * Entity schema and exact queries: [arkiv/schema.md](arkiv/schema.md)
 * Arkiv friction report: [arkiv/friction.md](arkiv/friction.md)
@@ -95,7 +95,7 @@ Setting `COMPOSE_PROFILES=demo` in `.env` has the same effect. No private key is
 
 ## Data API (for apps and AI agents)
 
-The web proxy exposes the index read only at `http://localhost:3000/data` (hosted: `<API_URL>`). It forwards to the internal indexer (`apps/web/lib/proxy.ts`, `apps/indexer/src/http.ts`). If the indexer is down, it serves the same files from its read only mount of the data directory (`DATA_DIR`, `apps/web/lib/disk-data.ts`) and adds the header `x-served-by: disk`. No other paths are proxied.
+The web proxy exposes the index read only at `http://localhost:3000/data` (hosted: https://arkiv-sql.dokploy.anshudhar.dev/data). It forwards to the internal indexer (`apps/web/lib/proxy.ts`, `apps/indexer/src/http.ts`). If the indexer is down, it serves the same files from its read only mount of the data directory (`DATA_DIR`, `apps/web/lib/disk-data.ts`) and adds the header `x-served-by: disk`. No other paths are proxied.
 
 | Request | Returns |
 | :--- | :--- |
