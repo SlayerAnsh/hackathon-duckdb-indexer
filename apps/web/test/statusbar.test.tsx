@@ -8,7 +8,7 @@ const manifest: Manifest = { chainId: 60138453056, genesisHash: '0x0', expressio
 test('status bar shows state, en-US heights, fill progress and all entities', () => {
  const html = renderToStaticMarkup(<StatusBarView state={{ status: 'ready', manifest, liveHead: 749516, source: 'indexer' }} oldest={0}/>)
  expect(html).toContain('live')
- expect(html).toContain('from')
+ expect(html).toContain('attrs complete from')
  expect(html).toContain('genesis')
  expect(html).toContain('749,510')
  expect(html).toContain('749,516')
