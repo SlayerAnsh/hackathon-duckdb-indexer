@@ -2,6 +2,7 @@ import { ENTITY_INSERT_COLUMNS, LIVE_TABLES, RAW_TABLES_SQL, MERGE_VIEWS_SQL, MA
 import type { AsyncDuckDBConnection } from '@duckdb/duckdb-wasm'
 import { LiveTail, type LiveStatus } from './live-tail'
 import { createBrowserRpc } from './rpc-browser'
+import { fieldConverter } from './arrow-value'
 
 const clears = ['DELETE FROM delta_entities', 'DELETE FROM delta_attributes', 'DELETE FROM delta_tombstones']
 const literal = (value: string | number | null) => value === null ? 'NULL' : typeof value === 'number' ? String(value) : "'" + value.replaceAll("'", "''") + "'"
@@ -177,6 +178,7 @@ export class IndexDb {
       // The Arrow stream exposes its schema only after the first message is read.
       await reader.open()
       const columns = reader.schema.fields.map(field => field.name)
+      const convert = reader.schema.fields.map(field => fieldConverter(field.type as { typeId?: number; scale?: number }))
       const rows: unknown[][] = []
       try {
         for await (const batch of reader) {
@@ -186,7 +188,7 @@ export class IndexDb {
               await this.cancel()
               return { columns, rows, truncated: true, elapsedMs }
             }
-            rows.push(columns.map((_, j) => batch.getChildAt(j)?.get(i)))
+            rows.push(columns.map((_, j) => convert[j]!(batch.getChildAt(j)?.get(i))))
           }
         }
         return { columns, rows, truncated: false, elapsedMs: performance.now() - start }
