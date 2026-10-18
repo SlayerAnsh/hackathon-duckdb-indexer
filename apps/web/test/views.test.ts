@@ -3,6 +3,7 @@ import { DuckDBInstance } from '../../../packages/core/node_modules/@duckdb/node
 import { RAW_TABLES_SQL, MERGE_VIEWS_SQL, setHeadSql } from '@asi/core'
 import { ACTIVITY_SQL } from '../components/dash/ActivityFeed'
 import { VIEWS, DEFAULT_SQL } from '../lib/views'
+import { OLDEST_SQL } from '../lib/heights'
 test('every widget executes on populated and empty public views with declared columns', async () => {
  const instance = await DuckDBInstance.create(':memory:'); const db = await instance.connect()
  try {
@@ -54,5 +55,22 @@ test('every widget executes on populated and empty public views with declared co
     for(const col of [widget.x,...(Array.isArray(widget.y)?widget.y:[widget.y]),widget.series].filter(Boolean)) expect(columns).toContain(col!)
    }
   }
+ } finally { db.closeSync(); instance.closeSync() }
+})
+test('oldest complete block is genesis without pending rows and newest pending update plus one otherwise', async () => {
+ const instance = await DuckDBInstance.create(':memory:'); const db = await instance.connect()
+ const oldest = async () => Number((await db.runAndReadAll(OLDEST_SQL)).getRowObjects()[0].oldest)
+ try {
+  for (const sql of [...RAW_TABLES_SQL,...MERGE_VIEWS_SQL,...setHeadSql(50000)]) await db.run(sql)
+  expect(await oldest()).toBe(0)
+  await db.run("INSERT INTO base_entities VALUES ('done','o','c',100,49000,90000,NULL,0,false)")
+  expect(await oldest()).toBe(0)
+  await db.run("INSERT INTO base_entities VALUES ('p1','o','c',100,300,90000,NULL,0,true),('p2','o','c',100,700,90000,NULL,0,true),('gone','o','c',100,900,40000,NULL,0,true)")
+  expect(await oldest()).toBe(701)
+  // A fetched delta row for p2 outranks its pending snapshot row.
+  await db.run("INSERT INTO delta_entities VALUES ('p2','o','c',100,700,90000,NULL,0,false)")
+  expect(await oldest()).toBe(301)
+  await db.run("INSERT INTO delta_entities VALUES ('p1','o','c',100,300,90000,NULL,0,false)")
+  expect(await oldest()).toBe(0)
  } finally { db.closeSync(); instance.closeSync() }
 })

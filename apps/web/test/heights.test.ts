@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test'
-import { describeHeights } from '../lib/heights'
+import { describeHeights, heightText } from '../lib/heights'
 test('freshness thresholds, missing chain and serving heights', () => {
  expect(describeHeights({chain:100,stored:91}).state).toBe('live')
  expect(describeHeights({chain:100,stored:91}).lagText).toBe('9 blocks (18 s)')
@@ -10,4 +10,17 @@ test('freshness thresholds, missing chain and serving heights', () => {
  expect(describeHeights({stored:1,serving:1}).items.map(i=>i.label)).toEqual(['stored'])
  expect(describeHeights({chain:100,stored:1,serving:99}).items.map(i=>i.label)).toEqual(['stored','serving','chain'])
  expect(describeHeights({chain:100}).state).toBe('unknown')
+})
+test('oldest block adds a from item without changing lag or state', () => {
+ const base = describeHeights({chain:100,stored:91})
+ const genesis = describeHeights({chain:100,stored:91,oldest:0})
+ expect(genesis.items).toEqual([{label:'from',block:0},...base.items])
+ expect(genesis.lagText).toBe(base.lagText)
+ expect(genesis.state).toBe(base.state)
+ expect(describeHeights({chain:100,stored:91,oldest:40}).items.map(i=>i.label)).toEqual(['from','stored','chain'])
+ expect(describeHeights({oldest:5}).state).toBe('unknown')
+ expect(describeHeights({chain:100,stored:91}).items.some(i=>i.label==='from')).toBe(false)
+ expect(heightText({label:'from',block:0})).toBe('genesis')
+ expect(heightText({label:'from',block:1234})).toBe((1234).toLocaleString())
+ expect(heightText({label:'stored',block:0})).toBe('0')
 })
