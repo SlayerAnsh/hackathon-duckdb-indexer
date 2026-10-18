@@ -21,6 +21,7 @@ test('oldest block adds a from item without changing lag or state', () => {
  expect(describeHeights({oldest:5}).state).toBe('unknown')
  expect(describeHeights({chain:100,stored:91}).items.some(i=>i.label==='from')).toBe(false)
  expect(heightText({label:'from',block:0})).toBe('genesis')
- expect(heightText({label:'from',block:1234})).toBe((1234).toLocaleString())
+ expect(heightText({label:'from',block:1234})).toBe('1,234')
+ expect(heightText({label:'chain',block:749516})).toBe('749,516')
  expect(heightText({label:'stored',block:0})).toBe('0')
 })

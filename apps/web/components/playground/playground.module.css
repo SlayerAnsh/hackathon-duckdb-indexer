@@ -1,5 +1,5 @@
 /* SQL playground. 8 px spacing scale: 8, 16, 24, 32, 48. Colors come from app/theme.css tokens. */
-.shell{--side-w:300px;--top-h:57px;display:grid;grid-template-columns:var(--side-w) minmax(0,1fr);height:calc(100dvh - var(--top-h));min-height:640px;border-bottom:1px solid var(--border)}
+.shell{--side-w:300px;--top-h:57px;display:grid;grid-template-columns:var(--side-w) minmax(0,1fr);height:calc(100dvh - var(--top-h) - var(--status-h, 0px));min-height:640px;border-bottom:1px solid var(--border)}
 
 /* ---------- sidebar */
 .side{display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--card);border-right:1px solid var(--border)}

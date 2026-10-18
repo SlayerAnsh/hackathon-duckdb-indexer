@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { IndexState } from '../../lib/indexdb'
-import { HeightsCluster } from './HeightsCluster'
+import { StatusBar, TopStateChip } from './StatusBar'
 import { ThemeToggle } from './ThemeToggle'
 
 export const NAV_ITEMS = [
@@ -26,12 +26,11 @@ export function PageNav({ pathname }: { pathname: string | null }) {
 
 export function TopBar({ state }: { state: IndexState }) {
  const pathname = usePathname()
- return <header className="top"><div className="wrap top-in">
+ return <><header className="top"><div className="wrap top-in">
   <Link className="brand" href="/"><span className="brand-mark">A</span><span>Arkiv <b>SQL</b></span></Link>
   <PageNav pathname={pathname}/>
   <span className="top-sp"/>
-  <span className="pill-chain top-chain">Tiramisu <span className="mono">{state.manifest?.chainId ?? '…'}</span></span>
-  <HeightsCluster state={state}/>
+  <TopStateChip state={state}/>
   <ThemeToggle/>
- </div></header>
+ </div></header><StatusBar state={state}/></>
 }
