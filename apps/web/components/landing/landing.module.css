@@ -37,7 +37,7 @@
 /* Sections below the hero. */
 .section{min-width:0}
 .sectionHead{display:flex;align-items:baseline;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;margin-bottom:24px}
-.sectionHead h2,.aboutLead h2{margin:0;font-size:24px;line-height:1.25;letter-spacing:-.02em;font-weight:650}
+.sectionHead h2{margin:0;font-size:24px;line-height:1.25;letter-spacing:-.02em;font-weight:650}
 .sectionHead p{margin:0;color:var(--text-2);font-size:14px}
 
 .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
@@ -53,26 +53,39 @@
 .chips a:hover{border-color:var(--accent);color:var(--text)}
 .chips code{font:600 12px var(--font-mono);color:var(--text)}
 .sample{margin:0;padding:16px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--inset);font:12.5px/1.7 var(--font-mono);color:var(--text);overflow-x:auto}
-.cardText code,.block code{font:12.5px var(--font-mono);padding:2px 6px;border-radius:var(--r-sm);background:var(--card-2);color:var(--text)}
+.cardText code{font:12.5px var(--font-mono);padding:2px 6px;border-radius:var(--r-sm);background:var(--card-2);color:var(--text)}
 
-/* About: a sticky lead column and plain text blocks. */
-.about{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:64px;padding-top:64px;border-top:1px solid var(--border)}
-.aboutLead{position:sticky;top:96px;align-self:start}
-.aboutLead p{margin:16px 0 0;color:var(--text-2);font-size:15px;line-height:1.7;max-width:44ch}
-.links{list-style:none;margin:24px 0 0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:14px}
-.links a{color:var(--accent);text-decoration:none;font-weight:500}
-.links a:hover{text-decoration:underline;text-underline-offset:4px}
-.aboutBody{display:grid;gap:48px;min-width:0}
-.block h3{margin:0 0 16px;font-size:16px;font-weight:650;letter-spacing:-.01em}
-.block p{margin:0;color:var(--text-2);font-size:14.5px;line-height:1.7;max-width:68ch}
-.how{list-style:none;margin:0;padding:0;display:grid;gap:16px;counter-reset:how;max-width:68ch}
-.how li{counter-increment:how;display:grid;grid-template-columns:40px minmax(0,1fr);color:var(--text-2);font-size:14.5px;line-height:1.7}
-.how li::before{content:counter(how,decimal-leading-zero);font:600 12px/1.7 var(--font-mono);color:var(--text-3);padding-top:2px}
+/* Story: condensed /about chapters. Heading and link on the left, the content on the right. */
+.chapter{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:64px;padding-top:48px;border-top:1px solid var(--border);min-width:0;scroll-margin-top:80px}
+.chapterLead{align-self:start;position:sticky;top:96px}
+.chapterLead h2{margin:0;font-size:24px;line-height:1.25;letter-spacing:-.02em;font-weight:650;text-wrap:balance}
+.chapterLead p{margin:16px 0 0;color:var(--text-2);font-size:15px;line-height:1.65;max-width:42ch}
+.chapterLead .more{font-size:14px;font-weight:600}
+.more a{color:var(--accent);text-decoration:none}
+.more a:hover{text-decoration:underline;text-underline-offset:4px}
+.chapterBody{display:flex;flex-direction:column;gap:24px;min-width:0}
+.chapterBody code{font:12.5px var(--font-mono);padding:1px 6px;border-radius:var(--r-sm);background:var(--card-2);color:var(--text);overflow-wrap:anywhere}
+.prose p{margin:0 0 16px;font-size:15px;line-height:1.7;color:var(--text-2);max-width:66ch}
+.pipeSplit{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:40px;align-items:start}
+.archFig{margin:0;padding:16px;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--card);min-width:0}
+.relies{list-style:none;margin:0;padding:0;display:grid;gap:16px}
+.relies li{padding-left:16px;border-left:2px solid var(--ok);font-size:14.5px;line-height:1.65;color:var(--text-2);max-width:68ch}
+.relies b,.featureList b{color:var(--text);font-weight:600}
+.offLine{margin:0;padding-left:16px;border-left:2px dashed var(--border-strong);font-size:14.5px;line-height:1.65;color:var(--text-2);max-width:68ch}
+.featureList{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 40px}
+.featureList li{display:flex;flex-direction:column;gap:4px;min-width:0;padding-top:12px;border-top:1px solid var(--border);font-size:14px;line-height:1.6;color:var(--text-2)}
+.ids{margin:0;display:grid;gap:0;border-top:1px solid var(--border)}
+.ids div{display:grid;grid-template-columns:minmax(0,180px) minmax(0,1fr);gap:16px;padding:10px 0;border-bottom:1px solid var(--border);font-size:13.5px}
+.ids dt{color:var(--text-2);font-weight:600}
+.ids dd{margin:0;font:12.5px var(--font-mono);overflow-wrap:anywhere}
+.ids a{color:var(--accent);text-decoration:none}
+.ids a:hover{text-decoration:underline;text-underline-offset:3px}
 
 @media(max-width:1023px){
  .heroGrid{grid-template-columns:minmax(0,1fr);gap:48px}
- .about{grid-template-columns:minmax(0,1fr);gap:48px}
- .aboutLead{position:static}
+ .chapter{grid-template-columns:minmax(0,1fr);gap:32px}
+ .chapterLead{position:static}
+ .pipeSplit{grid-template-columns:minmax(0,1fr)}
 }
 @media(max-width:860px){
  .steps{grid-template-columns:minmax(0,1fr);gap:24px}
@@ -90,9 +103,9 @@
  .pipe{padding:16px}
  .cards{grid-template-columns:minmax(0,1fr);gap:16px}
  .card{padding:16px}
- .about{padding-top:48px;gap:32px}
- .aboutBody{gap:32px}
- .how li{grid-template-columns:32px minmax(0,1fr)}
+ .featureList{grid-template-columns:minmax(0,1fr)}
+ .ids div{grid-template-columns:minmax(0,1fr);gap:2px}
+ .archFig{padding:8px}
 }
 
 /* Hero backdrop: a static full bleed grid, clear toward the edges and fading out at the centre so the

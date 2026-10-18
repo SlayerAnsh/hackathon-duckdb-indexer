@@ -13,7 +13,7 @@
 .query figcaption code{font:12.5px var(--font-mono);color:var(--text)}
 
 /* Sections: heading rail on the left, content on the right, separated by a hairline. */
-.section{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:64px;padding-top:48px;border-top:1px solid var(--border);min-width:0}
+.section{scroll-margin-top:80px;display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:64px;padding-top:48px;border-top:1px solid var(--border);min-width:0}
 .rail{align-self:start;position:sticky;top:96px}
 .rail h2{margin:0;font-size:26px;line-height:1.2;letter-spacing:-.025em;font-weight:650;text-wrap:balance}
 .rail p{margin:16px 0 0;color:var(--text-2);font-size:15px;line-height:1.65;max-width:42ch}
