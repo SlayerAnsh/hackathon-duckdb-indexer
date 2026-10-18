@@ -28,7 +28,7 @@
 
 ### Task 1: Scaffold [Claude]
 
-- [ ] **Step 1:** Claude creates `apps/web` with `create-next-app` (TypeScript, App Router, no Tailwind unless default, no `src/` dir), sets package name `@asi/web`, adds `@asi/core` workspace dependency, `@duckdb/duckdb-wasm`, `@uiw/react-codemirror`, `@codemirror/lang-sql`, `recharts`, and runs `bun install`.
+- [x] **Step 1 (done, Next.js 16.4.2; read `apps/web/AGENTS.md` and `apps/web/node_modules/next/dist/docs/` before writing Next code):** Claude creates `apps/web` with `create-next-app` (TypeScript, App Router, no Tailwind unless default, no `src/` dir), sets package name `@asi/web`, adds `@asi/core` workspace dependency, `@duckdb/duckdb-wasm`, `@uiw/react-codemirror`, `@codemirror/lang-sql`, `recharts`, and runs `bun install`.
 - [ ] **Step 2:** `next.config` sets `output: 'standalone'` and `transpilePackages: ['@asi/core']`. `.env.example` gains `INDEXER_URL=http://localhost:8080` and `NEXT_PUBLIC_TIRAMISU_RPC_URL=https://rpc.tiramisu.db-chain.testnet.arkiv.network`.
 - [ ] **Step 3:** `bun run build` in `apps/web` succeeds. Commit `chore(web): scaffold next app`.
 
