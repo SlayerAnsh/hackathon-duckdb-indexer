@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+
+# build output
+.next/
+out/
+dist/
+*.tsbuildinfo
+
+# runtime data
+data/
+*.duckdb
+*.duckdb.wal
+*.parquet
+
+# secrets
+.env
+.env.*
+!.env.example
+
+# agent tooling (skills are reproducible from skills-lock.json)
+.agents/
+.claude/
+CODEX-REPORT.md
+
+# os and editors
+.DS_Store
+.idea/
+.vscode/
+*.log

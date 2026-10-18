@@ -1,0 +1,11 @@
+{
+  "name": "@asi/indexer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@asi/core": "workspace:*",
+    "@duckdb/node-api": "1.5.6-r.1",
+    "viem": "^2.57.3"
+  }
+}
