@@ -1,13 +1,23 @@
 /* Showcase cards and grid. Spacing follows the 8 px scale; colours come from app/theme.css tokens. */
 .grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:24px;align-items:stretch}
 
-.card{--pad:24px;grid-column:span var(--lg,6);min-width:0;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;transition:border-color .15s}
+.card{--pad:24px;container:card/inline-size;grid-column:span var(--lg,6);min-width:0;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;transition:border-color .15s}
 .card:hover{border-color:var(--border-strong)}
 .card:target{border-color:var(--accent)}
 
-.head{padding:var(--pad) var(--pad) 0;min-height:calc(var(--pad) + 44px)}
-.head h3{margin:0;font-size:15px;line-height:1.4;font-weight:600;letter-spacing:-.005em;color:var(--text)}
-.head p{margin:4px 0 0;color:var(--text-2);font-size:13px;line-height:1.45;max-width:68ch;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.head{padding:var(--pad) var(--pad) 0}
+.card:not(.statCard) .head{min-height:calc(var(--pad) + 52px)}
+.titleRow{display:flex;align-items:flex-start;justify-content:space-between;gap:4px 12px;flex-wrap:wrap}
+.titleRow :global(.tip-trigger){flex:none;margin-left:auto}
+.head h3{margin:0;font-size:15px;line-height:20px;font-weight:600;letter-spacing:-.005em;color:var(--text);min-width:0}
+.subRow{display:flex;align-items:center;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;margin-top:4px}
+.head p{margin:0;color:var(--text-2);font-size:13px;line-height:20px;max-width:68ch;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* time range: small segmented control */
+.ranges{display:inline-flex;margin-left:auto;padding:2px;gap:2px;border-radius:var(--r-md);background:var(--inset);border:1px solid var(--border)}
+.ranges button{height:24px;padding:0 8px;border:0;border-radius:6px;background:none;color:var(--text-2);font:500 12px/1 var(--font-ui);font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer}
+.ranges button:hover{color:var(--text)}
+.ranges button[aria-pressed="true"]{background:var(--card);color:var(--text);box-shadow:0 0 0 1px var(--border-strong)}
 
 .body{flex:1;min-width:0;padding:16px var(--pad) var(--pad);display:flex;flex-direction:column}
 .body :global(.empty){margin:auto 0;padding:0}
@@ -19,22 +29,39 @@
 .chart :global(.chart-key){padding-top:12px;gap:8px 16px;font-size:12px}
 .table{min-height:200px}
 .table :global(.tbl-wrap){max-height:360px}
-.stat{min-height:96px;justify-content:center}
-.stat :global(.stat-value){font-size:40px;line-height:1.1;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+
+/* stat: label row, value and one context line, bottom aligned so values share a baseline across a row */
+.statCard .head h3{font-size:13px;font-weight:500;color:var(--text-2)}
+.stat{padding-top:4px;padding-bottom:16px;justify-content:flex-end}
+.stat :global(.stat-value){font-size:32px;line-height:40px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat :global(.empty){margin:0;line-height:40px;font-size:13px;color:var(--text-3)}
+.note{display:flex;align-items:center;gap:8px;min-height:16px;margin-top:4px;font-size:12px;line-height:16px;color:var(--text-2);font-variant-numeric:tabular-nums;min-width:0}
+.noteText{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.meter{flex:none;width:48px;height:4px;border-radius:2px;background:var(--border-strong);overflow:hidden}
+.meter i{display:block;height:100%;border-radius:inherit;background:var(--accent)}
+.stat.sql{padding-bottom:var(--pad)}
+.stat.sql :global(.sqlpane pre){max-height:160px}
 
 .sql :global(.sqlpane){margin:0}
 .chart.sql :global(.sqlpane pre){max-height:240px}
 .table.sql :global(.sqlpane pre){max-height:320px}
 
-.foot{display:flex;align-items:center;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;padding:12px var(--pad);border-top:1px solid var(--border);background:color-mix(in srgb,var(--card-2) 55%,var(--card));min-height:56px}
-.meta{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;min-width:0}
+/* footer: one row, run badge left, compact actions right */
+.foot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:nowrap;padding:8px var(--pad);border-top:1px solid var(--border);background:color-mix(in srgb,var(--card-2) 55%,var(--card));min-height:44px}
+.meta{display:flex;align-items:center;min-width:0;overflow:hidden}
 .meta :global(.run){font-size:12px}
-.actions{display:flex;align-items:center;gap:8px;margin-left:auto}
-.action{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--card);color:var(--text-2);font-size:13px;font-weight:500;text-decoration:none;white-space:nowrap;cursor:pointer}
-.action:hover{color:var(--text);border-color:var(--border-strong)}
-.action[aria-expanded="true"]{color:var(--text);background:var(--accent-soft);border-color:transparent}
-.primary{color:var(--text);background:var(--accent-soft);border-color:transparent}
+.actions{display:flex;align-items:center;gap:4px;margin-left:auto;flex:none}
+.action{display:inline-flex;align-items:center;justify-content:center;gap:4px;height:28px;padding:0 8px;border-radius:var(--r-md);border:1px solid transparent;background:none;color:var(--text-2);font:500 12px/1 var(--font-ui);text-decoration:none;white-space:nowrap;cursor:pointer}
+.action svg{width:14px;height:14px;flex:none}
+.action:hover{color:var(--text);background:var(--card);border-color:var(--border)}
+.action:disabled{cursor:progress}
+.action[aria-expanded="true"]{color:var(--text);background:var(--accent-soft)}
+.icon{width:28px;padding:0}
+.primary{color:var(--text);background:var(--accent-soft)}
 .primary:hover{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.spinOnce{animation:spin .6s ease-out}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spinOnce{animation:none}}
 
 /* donut: chart beside its legend */
 .donut{display:flex;align-items:center;gap:24px;min-height:240px}
@@ -44,27 +71,43 @@
 @media (max-width:1100px){.card{grid-column:span var(--md,6)}}
 @media (max-width:760px){
  .grid{gap:16px}
- .card{--pad:16px;grid-column:1/-1}
+ .card{--pad:16px;grid-column:span var(--sm,12)}
  .chart{min-height:0}
  .chart :global(.chart-frame){height:220px}
  .donut{flex-direction:column;align-items:stretch;gap:16px}
  .donut :global(.chart-frame){flex:none;width:100%;height:200px}
+ .stat{padding-bottom:16px}
+ .stat :global(.stat-value){font-size:28px;line-height:36px}
 }
-@media (max-width:420px){
- .foot{align-items:stretch}
- .actions{width:100%;margin-left:0}
- .action{flex:1;justify-content:center;padding:0 8px}
+/* narrow cards (stats three or two to a row): icon only actions, then the run badge on its own row */
+@container card (max-width:320px){
+ .action span{display:none}
+ .action{width:28px;padding:0}
+}
+@container card (max-width:240px){
+ .foot{flex-wrap:wrap;gap:4px 8px}
+ .meta{flex:1 0 100%}
 }
 
 /* page */
-.page{padding:48px 0 64px}
+.page{padding-top:48px;padding-bottom:64px}
 .intro{display:flex;align-items:flex-end;justify-content:space-between;gap:16px 32px;flex-wrap:wrap;margin-bottom:32px}
 .intro h1{margin:0;font-size:32px;line-height:1.2;font-weight:650;letter-spacing:-.02em}
 .intro p{margin:8px 0 0;max-width:60ch;color:var(--text-2);font-size:15px;line-height:1.55}
+.introSide{display:flex;flex-direction:column;align-items:flex-end;gap:16px}
 .counts{display:flex;gap:24px;margin:0}
+.live{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.segment{display:inline-flex;padding:2px;gap:2px;border-radius:var(--r-md);background:var(--inset);border:1px solid var(--border)}
+.segment button{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 12px;border:0;border-radius:6px;background:none;color:var(--text-2);font:500 13px/1 var(--font-ui);cursor:pointer}
+.segment button:hover{color:var(--text)}
+.segment button svg{width:12px;height:12px}
+.segment button[aria-pressed="true"]{background:var(--card);color:var(--text);box-shadow:0 0 0 1px var(--border-strong)}
+.segment button[data-mode="live"][aria-pressed="true"] svg{color:var(--ok)}
+.segment button[data-mode="paused"][aria-pressed="true"] svg{color:var(--warn)}
+.intro .liveNote{margin:0;font-size:12px;line-height:16px;color:var(--text-3);font-variant-numeric:tabular-nums}
 .counts div{display:flex;flex-direction:column}
 .counts dt{order:2;font-size:12px;color:var(--text-3)}
 .counts dd{order:1;margin:0;font:600 24px/1.2 var(--font-mono);font-variant-numeric:tabular-nums;color:var(--text)}
 .panelDesc{margin:24px 0;color:var(--text-2);font-size:14px;max-width:80ch}
 .fallback{min-height:480px}
-@media (max-width:760px){.page{padding:32px 0 48px}.intro{margin-bottom:24px}.intro h1{font-size:26px}.panelDesc{margin:16px 0}}
+@media (max-width:760px){.introSide,.live{align-items:flex-start}.page{padding-top:32px;padding-bottom:48px}.intro{margin-bottom:24px}.intro h1{font-size:26px}.panelDesc{margin:16px 0}}

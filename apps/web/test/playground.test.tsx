@@ -54,7 +54,7 @@ test('filterSnippets matches title or SQL, case insensitive, all terms, and drop
 test('matchSnippet finds a snippet by SQL ignoring surrounding whitespace', () => {
  const groups = buildSnippets(VIEWS, DEFAULT_SQL)
  expect(matchSnippet(groups, '\n' + DEFAULT_SQL + '  ')).toBe('featured/default')
- expect(matchSnippet(groups, VIEWS[1].widgets[0].sql)).toBe('expiry/horizon')
+ expect(matchSnippet(groups, VIEWS[1].widgets.find(w => w.id === 'horizon')!.sql)).toBe('expiry/horizon')
  expect(matchSnippet(groups, 'SELECT 42')).toBeNull()
 })
 

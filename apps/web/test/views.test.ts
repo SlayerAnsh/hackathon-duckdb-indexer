@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test'
 import { DuckDBInstance } from '../../../packages/core/node_modules/@duckdb/node-api'
 import { RAW_TABLES_SQL, MERGE_VIEWS_SQL, MATERIALIZE_SQL, setHeadSql } from '@asi/core'
 import { ACTIVITY_SQL } from '../components/dash/ActivityFeed'
-import { VIEWS, DEFAULT_SQL } from '../lib/views'
+import { VIEWS, DEFAULT_SQL, TIME_RANGES, widgetSql } from '../lib/views'
 import { OLDEST_SQL } from '../lib/heights'
 test('every widget executes on populated and empty public views with declared columns', async () => {
  const instance = await DuckDBInstance.create(':memory:'); const db = await instance.connect()
@@ -52,8 +52,20 @@ test('every widget executes on populated and empty public views with declared co
   const creations=VIEWS[0].widgets.find(w=>w.id==='creations')!
   const hours=(await db.runAndReadAll(creations.sql)).getRowObjects()
   expect(Number(hours[0].head_block)).toBe(50000)
+  for (const widget of VIEWS.flatMap(v=>v.widgets).filter(w=>w.timeRange)) {
+   for (const range of TIME_RANGES) {
+    const result = await db.runAndReadAll(widgetSql(widget, range.id))
+    const columns = result.columnNames()
+    for (const col of [widget.x!, ...(Array.isArray(widget.y)?widget.y:[widget.y!]), 'head_block']) expect(columns).toContain(col)
+    const rows = result.getRowObjects()
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows.length).toBeLessThanOrEqual(range.blocks / range.bucket + 1)
+    for (const row of rows) { expect(Number(row[widget.x!]) % range.bucket).toBe(0); expect(Number(row[widget.x!])).toBeGreaterThanOrEqual(Math.floor((50000 - range.blocks) / range.bucket) * range.bucket) }
+   }
+  }
   const ids = VIEWS.flatMap(v=>v.widgets.map(w=>w.id)); expect(new Set(ids).size).toBe(ids.length)
   expect(VIEWS.map(v=>v.id)).toEqual(['overview','expiry','creators','attributes','activity'])
+  const liveCount = Number((await db.runAndReadAll('SELECT count(*) AS n FROM entities')).getRowObjects()[0].n)
   for (const empty of [false,true]) {
    if(empty) {
     await db.run('DELETE FROM base_entities')
@@ -67,6 +79,13 @@ test('every widget executes on populated and empty public views with declared co
     const result = await db.runAndReadAll(widget.sql)
     const columns = result.columnNames()
     for(const col of [widget.x,...(Array.isArray(widget.y)?widget.y:[widget.y]),widget.series].filter(Boolean)) expect(columns).toContain(col!)
+    if (widget.kind==='stat') {
+     expect(result.getRowObjects()).toHaveLength(1)
+     if (widget.note) expect(columns).toEqual(['value','total'])
+     const row = result.getRowObjects()[0]
+     if (widget.note?.kind==='share' && !empty) { expect(Number(row.value)).toBeLessThanOrEqual(Number(row.total)); expect(Number(row.total)).toBeGreaterThan(0) }
+     if (widget.note?.kind==='share' && widget.note.text.includes('live entities') && !empty) expect(Number(row.total)).toBe(liveCount)
+    }
    }
   }
  } finally { db.closeSync(); instance.closeSync() }

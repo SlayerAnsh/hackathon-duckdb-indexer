@@ -1,7 +1,7 @@
 import type { Widget } from '../../lib/views'
 
 export const COLUMNS = 12
-export type CardSpan = { lg: number; md: number }
+export type CardSpan = { lg: number; md: number; sm: number }
 
 /** Desktop span on a 12 column grid: stats are small, charts take half, tables and wide charts the full row. */
 export function baseSpan(widget: Widget): number {
@@ -32,10 +32,11 @@ export function packRow(spans: number[], columns = COLUMNS): number[] {
  return out
 }
 
-/** Spans for desktop (lg) and tablet (md). Phones always use the full row. */
+/** Spans for desktop (lg), tablet (md) and phone (sm). Stats sit three to a row on tablet and two on phones. */
 export function cardSpans(widgets: Widget[]): CardSpan[] {
  const base = widgets.map(baseSpan)
  const lg = packRow(base)
- const md = packRow(base.map(s => (s === COLUMNS ? COLUMNS : 6)))
- return widgets.map((_, i) => ({ lg: lg[i], md: md[i] }))
+ const md = packRow(widgets.map((w, i) => (base[i] === COLUMNS ? COLUMNS : w.kind === 'stat' ? 4 : 6)))
+ const sm = packRow(widgets.map(w => (w.kind === 'stat' ? 6 : COLUMNS)))
+ return widgets.map((_, i) => ({ lg: lg[i], md: md[i], sm: sm[i] }))
 }
