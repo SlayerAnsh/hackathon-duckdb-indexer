@@ -57,7 +57,7 @@ test('images use locked workspace installs and the standalone runtime layout', (
 
 test('submission docs cover demo identity, schema, expiry, and observed friction', () => {
   const readme = read('README.md');
-  for (const value of ['TODO', '0x1f61c3cac1612C020f64739B128C5f198939C8Cd', '0xb0B87EdDB0bc777Eb663c7a11703ba5ED4849A28', '0xF1BC753cF42d0157Ac34E28DBf06108F66aDB3B3', 'docker compose up -d --build', '--profile demo', '$creator', 'Open Source', 'Security', 'DataFusion', 'DuckLake', '9 to 18 October 2026']) expect(readme).toContain(value);
+  for (const value of ['0x1f61c3cac1612C020f64739B128C5f198939C8Cd', '0xb0B87EdDB0bc777Eb663c7a11703ba5ED4849A28', '0xF1BC753cF42d0157Ac34E28DBf06108F66aDB3B3', 'up -d --build', 'COMPOSE_PROFILES=demo', '$creator', 'Open Source', 'Security', 'DataFusion', 'DuckLake', '9 to 18 October 2026']) expect(readme).toContain(value);
   const schema = read('arkiv/schema.md');
   for (const value of ['ticket', 'comment', 'heartbeat', 'title', 'status', 'priority', 'assignee', 'project', 'u64', 'addr', 'atBlock', '50', 'payload', 'verify', '600']) expect(schema).toContain(value);
   const friction = read('arkiv/friction.md');
