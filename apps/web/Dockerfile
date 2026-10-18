@@ -10,6 +10,8 @@ COPY packages/core ./packages/core
 COPY apps/web ./apps/web
 ARG NEXT_PUBLIC_TIRAMISU_RPC_URL=https://rpc.tiramisu.db-chain.testnet.arkiv.network
 ENV NEXT_PUBLIC_TIRAMISU_RPC_URL=$NEXT_PUBLIC_TIRAMISU_RPC_URL
+ARG NEXT_PUBLIC_EXPLORER_URL=https://tiramisu.explorer.arkiv.network
+ENV NEXT_PUBLIC_EXPLORER_URL=$NEXT_PUBLIC_EXPLORER_URL
 RUN bun run --cwd apps/web build
 
 FROM node:22-slim AS runtime

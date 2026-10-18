@@ -81,10 +81,16 @@ test('every widget executes on populated and empty public views with declared co
     for(const col of [widget.x,...(Array.isArray(widget.y)?widget.y:[widget.y]),widget.series].filter(Boolean)) expect(columns).toContain(col!)
     if (widget.kind==='stat') {
      expect(result.getRowObjects()).toHaveLength(1)
-     if (widget.note) expect(columns).toEqual(['value','total'])
+     if (widget.note) expect(columns.slice(0,2)).toEqual(['value','total'])
+     expect(columns.filter(c=>!['value','total'].includes(c))).toEqual(widget.id==='top-creator-share'?['address']:[])
      const row = result.getRowObjects()[0]
      if (widget.note?.kind==='share' && !empty) { expect(Number(row.value)).toBeLessThanOrEqual(Number(row.total)); expect(Number(row.total)).toBeGreaterThan(0) }
      if (widget.note?.kind==='share' && widget.note.text.includes('live entities') && !empty) expect(Number(row.total)).toBe(liveCount)
+     if (widget.id==='top-creator-share') {
+      const top = (await db.runAndReadAll('SELECT creator, count(*) AS n FROM entities GROUP BY creator ORDER BY n DESC, creator LIMIT 1')).getRowObjects()[0]
+      expect(row.address ?? null).toBe(empty ? null : top.creator)
+      if (!empty) expect(Number(row.value)).toBe(Number(top.n))
+     }
     }
    }
   }

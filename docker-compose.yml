@@ -34,6 +34,7 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         NEXT_PUBLIC_TIRAMISU_RPC_URL: ${NEXT_PUBLIC_TIRAMISU_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
+        NEXT_PUBLIC_EXPLORER_URL: ${NEXT_PUBLIC_EXPLORER_URL:-https://tiramisu.explorer.arkiv.network}
     expose: ["3000"]
     # Read only copy of the index so stored data stays reachable while the indexer is down.
     volumes: ["${INDEX_DATA_PATH:-./data}:/data:ro"]
@@ -41,6 +42,7 @@ services:
       INDEXER_URL: http://indexer:8080
       DATA_DIR: /data
       NEXT_PUBLIC_TIRAMISU_RPC_URL: ${NEXT_PUBLIC_TIRAMISU_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
+      NEXT_PUBLIC_EXPLORER_URL: ${NEXT_PUBLIC_EXPLORER_URL:-https://tiramisu.explorer.arkiv.network}
     depends_on:
       indexer:
         condition: service_started

@@ -46,3 +46,11 @@ test('no rows or a null value yields no summary', () => {
  expect(statSummary(widget(), data(['value']))).toBeNull()
  expect(statSummary(widget(), data(['value'], [null]))).toBeNull()
 })
+
+test('an address column names the subject of the stat', () => {
+ const addr = '0x6cb4a1b2c3d4e5f60718293a4b5c6d7e8f905e22'
+ const s = statSummary(widget({ kind: 'share', text: '{n} of live entities' }), data(['value', 'total', 'address'], [7309, 31235, addr]))
+ expect(s).toEqual({ value: '7,309', note: '23.4% of live entities', share: 7309 / 31235, address: addr })
+ expect(statSummary(widget(), data(['value', 'address'], [5, null]))).toEqual({ value: '5' })
+ expect(statSummary(widget(), data(['value', 'address'], [5, '']))).toEqual({ value: '5' })
+})

@@ -23,6 +23,8 @@ test('compose keeps data persistent, credentials isolated, and writer opt in', (
   expect(s.web.environment.INDEXER_URL).toBe('http://indexer:8080');
   expect(s.web.environment).toHaveProperty('NEXT_PUBLIC_TIRAMISU_RPC_URL');
   expect(s.web.build.args.NEXT_PUBLIC_TIRAMISU_RPC_URL).toBe(s.web.environment.NEXT_PUBLIC_TIRAMISU_RPC_URL);
+  expect(s.web.build.args.NEXT_PUBLIC_EXPLORER_URL).toBe('${NEXT_PUBLIC_EXPLORER_URL:-https://tiramisu.explorer.arkiv.network}');
+  expect(s.web.environment.NEXT_PUBLIC_EXPLORER_URL).toBe(s.web.build.args.NEXT_PUBLIC_EXPLORER_URL);
   expect(s['demo-writer'].profiles).toEqual(['demo']);
   for (const name of ['web', 'demo-writer']) {
     expect(s[name].env_file).toBeUndefined();
@@ -54,6 +56,8 @@ test('images use locked workspace installs and the standalone runtime layout', (
   expect(read('apps/indexer/Dockerfile')).toContain('CMD ["bun", "apps/indexer/src/main.ts"]');
   expect(read('apps/indexer/Dockerfile')).toContain('ENV DATA_DIR=/data');
   const web = read('apps/web/Dockerfile');
+  expect(web).toContain('ARG NEXT_PUBLIC_EXPLORER_URL=https://tiramisu.explorer.arkiv.network');
+  expect(web).toContain('ENV NEXT_PUBLIC_EXPLORER_URL=$NEXT_PUBLIC_EXPLORER_URL');
   expect(web).toContain('node:22-slim');
   expect(web).toContain('bun run --cwd apps/web build');
   expect(web).toContain('/.next/standalone ./');
@@ -63,7 +67,7 @@ test('images use locked workspace installs and the standalone runtime layout', (
   const ignore = read('.dockerignore');
   for (const value of ['**/node_modules', '**/.next', '.env', '.env.*', '.git', 'data']) expect(ignore).toContain(value);
   const env = read('.env.example');
-  for (const value of ['TIRAMISU_API_KEY=', 'SYNC_USE_API_KEY=false', 'FILL_USE_API_KEY=false', 'INDEX_EXPRESSION=', 'DEMO_PRIVATE_KEY=', 'DEMO_AGENT_ADDRESSES=', 'NEXT_PUBLIC_TIRAMISU_RPC_URL=']) expect(env).toContain(value);
+  for (const value of ['TIRAMISU_API_KEY=', 'SYNC_USE_API_KEY=false', 'FILL_USE_API_KEY=false', 'INDEX_EXPRESSION=', 'DEMO_PRIVATE_KEY=', 'DEMO_AGENT_ADDRESSES=', 'NEXT_PUBLIC_TIRAMISU_RPC_URL=', 'NEXT_PUBLIC_EXPLORER_URL=']) expect(env).toContain(value);
 });
 
 test('submission docs cover demo identity, schema, expiry, and observed friction', () => {

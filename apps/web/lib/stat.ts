@@ -1,7 +1,7 @@
 import type { Widget } from './views'
 import { compact } from './format'
 
-export type StatSummary = { value: string; note?: string; share?: number }
+export type StatSummary = { value: string; note?: string; share?: number; address?: string }
 type Rows = { columns: string[]; rows: unknown[][] }
 
 const grouped = (n: number, digits = 0) => n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: digits })
@@ -20,8 +20,15 @@ export function formatShare(share: number): string {
 
 const num = (v: unknown) => (v == null || v === '' ? NaN : Number(v))
 
-/** Value and context line of a stat widget, read from the `value` and `total` columns of its SQL result. */
+/** Value, context line and optional subject address of a stat widget, read from its `value`, `total` and `address` columns. */
 export function statSummary(widget: Widget, data: Rows): StatSummary | null {
+ const sum = valueSummary(widget, data)
+ const i = data.columns.indexOf('address')
+ const address = sum && i >= 0 ? data.rows[0][i] : undefined
+ return sum && typeof address === 'string' && address ? { ...sum, address } : sum
+}
+
+function valueSummary(widget: Widget, data: Rows): StatSummary | null {
  const row = data.rows[0]
  if (!row) return null
  const at = (col: string, fallback: number) => { const i = data.columns.indexOf(col); return num(row[i < 0 ? fallback : i]) }

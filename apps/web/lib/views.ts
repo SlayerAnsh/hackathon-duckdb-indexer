@@ -50,7 +50,7 @@ export const VIEWS: View[] = [
   {id:'next-expiry',title:'Expiring next',kind:'table',span:3,sql:`SELECT key,owner,expires_at,round((expires_at::DOUBLE-${head})/1800,2) AS hours_remaining FROM entities ORDER BY expires_at,key LIMIT 10`,notInArkivQuery:'ORDER BY + arithmetic'},
  ]},
  {id:'creators',title:'Creators',description:'Creation, ownership and the diversity of indexed entities.',widgets:[
-  stat('top-creator-share','Most prolific creator','SELECT max(n) AS value, sum(n) AS total FROM (SELECT count(*) AS n FROM entities GROUP BY creator)','GROUP BY',ofLive),
+  stat('top-creator-share','Most prolific creator','SELECT max(n) AS value, sum(n) AS total, (SELECT creator FROM entities GROUP BY creator ORDER BY count(*) DESC,creator LIMIT 1) AS address FROM (SELECT count(*) AS n FROM entities GROUP BY creator)','GROUP BY',ofLive),
   stat('transfers','Entities transferred','SELECT count(*) FILTER (WHERE owner <> creator) AS value, count(*) AS total FROM entities',undefined,ofLive),
   stat('single-creators','Creators with one entity','SELECT count(*) FILTER (WHERE n = 1) AS value, count(*) AS total FROM (SELECT count(*) AS n FROM entities GROUP BY creator)','GROUP BY',{kind:'share',text:'{n} of creators'}),
   {id:'top-creators',title:'Top 10 creators',kind:'bar',x:'creator',y:'count',span:2,notInArkivQuery:'GROUP BY',sql:'SELECT creator,count(*) AS count FROM entities GROUP BY creator ORDER BY count DESC,creator LIMIT 10'},

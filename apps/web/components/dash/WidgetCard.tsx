@@ -17,6 +17,7 @@ import { HBarChart } from './HBarChart'
 import { StackedBarChart } from './StackedBarChart'
 import { ColumnChart } from './ColumnChart'
 import { DonutChart } from './DonutChart'
+import { AddressLink } from './AddressLink'
 
 export const playgroundHref = (sql: string) => '/playground#' + encodeSqlHash(sql)
 
@@ -76,6 +77,7 @@ export function StatBody({ widget, data }: { widget: Widget; data: NonNullable<T
  const pct = sum.share === undefined ? undefined : Math.round(sum.share * 1000) / 10
  return <>
   <div className="stat-value">{sum.value}</div>
+  {sum.address && <div className={s.subject}>by <AddressLink address={sum.address}/></div>}
   <div className={s.note}>
    {pct !== undefined && <span className={s.meter} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={sum.note}><i style={{ width: pct > 0 ? `max(2px, ${pct}%)` : 0 }}/></span>}
    <span className={s.noteText}>{sum.note ?? '\u00a0'}</span>

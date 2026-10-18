@@ -37,6 +37,7 @@
 .stat :global(.empty){margin:0;line-height:40px;font-size:13px;color:var(--text-3)}
 .note{display:flex;align-items:center;gap:8px;min-height:16px;margin-top:4px;font-size:12px;line-height:16px;color:var(--text-2);font-variant-numeric:tabular-nums;min-width:0}
 .noteText{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.subject{margin-top:2px;font-size:12px;line-height:16px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .meter{flex:none;width:48px;height:4px;border-radius:2px;background:var(--border-strong);overflow:hidden}
 .meter i{display:block;height:100%;border-radius:inherit;background:var(--accent)}
 .stat.sql{padding-bottom:var(--pad)}
