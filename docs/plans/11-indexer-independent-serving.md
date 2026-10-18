@@ -40,7 +40,7 @@
 - [ ] **Step 3:** Implement with `node:fs/promises` (the web server runs on Node, not Bun).
 - [ ] **Step 4:** Run all web tests and `bunx tsc --noEmit -p apps/web`. Expected: PASS.
 
-### Task 2: Heights in the top bar
+### Task 2: Heights in the top bar (implemented by plan 10; skip if `apps/web/lib/heights.ts` exists)
 
 **Files:**
 - Modify: the TopBar from plan 10 (or `StatusBar` if plan 10 is not merged), `apps/web/lib/use-index.ts` only if a value is missing

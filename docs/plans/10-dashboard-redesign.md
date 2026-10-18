@@ -14,7 +14,7 @@
 
 **Tech Stack:** Next.js 16 client components, CSS modules or plain CSS (no Tailwind, no new dependencies, no web fonts; system font stack and `ui-monospace`), `recharts` (installed), `@uiw/react-codemirror` (installed).
 
-**Boundaries:** Plan 09 is changing `apps/web/lib/indexdb.ts`, `apps/web/lib/live-tail.ts` and `apps/web/components/StatusBar.tsx` in parallel. Do not edit those three files. Render `<StatusBar />` unchanged inside the new header area if needed, or read the same `useIndex()` state. Do not touch `packages/` or `apps/indexer`.
+**Boundaries:** Plan 09 is merged. Do not change the data layer behaviour in `apps/web/lib/indexdb.ts` or `apps/web/lib/live-tail.ts` beyond exposing values the UI needs (for example a getter). Do not touch `packages/` or `apps/indexer` (plan 12 is changing them in parallel) or `docker-compose.yml`.
 
 ## Review Focus
 
@@ -50,30 +50,32 @@
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run. Expected: PASS.
 
-### Task 2: Visual system and layout
+### Task 2: Implement the approved mock
+
+**Source of truth:** `docs/design/dashboard-mock.html` (approved by the user on 18 October 2026). Open it and reproduce its layout, tokens, components and interactions in React. Its CSS tokens (`--surface`, `--card`, `--c1`..`--c8`, `--sx-*`, `--font-ui`, `--font-mono`, ...) and class structure may be ported directly into `apps/web/app/theme.css` or CSS modules. Its numbers and table rows are sample data: every value on the real page comes from SQL run in DuckDB WASM, and every run time badge is measured.
 
 **Files:**
-- Create: `apps/web/app/theme.css` (imported by `layout.tsx`), `apps/web/components/dash/*` (`TopBar`, `HeroStats`, `ViewTabs`, `WidgetCard`, `ChartRenderer`, `SqlBlock`, `ActivityFeed`, `WhySqlStrip`, `QueryConsole`)
+- Create: `apps/web/app/theme.css`, `apps/web/components/dash/` with one file per mock component: `TopBar`, `HeightsCluster`, `StateChip`, `ThemeToggle`, `Hero`, `StatTile`, `RunBadge`, `WhySqlStrip`, `ShowcaseGallery`, `ViewTabs`, `WidgetCard`, `NotInArkivQueryBadge`, `SqlBlock`, `AreaChart`, `DonutChart`, `HBarChart`, `StackedBarChart`, `ColumnChart`, `DataTable`, `TypeTag`, `QueryConsole`, `QueryHistory`, `ResultsGrid`, `RowActions`, `VerifyChip`, `ActivityFeed`, `EventPill`, `Footer`, `Tooltip`
+- Create: `apps/web/lib/heights.ts` and `apps/web/test/heights.test.ts` (interface `describeHeights` exactly as in `docs/plans/11-indexer-independent-serving.md` Task 2; it feeds `HeightsCluster`)
 - Modify: `apps/web/app/page.tsx`, `apps/web/app/layout.tsx`, `apps/web/app/globals.css`
+- Remove from the page (files may stay if imported elsewhere): the old `StatusBar` text block, RPC URL input, error banners, old `Dashboard`/`Tile` grid
 
-Design direction (dark first, data dense, calm):
-- Tokens on `:root`: surface `#0f1115`, card `#161a20`, card border `#232a33`, text primary `#e8eaed`, secondary `#9aa4b2`, muted `#6b7685`, accent `#3987e5`. Provide a light theme via `[data-theme="light"]` (surface `#fcfcfb`, card `#ffffff`, text `#0b0b0b`, secondary `#52514e`) and a toggle in the top bar; respect `prefers-color-scheme` when no choice is stored.
-- Categorical chart colors in this fixed order (validated palette, dark values): `#3987e5`, `#d95926`, `#199e70`, `#c98500`, `#d55181`, `#008300`, `#9085e9`, `#e66767` (light: `#2a78d6`, `#eb6834`, `#1baf7a`, `#eda100`, `#e87ba4`, `#008300`, `#6250d6`, `#e34948`). A series keeps its color by entity, not rank. More than 8 categories fold into "Other".
-- Chart marks: 2 px lines, bars with 4 px rounded data ends, 2 px gaps between bars, recessive grid (`#232a33`), axis text in secondary color, tooltips on hover for every chart, legend when 2 or more series. Text never uses the series color.
-- Fonts: system UI stack for text, `ui-monospace, SFMono-Regular, Menlo, monospace` for SQL, hashes and numbers; tabular numbers on stats.
+**Rules:**
+- Charts may be hand rolled SVG as in the mock, or `recharts` styled to match; keep hover tooltips on every chart and legends for 2 or more series.
+- Section order as in the mock: TopBar, Hero with stat tiles and WhySqlStrip, Showcase queries (tabs and widget cards), Console, Latest changes, Footer.
+- Errors stay inside the affected card (small muted message); indexer or RPC trouble shows only as the `HeightsCluster` state chip (`behind`, `stale`, `disk`) and its popover. No banners, no RPC URL input.
+- Theme: dark default, light via toggle, `prefers-color-scheme` honoured until the user picks; choice stored in `localStorage` inside try/catch.
 
-Layout:
-1. **TopBar:** product name "Arkiv SQL", chain pill (`Tiramisu 7738577`), live head block with a pulsing dot that ticks as `live_head` advances, snapshot version, indexed expression in mono (truncated, full on hover), `$creator` filter badge, theme toggle.
-2. **HeroStats:** 5 stat tiles from the `overview` stats; each tile shows its value and a small `⚡ 1.4 ms` badge with the measured time; one extra tile "Queries this session" with count and median run time.
-3. **WhySqlStrip:** one row explaining what SQL adds over `arkiv_query` (joins, GROUP BY, ORDER BY on attributes, window functions, no 200 row page limit), each item linking to a widget that demonstrates it.
-4. **ViewTabs:** tabs for each `View`, with its description; a responsive 3 column grid of `WidgetCard`s honoring `span`.
-5. **WidgetCard:** header with title, subtitle, `notInArkivQuery` badge, run time and row count (`1.7 ms · 34 rows`); body renders the chart or table; footer actions "SQL" (expands a `SqlBlock` with highlighted SQL and copy button), "Open in console" (loads SQL into the console and scrolls to it), "CSV".
-6. **ActivityFeed:** reuse the data source of the current `ChangesFeed` (do not modify it; import its logic or wrap it) styled like an explorer activity list: colored event type pill, shortened key with copy, block, age.
-7. **QueryConsole:** CodeMirror editor (existing autocomplete), Run with Ctrl or Cmd plus Enter, measured run time and row count after each run, query history of the last 10 queries in `localStorage` (wrapped in try/catch), example dropdown populated from all widget SQL, results grid with sticky header, monospace cells, shortened hashes with full value on hover, existing payload and verify row actions, CSV download.
+**Fixes to the mock (user approved):**
+1. The index covers every entity (blank `INDEX_EXPRESSION`). The top bar shows an "all entities" chip instead of "$creator filtered" when the manifest expression is empty, and the `$creator` chip only when the expression has a `$creator` term. Add a showcase widget "Entities by creator" in the Creators view that demonstrates `$creator` filtering in SQL.
+2. Most live entities are load test data without a `type` attribute. Group by `type`, falling back to `project`, then to `unlabelled`, via `COALESCE`. Support desk widgets (tickets, comments, priority, status, the console's default "open tickets with most discussion" query) must not assume those attributes exist chain wide: they return rows only where they exist and render the empty state otherwise.
+3. The gallery heading counts the real number of widgets. The SQL Copy button copies to the clipboard (`navigator.clipboard.writeText` in try/catch).
+4. Dark theme is the default.
+5. `ActivityFeed` reads its rows from the existing live tail / changes feed data (`apps/web/components/ChangesFeed.tsx` logic, `live_*` tables, or delta); do not invent a separate RPC poller.
 
-- [ ] **Step 1:** Build the components. Keep every component under about 200 lines.
+- [ ] **Step 1:** Build the components, wired to `VIEWS` (Task 1) and `useTimedQuery`. Keep each component under about 200 lines.
 - [ ] **Step 2:** `bun run build` in `apps/web`. Expected: success, no type errors.
-- [ ] **Step 3:** `bun test` in `apps/web`. Expected: all pass (update `test/helpers.test.ts` only if `lib/tiles.ts` is removed; prefer keeping it if other code imports it).
+- [ ] **Step 3:** `bun test` in `apps/web`. Expected: all pass.
 
 ### Task 3: Report
 
