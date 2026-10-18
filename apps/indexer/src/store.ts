@@ -2,7 +2,7 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { DuckDBInstance, type DuckDBConnection } from '@duckdb/node-api'
 import type { EntityRow, AttributeRow } from '@asi/core'
-export type SyncState = { chain_id: number; genesis_hash: string; expression: string; start_block: number; head_block: number; snapshot_version: number; snapshot_block: number }
+export type SyncState = { chain_id: number; genesis_hash: string; expression: string; start_block: number; head_block: number; head_hash: string | null; snapshot_version: number; snapshot_block: number }
 export class Store {
   private constructor(public conn: DuckDBConnection, private db: DuckDBInstance, private identity: Pick<SyncState, 'chain_id' | 'genesis_hash' | 'expression'>) {}
   static async open(dir: string, expression: string, chainId: number, genesisHash: string): Promise<Store> {
@@ -16,6 +16,7 @@ export class Store {
         CREATE TABLE IF NOT EXISTS changes (block UBIGINT, key VARCHAR, deleted BOOLEAN);
         CREATE TABLE IF NOT EXISTS sync_state (chain_id UBIGINT, genesis_hash VARCHAR, expression VARCHAR, start_block UBIGINT, head_block UBIGINT, snapshot_version INTEGER, snapshot_block UBIGINT);
         CREATE TABLE IF NOT EXISTS store_identity (chain_id UBIGINT, genesis_hash VARCHAR, expression VARCHAR);`)
+      await conn.run('ALTER TABLE sync_state ADD COLUMN IF NOT EXISTS head_hash VARCHAR')
       const saved = (await conn.runAndReadAll('SELECT * FROM store_identity')).getRowObjects()[0]
       if (saved && saved.expression !== expression) throw Error(`Stored expression "${saved.expression}" differs from configured "${expression}" at ${dir}. Delete the store or restore the expression.`)
       if (saved && (Number(saved.chain_id) !== chainId || saved.genesis_hash !== genesisHash)) throw Error('Chain identity mismatch at ' + dir)
@@ -26,13 +27,16 @@ export class Store {
   async state(): Promise<SyncState | null> {
     const s = (await this.conn.runAndReadAll('SELECT * FROM sync_state')).getRowObjects()[0]
     if (!s) return null
-    return { chain_id: Number(s.chain_id), genesis_hash: String(s.genesis_hash), expression: String(s.expression), start_block: Number(s.start_block), head_block: Number(s.head_block), snapshot_version: Number(s.snapshot_version), snapshot_block: Number(s.snapshot_block) }
+    return { chain_id: Number(s.chain_id), genesis_hash: String(s.genesis_hash), expression: String(s.expression), start_block: Number(s.start_block), head_block: Number(s.head_block), head_hash: s.head_hash == null ? null : String(s.head_hash), snapshot_version: Number(s.snapshot_version), snapshot_block: Number(s.snapshot_block) }
   }
   async setState(partial: Partial<SyncState>): Promise<void> {
-    const state = { ...this.identity, start_block: 0, head_block: 0, snapshot_version: 0, snapshot_block: 0, ...await this.state(), ...partial }
-    await this.conn.run('DELETE FROM sync_state')
-    await this.conn.run('INSERT INTO sync_state VALUES (?, ?, ?, ?, ?, ?, ?)', [state.chain_id, state.genesis_hash, state.expression, state.start_block, state.head_block, state.snapshot_version, state.snapshot_block])
+    const previous = await this.state()
+    const state = { ...this.identity, start_block: 0, head_block: 0, head_hash: null, snapshot_version: 0, snapshot_block: 0, ...previous, ...partial }
+    const values = [state.chain_id, state.genesis_hash, state.expression, state.start_block, state.head_block, state.snapshot_version, state.snapshot_block, state.head_hash]
+    if (previous) await this.conn.run('UPDATE sync_state SET chain_id = ?, genesis_hash = ?, expression = ?, start_block = ?, head_block = ?, snapshot_version = ?, snapshot_block = ?, head_hash = ?', values)
+    else await this.conn.run('INSERT INTO sync_state (chain_id, genesis_hash, expression, start_block, head_block, snapshot_version, snapshot_block, head_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', values)
   }
+
   async upsert(rows: { entity: EntityRow; attributes: AttributeRow[] }[], changeBlock: number | null): Promise<void> {
     for (const { entity: e, attributes } of rows) {
       await this.conn.run('INSERT OR REPLACE INTO entities VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [e.key, e.owner, e.creator, e.created_at, e.updated_at, e.expires_at, e.content_type, e.creation_flags])
@@ -61,5 +65,6 @@ export class Store {
     try { const result = await fn(); await this.conn.run('COMMIT'); return result }
     catch (error) { await this.conn.run('ROLLBACK'); throw error }
   }
-  close(): void { this.conn.closeSync(); this.db.closeSync() }
+  private closed = false
+  close(): void { if (this.closed) return; this.closed = true; this.conn.closeSync(); this.db.closeSync() }
 }

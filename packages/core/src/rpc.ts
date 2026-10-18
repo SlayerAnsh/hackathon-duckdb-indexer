@@ -12,6 +12,7 @@ export interface ArkivRpc {
   blockNumber(): Promise<number>
   chainId(): Promise<number>
   genesisHash(): Promise<string>
+  blockHash(block: number): Promise<string>
   getLogs(fromBlock: number, toBlock: number): Promise<RawLog[]>
 }
 export const ROW_SELECT: RpcSelect = {
@@ -19,7 +20,7 @@ export const ROW_SELECT: RpcSelect = {
   expiresAt: true, creationFlags: true, contentType: true, attributes: true,
 }
 export class RpcError extends Error {
-  constructor(message: string, public status: number, public code: string | number) {
+  constructor(message: string, public status: number, public code: string | number, public retryAfter: string | null = null) {
     super(message); this.name = 'RpcError'
   }
 }
@@ -48,6 +49,7 @@ export function createRpc(url: string, opts: {
         (typeof error === 'object' && error !== null ? error.message : body.message) ?? response.statusText ?? 'RPC error',
         response.status,
         (typeof error === 'object' && error !== null ? error.code : error) ?? response.status,
+        response.headers.get('retry-after'),
       )
     }
     return body.result as T
@@ -63,6 +65,11 @@ export function createRpc(url: string, opts: {
     async blockNumber() { return Number(await request<string>('eth_blockNumber', [])) },
     async chainId() { return Number(await request<string>('eth_chainId', [])) },
     async genesisHash() { return (await request<{ hash: string }>('eth_getBlockByNumber', ['0x0', false])).hash },
+    async blockHash(block) {
+      const header = await request<{ hash: string } | null>('eth_getBlockByNumber', [hex(block), false])
+      if (!header?.hash) throw new RpcError('Block hash unavailable', 200, 'BLOCK_UNAVAILABLE')
+      return header.hash.toLowerCase()
+    },
     async getLogs(fromBlock, toBlock) {
       const logs = await request<(Omit<RawLog, 'blockNumber' | 'logIndex'> & { blockNumber: string; logIndex: string })[]>('eth_getLogs', [{
         address: '0x4400000000000000000000000000000000000044', fromBlock: hex(fromBlock), toBlock: hex(toBlock),

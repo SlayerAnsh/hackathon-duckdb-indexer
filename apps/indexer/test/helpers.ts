@@ -18,6 +18,6 @@ export function raw(key = '0x01'): RpcEntity {
   return { key, owner: '0x02', creator: '0x02', createdAt: '0x1', updatedAt: '0x2', expiresAt: '0xc8', creationFlags: { raw: 0, readonly: false, permissionlessExtension: false }, attributes: [] } as RpcEntity
 }
 export function fake(query: ArkivRpc['query']): ArkivRpc {
-  return { query, blockNumber: async () => 103, chainId: async () => 7738577, genesisHash: async () => hash, getLogs: async () => [] }
+  return { blockHash: async () => hash, query, blockNumber: async () => 103, chainId: async () => 7738577, genesisHash: async () => hash, getLogs: async () => [] }
 }
 export async function rows(store: Store, sql: string) { return (await store.conn.runAndReadAll(sql)).getRowObjects() }

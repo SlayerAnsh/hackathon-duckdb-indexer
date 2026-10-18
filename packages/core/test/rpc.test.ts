@@ -55,3 +55,12 @@ test('getLogs splits nothing and decodes numbers', async () => {
   expect(f.calls).toHaveLength(1)
   expect(f.calls[0]!.body).toMatchObject({ method: 'eth_getLogs', params: [{ address: '0x4400000000000000000000000000000000000044', fromBlock: '0x10', toBlock: '0x20' }] })
 })
+test('blockHash reads numeric header and rejects missing blocks', async () => {
+  const f = fake({ result: { hash: '0xABC' } })
+  expect(await createRpc('url', f).blockHash(105)).toBe('0xabc')
+  expect(f.calls[0]!.body).toMatchObject({ method: 'eth_getBlockByNumber', params: ['0x69', false] })
+  await expect(createRpc('url', fake({ result: null })).blockHash(105)).rejects.toThrow('Block hash unavailable')
+})
+test('rate limits retain Retry-After', async () => {
+  await expect(createRpc('url', fake({ error: 'ANON_COST_LIMITED' }, 429, { 'retry-after': '30' })).blockNumber()).rejects.toMatchObject({ retryAfter: '30', status: 429 })
+})
