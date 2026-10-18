@@ -1,9 +1,12 @@
+'use client'
 import { useState, type CSSProperties } from 'react'
+import Link from 'next/link'
 import type { Widget } from '../../lib/views'
 import { useTimedQuery, type TimedResult } from '../../lib/use-query'
-import { useIndex } from '../../lib/use-index'
 import { compact } from '../../lib/format'
-import { toCsv } from '../../lib/csv'
+import { encodeSqlHash } from '../../lib/hash-state'
+import { baseSpan, type CardSpan } from '../showcase/layout'
+import s from '../showcase/showcase.module.css'
 import { RunBadge } from './RunBadge'
 import { NotInArkivQueryBadge } from './NotInArkivQueryBadge'
 import { SqlBlock } from './SqlBlock'
@@ -14,48 +17,28 @@ import { StackedBarChart } from './StackedBarChart'
 import { ColumnChart } from './ColumnChart'
 import { DonutChart } from './DonutChart'
 
-export function WidgetCard({ widget, version, onSql }: { widget: Widget; version: number; onSql: (s: string) => void }) {
- const [rerun, setRerun] = useState(0)
- const [exporting, setExporting] = useState(false)
- const [exportError, setExportError] = useState('')
- const { db } = useIndex()
- const q = useTimedQuery(widget.sql, version + rerun)
+export const playgroundHref = (sql: string) => '/playground#' + encodeSqlHash(sql)
 
- async function download() {
-  if (!db || exporting) return
-  setExporting(true)
-  setExportError('')
-  try {
-   const full = await db.run(widget.sql, Infinity)
-   const url = URL.createObjectURL(new Blob([toCsv(full.columns, full.rows)], { type: 'text/csv;charset=utf-8' }))
-   const link = document.createElement('a')
-   link.href = url
-   link.download = widget.id + '.csv'
-   link.click()
-   setTimeout(() => URL.revokeObjectURL(url), 1000)
-  } catch (error) {
-   setExportError(String(error))
-  } finally {
-   setExporting(false)
-  }
- }
-
- return <article className="w" id={widget.id} style={{ '--span': (widget.span ?? 1) * 4 } as CSSProperties} aria-busy={q.loading}>
-  <header className="w-h">
-   <div className="w-t"><h3>{widget.title}</h3>{widget.subtitle && <p className="w-r">{widget.subtitle}</p>}</div>
-   <div className="w-m"><NotInArkivQueryBadge reason={widget.notInArkivQuery}/><RunBadge ms={q.ms} rows={q.data?.rows.length}/></div>
+export function WidgetCard({ widget, version, span }: { widget: Widget; version: number; span?: CardSpan }) {
+ const [showSql, setShowSql] = useState(false)
+ const q = useTimedQuery(widget.sql, version)
+ const fallback = baseSpan(widget)
+ const style = { '--lg': span?.lg ?? fallback, '--md': span?.md ?? (fallback === 12 ? 12 : 6) } as CSSProperties
+ const kind = widget.kind === 'table' ? s.table : widget.kind === 'stat' ? s.stat : s.chart
+ const sqlId = widget.id + '-sql'
+ return <article className={s.card} id={widget.id} style={style} aria-busy={q.loading} aria-labelledby={widget.id + '-t'}>
+  <header className={s.head}>
+   <h3 id={widget.id + '-t'}>{widget.title}</h3>
+   {widget.subtitle && <p>{widget.subtitle}</p>}
   </header>
-  {widget.notInArkivQuery && <code className="w-clause">{widget.notInArkivQuery}</code>}
-  <div className="w-b">
-   <WidgetBody widget={widget} query={q}/>
-   {exportError && <p className="error">{exportError}</p>}
+  <div className={`${s.body} ${kind}${showSql ? ' ' + s.sql : ''}`}>
+   {showSql ? <div id={sqlId}><SqlBlock sql={widget.sql}/></div> : <WidgetBody widget={widget} query={q}/>}
   </div>
-  <footer className="w-f">
-   <details className="w-sql"><summary>› SQL</summary><SqlBlock sql={widget.sql}/></details>
-   <div className="w-acts">
-    <button className="btn btn-quiet" disabled={!db || exporting} onClick={() => void download()}>↓ CSV</button>
-    <button className="btn btn-quiet" onClick={() => onSql(widget.sql)}>Open in console</button>
-    <button className="btn btn-run" disabled={!db || q.loading} onClick={() => setRerun(n => n + 1)}>▶ Run</button>
+  <footer className={s.foot}>
+   <div className={s.meta}><RunBadge ms={q.ms} rows={q.data?.rows.length}/><NotInArkivQueryBadge reason={widget.notInArkivQuery}/></div>
+   <div className={s.actions}>
+    <button type="button" className={s.action} aria-expanded={showSql} aria-controls={showSql ? sqlId : undefined} onClick={() => setShowSql(v => !v)}>{showSql ? 'Show result' : 'View SQL'}</button>
+    <Link className={`${s.action} ${s.primary}`} href={playgroundHref(widget.sql)}>Open in playground</Link>
    </div>
   </footer>
  </article>

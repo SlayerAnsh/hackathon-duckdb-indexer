@@ -1,4 +1,19 @@
+'use client'
 import { VIEWS } from '../../lib/views'
+import { cardSpans } from '../showcase/layout'
+import s from '../showcase/showcase.module.css'
 import { ViewTabs } from './ViewTabs'
 import { WidgetCard } from './WidgetCard'
-export function ShowcaseGallery({version,selected,onSelect,onSql}:{version:number;selected:string;onSelect:(s:string)=>void;onSql:(s:string)=>void}) { const view=VIEWS.find(v=>v.id===selected)??VIEWS[0];return <section className="sec" id="showcase" aria-labelledby="showcase-h"><div className="sec-h"><h2 id="showcase-h">Showcase queries <span className="tab-n">{VIEWS.reduce((n,v)=>n+v.widgets.filter(w=>v.id!=='overview'||w.kind!=='stat').length,0)}</span></h2><p>Real SQL. Real data. Measured in your browser.</p></div><ViewTabs selected={view.id} onSelect={onSelect}/><div role="tabpanel" id={'panel-'+view.id} aria-labelledby={'tab-'+view.id}><p className="panel-d">{view.description}</p><div className="grid">{view.widgets.filter(w=>view.id!=='overview'||w.kind!=='stat').map(w=><WidgetCard key={w.id} widget={w} version={version} onSql={onSql}/>)}</div></div></section> }
+
+/** View tabs plus the card grid of the selected view. `onSql` is accepted for older callers and unused: cards link to the playground. */
+export function ShowcaseGallery({ version, selected, onSelect }: { version: number; selected: string; onSelect: (id: string) => void; onSql?: (sql: string) => void }) {
+ const view = VIEWS.find(v => v.id === selected) ?? VIEWS[0]
+ const spans = cardSpans(view.widgets)
+ return <section id="showcase" aria-label="Showcase queries">
+  <ViewTabs selected={view.id} onSelect={onSelect}/>
+  <div role="tabpanel" id={'panel-' + view.id} aria-labelledby={'tab-' + view.id}>
+   <p className={s.panelDesc}>{view.description}</p>
+   <div className={s.grid}>{view.widgets.map((w, i) => <WidgetCard key={w.id} widget={w} version={version} span={spans[i]}/>)}</div>
+  </div>
+ </section>
+}
