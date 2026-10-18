@@ -72,7 +72,7 @@ export class Store {
   async transaction<T>(fn: () => Promise<T>): Promise<T> {
     await this.conn.run('BEGIN TRANSACTION')
     try { const result = await fn(); await this.conn.run('COMMIT'); return result }
-    catch (error) { await this.conn.run('ROLLBACK'); throw error }
+    catch (error) { await this.conn.run('ROLLBACK').catch(() => {}); throw error } // DuckDB may have already ended the transaction; keep the original error
   }
   private closed = false
   get isClosed(): boolean { return this.closed }

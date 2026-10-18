@@ -45,6 +45,11 @@ test('state persists numbers and transaction rolls back', async () => {
   const reopened = track(await Store.open(dir, expression, 7738577, hash))
   expect(await reopened.state()).toMatchObject({ head_block: 100, start_block: 100, snapshot_version: 0 })
 })
+test('transaction rethrows the original error when rollback fails', async () => {
+  const s = track(await Store.open(await temp(), expression, 7738577, hash))
+  await expect(s.transaction(async () => { await s.conn.run('ROLLBACK'); throw Error('original') })).rejects.toThrow('original')
+  await s.transaction(async () => s.upsert([row()], null)); expect((await s.indexedKeys()).size).toBe(1)
+})
 test('head_hash migration preserves extra sync_state columns', async () => {
   const dir = await temp(); const s = await Store.open(dir, expression, 7738577, hash)
   await s.setState({ start_block: 100, head_block: 100 })
