@@ -29,3 +29,8 @@ test('text keeps the short hex form and null is empty', () => {
  expect(formatCell('name', 'status')).toBe('status')
  expect(formatCell('x', null)).toBe('')
 })
+
+test('large floats are not grouped, so they match the integers beside them', () => {
+ expect(formatCell('avg', 1792334264663.6667)).toBe('1792334264663.67')
+ expect(formatCell('max', 1792335007571)).toBe('1792335007571')
+})

@@ -20,6 +20,7 @@ export function formatCell(column: string, v: unknown): string {
  if (typeof v === 'number' && !Number.isInteger(v)) {
   if (!Number.isFinite(v)) return String(v)
   const r = Math.round(v * 100) / 100
+  if (rawInteger(column, v)) return String(r)
   return (r === 0 ? 0 : r).toLocaleString('en-US', { maximumFractionDigits: 2 })
  }
  if (isNum(v)) return rawInteger(column, v) ? String(v) : v.toLocaleString('en-US')
