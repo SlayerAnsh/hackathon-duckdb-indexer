@@ -39,7 +39,7 @@ Start the frontend with `INDEXER_URL=http://localhost:8080 bun run --cwd apps/we
   snap/v<n>/attributes.parquet
 ```
 
-In Compose `DATA_DIR=/data` is a bind mount of the host path `INDEX_DATA_PATH` (default `./data`). The web container mounts the same path read only. Chain ID and genesis hash identify a store, and a changed expression refuses reuse. A reorg, chain reset or unavailable historical state builds a fresh generation `-g<n>` and switches to it through `active-generation.json`. A completed backfill checkpoint permits restart without repeating backfill. Keep one indexer writer per data directory. Never edit a published snapshot in place.
+In Compose `DATA_DIR=/data` is a bind mount of the host path `INDEX_DATA_PATH` (default `./data`). The web container mounts the same path read only. `docker-compose.dokploy.yml` uses the named volume `index-data` instead, so Dokploy redeploys keep the index, and drops `expose` because services on one Compose network reach each other without it. Chain ID and genesis hash identify a store, and a changed expression refuses reuse. A reorg, chain reset or unavailable historical state builds a fresh generation `-g<n>` and switches to it through `active-generation.json`. A completed backfill checkpoint permits restart without repeating backfill. Keep one indexer writer per data directory. Never edit a published snapshot in place.
 
 ## Backfill and fill
 

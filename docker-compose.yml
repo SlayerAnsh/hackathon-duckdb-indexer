@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: apps/indexer/Dockerfile
     expose: ["8080"]
-    # Bind mount so the index is visible in the repo. On Dokploy set INDEX_DATA_PATH=../files/data so redeploys keep it.
+    # Bind mount so the index is visible in the repo. Dokploy uses docker-compose.dokploy.yml with a named volume instead.
     volumes: ["${INDEX_DATA_PATH:-./data}:/data"]
     environment:
       SYNC_PAUSED: ${SYNC_PAUSED:-false}

@@ -88,8 +88,8 @@ Setting `COMPOSE_PROFILES=demo` in `.env` has the same effect. No private key is
 
 ### Deploy with Dokploy
 
-1. Create a Docker Compose application from this repository with compose path `./docker-compose.yml` and keep Isolated Deployments enabled.
-2. In the Environment tab set `INDEX_EXPRESSION` (single quoted, as above) and `INDEX_DATA_PATH=../files/data` so the index survives redeploys. For the writer also set `DEMO_PRIVATE_KEY`, `DEMO_AGENT_ADDRESSES` and `COMPOSE_PROFILES=demo`.
+1. Create a Docker Compose application from this repository with compose path `./docker-compose.dokploy.yml` and keep Isolated Deployments enabled. This file stores the index in the named Docker volume `index-data` (indexer read and write, web read only), so redeploys keep it even though Dokploy wipes the cloned code folder.
+2. In the Environment tab set `INDEX_EXPRESSION` (single quoted, as above). For the writer also set `DEMO_PRIVATE_KEY`, `DEMO_AGENT_ADDRESSES` and `COMPOSE_PROFILES=demo`.
 3. In the Domains tab add the domain for service `web`, container port `3000`, with HTTPS. The indexer stays internal.
 4. Deploy, then open `https://<domain>/data/health`.
 

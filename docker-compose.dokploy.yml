@@ -1,0 +1,60 @@
+services:
+  indexer:
+    build:
+      context: .
+      dockerfile: apps/indexer/Dockerfile
+    # Named volume: Docker keeps it across Dokploy redeploys, which wipe the cloned code folder.
+    volumes: ["index-data:/data"]
+    environment:
+      SYNC_PAUSED: ${SYNC_PAUSED:-false}
+      TIRAMISU_API_KEY: ${TIRAMISU_API_KEY:-}
+      INDEX_EXPRESSION: ${INDEX_EXPRESSION:-}
+      PUBLIC_RPC_URL: ${PUBLIC_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
+      BACKFILL_MODE: ${BACKFILL_MODE:-logs}
+      FILL_RPC_URL: ${FILL_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
+      FILL_USE_API_KEY: ${FILL_USE_API_KEY:-false}
+      SYNC_USE_API_KEY: ${SYNC_USE_API_KEY:-false}
+      FILL_CHUNK: ${FILL_CHUNK:-50}
+      FILL_INTERVAL_MS: ${FILL_INTERVAL_MS:-4000}
+      ARKIV_RPC_URL: ${ARKIV_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
+      DATA_DIR: /data
+      PORT: "8080"
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:8080/health').then(r=>process.exit(r.ok?0:1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_TIRAMISU_RPC_URL: ${NEXT_PUBLIC_TIRAMISU_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
+        NEXT_PUBLIC_EXPLORER_URL: ${NEXT_PUBLIC_EXPLORER_URL:-https://tiramisu.explorer.arkiv.network}
+    # Read only copy of the index so stored data stays reachable while the indexer is down.
+    volumes: ["index-data:/data:ro"]
+    environment:
+      INDEXER_URL: http://indexer:8080
+      DATA_DIR: /data
+      NEXT_PUBLIC_TIRAMISU_RPC_URL: ${NEXT_PUBLIC_TIRAMISU_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
+      NEXT_PUBLIC_EXPLORER_URL: ${NEXT_PUBLIC_EXPLORER_URL:-https://tiramisu.explorer.arkiv.network}
+    depends_on:
+      indexer:
+        condition: service_started
+    restart: unless-stopped
+
+  demo-writer:
+    build:
+      context: .
+      dockerfile: apps/demo-writer/Dockerfile
+    profiles: ["demo"]
+    environment:
+      DEMO_PRIVATE_KEY: ${DEMO_PRIVATE_KEY:-}
+      DEMO_AGENT_ADDRESSES: ${DEMO_AGENT_ADDRESSES:-}
+    restart: unless-stopped
+
+volumes:
+  index-data:

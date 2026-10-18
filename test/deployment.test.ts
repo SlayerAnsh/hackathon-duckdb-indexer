@@ -43,6 +43,15 @@ test('web mounts the index read only for the disk fallback', () => {
   expect(s.web.environment.DATA_DIR).toBe('/data');
 });
 
+test('dokploy compose matches the base file except for the named index volume and no expose', () => {
+  const base = Bun.YAML.parse(read('docker-compose.yml')) as any, dokploy = Bun.YAML.parse(read('docker-compose.dokploy.yml')) as any;
+  expect(dokploy.volumes).toEqual({ 'index-data': null });
+  expect(dokploy.services.indexer.volumes).toEqual(['index-data:/data']);
+  expect(dokploy.services.web.volumes).toEqual(['index-data:/data:ro']);
+  for (const name of ['indexer', 'web']) expect(dokploy.services[name].expose).toBeUndefined();
+  for (const name of Object.keys(base.services)) expect({ ...dokploy.services[name], volumes: undefined, expose: undefined }).toEqual({ ...base.services[name], volumes: undefined, expose: undefined });
+});
+
 test('images use locked workspace installs and the standalone runtime layout', () => {
   for (const app of ['indexer', 'web', 'demo-writer']) {
     const file = read(`apps/${app}/Dockerfile`);
@@ -62,7 +71,7 @@ test('images use locked workspace installs and the standalone runtime layout', (
   expect(web).toContain('bun run --cwd apps/web build');
   expect(web).toContain('/.next/standalone ./');
   expect(web).toContain('/.next/static ./apps/web/.next/static');
-  expect(web).toContain('/public ./apps/web/public');
+  expect(web).not.toContain('apps/web/public');
   expect(web).toContain('CMD ["node", "apps/web/server.js"]');
   const ignore = read('.dockerignore');
   for (const value of ['**/node_modules', '**/.next', '.env', '.env.*', '.git', 'data']) expect(ignore).toContain(value);
