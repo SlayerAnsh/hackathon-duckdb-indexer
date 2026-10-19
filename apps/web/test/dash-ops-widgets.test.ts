@@ -130,3 +130,27 @@ test('SDK structured missing entity errors are found through causes', async () =
     await expect(deleteWidget(f.deps, S, K)).rejects.toMatchObject({ code: 'not_found', status: 404 })
   }
 })
+
+
+test('every user write rejects the app wallet before reading or writing', async () => {
+  const { createDashboard, updateDashboard, deleteDashboard, organizeDashboard, addLink } = await import('../lib/dash/server/operations')
+  const operations = [
+    (d: ReturnType<typeof fakeChain>['deps'], s: typeof S) => createWidget(d, s, { widget: validWidget }),
+    (d: ReturnType<typeof fakeChain>['deps'], s: typeof S) => updateWidget(d, s, K, validWidget),
+    (d: ReturnType<typeof fakeChain>['deps'], s: typeof S) => extendWidget(d, s, K),
+    (d: ReturnType<typeof fakeChain>['deps'], s: typeof S) => deleteWidget(d, s, K),
+    (d: ReturnType<typeof fakeChain>['deps'], s: typeof S) => createDashboard(d, s, { title: 'Overview' }),
+    (d: ReturnType<typeof fakeChain>['deps'], s: typeof S) => updateDashboard(d, s, D, { title: 'Overview' }),
+    (d: ReturnType<typeof fakeChain>['deps'], s: typeof S) => deleteDashboard(d, s, D),
+    (d: ReturnType<typeof fakeChain>['deps'], s: typeof S) => organizeDashboard(d, s, D, { items: [] }),
+    (d: ReturnType<typeof fakeChain>['deps'], s: typeof S) => addLink(d, s, D, { widget: K, size: 'md' }),
+  ]
+  for (const operation of operations) {
+    const f = fakeChain([])
+    f.deps.reader.blockNumber = async () => { throw new Error('Unexpected head read') }
+    f.deps.client.predictEntityKeys = async () => { throw new Error('Unexpected prediction') }
+    await expect(operation(f.deps, { ...S, address: W.toUpperCase().replace('0X', '0x') as `0x${string}` })).rejects.toMatchObject({ code: 'forbidden', status: 403 })
+    expect(f.calls).toEqual([])
+    expect(f.queries).toEqual([])
+  }
+})

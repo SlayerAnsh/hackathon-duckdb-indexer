@@ -1,3 +1,4 @@
+import { isOfficialUser } from '../official'
 import { isIP } from 'node:net'
 import { recoverMessageAddress, type Hex } from 'viem'
 import type { ServerDashConfig } from './config'
@@ -7,7 +8,7 @@ import type { RateLimiter } from './rate-limit'
 import { dashErrors, errorResponse, json } from './errors'
 import { clearSessionCookie, readCookie, SESSION_COOKIE, SESSION_TTL_SECONDS, sessionCookie, signSession, verifySession, type Session } from './session'
 
-export type AuthDeps = { config: Pick<ServerDashConfig, 'sessionSecret'>; privy: PrivyVerifier; nonces: NonceStore; nonceLimiter: RateLimiter; now: () => number }
+export type AuthDeps = { config: Pick<ServerDashConfig, 'sessionSecret'> & Partial<Pick<ServerDashConfig, 'wallet'>>; privy: PrivyVerifier; nonces: NonceStore; nonceLimiter: RateLimiter; now: () => number }
 export function publicHost(req: Request): string {
   return (req.headers.get('x-forwarded-host')?.split(',')[0].trim() ||
     req.headers.get('host')?.trim() || new URL(req.url).host).toLowerCase()
@@ -91,6 +92,7 @@ export async function handleCreateSession(req: Request, deps: AuthDeps): Promise
     try { identity = await deps.privy.verify(bearer[1]) } catch { throw dashErrors.unauthenticated() }
     try { address = (await recoverMessageAddress({ message: nonce.message, signature: body.signature as Hex })).toLowerCase() }
     catch { throw dashErrors.unauthenticated() }
+    if (isOfficialUser(address, deps.config.wallet ?? '')) throw dashErrors.forbidden()
     if (!identity.wallets.some(wallet => wallet.toLowerCase() === address)) throw dashErrors.unauthenticated()
     if (identity.login === null) throw dashErrors.forbidden('Use Google, Discord, X or Telegram to log in.')
     const info = { address, login: identity.login }

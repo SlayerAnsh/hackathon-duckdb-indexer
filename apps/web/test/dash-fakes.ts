@@ -42,3 +42,14 @@ export function fakeChain(entities: RpcRow[], head = 1000) {
   } }
   return { deps, calls, queries }
 }
+
+export function officialWidgetRow(options: Parameters<typeof widgetRow>[0] = {}): RpcRow {
+  const result = widgetRow({ user: W, ...options })
+  result.attributes = result.attributes!.map(a => a.name === 'login' ? { ...a, value: 'arkiv' } : a)
+  return result
+}
+export function officialDashboardRow(slug = 'network-overview', options: RowOptions = {}): RpcRow {
+  const result = dashboardRow({ user: W, ...options })
+  result.attributes = [...result.attributes!.map(a => a.name === 'login' ? { ...a, value: 'arkiv' } : a), { name: 'slug', value: slug, type: 'str' }]
+  return result
+}

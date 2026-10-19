@@ -85,3 +85,18 @@ test('public config is enabled only with an app id and a valid wallet', () => {
   expect(readPublicDashConfig({}).enabled).toBe(false)
   expect(readPublicDashConfig({ rpcUrl: 'https://example.test' }).rpcUrl).toBe('https://example.test')
 })
+
+
+test('official entities reserve arkiv login and validate optional dashboard slugs', () => {
+  const w = decodeDashEntity(row())
+  const official = { ...w, attrs: { ...w.attrs, user: W, login: 'arkiv' } }
+  expect(asWidget(official, W)).toMatchObject({ official: true, login: 'arkiv' })
+  expect(asWidget({ ...official, attrs: { ...official.attrs, user: U } }, W)).toBeNull()
+  expect(asWidget(w, W)?.official).toBe(false)
+  const d = { ...official, attrs: { ...official.attrs, type: 'dashboard', title: 'Overview', slug: 'network-overview' }, payload: { v: 1, title: 'Overview', description: '' } }
+  expect(asDashboard(d, W)).toMatchObject({ official: true, login: 'arkiv', slug: 'network-overview' })
+  expect(asDashboard({ ...d, attrs: { ...d.attrs, user: U } }, W)).toBeNull()
+  for (const slug of ['Bad Slug', 'a'.repeat(65), '']) expect(asDashboard({ ...d, attrs: { ...d.attrs, slug } }, W)?.slug).toBeNull()
+  expect(asDashboard({ ...d, attrs: { ...d.attrs, user: U, login: 'google', slug: '' } }, W)).toMatchObject({ official: false, slug: null })
+  expect(asLink({ ...official, attrs: { ...official.attrs, type: 'link', dashboard: D, widget: K }, payload: { v: 1, size: 'md', position: 0, name: 'Top' } }, W)?.official).toBe(true)
+})

@@ -20,6 +20,7 @@ export function dashCte(wallet: string): string {
   max(a.value) FILTER (WHERE a.name = 'title') AS title,
   max(a.value) FILTER (WHERE a.name = 'chart') AS chart,
   max(a.value) FILTER (WHERE a.name = 'dashboard') AS dashboard,
+  max(a.value) FILTER (WHERE a.name = 'slug') AS slug,
   max(a.value) FILTER (WHERE a.name = 'widget') AS widget
  FROM entities e JOIN attributes a ON a.key = e.key
  WHERE e.creator = ${address(wallet)}

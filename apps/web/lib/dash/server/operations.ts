@@ -1,3 +1,4 @@
+import { isOfficialUser } from '../official'
 import { ExpirationTime, type AttributeInputs, type WalletArkivClient, type PublicArkivClient } from '@arkiv-network/sdk'
 import { addr, key } from '@arkiv-network/sdk/attr'
 import { RpcError, type ArkivRpc } from '@asi/core'
@@ -11,6 +12,10 @@ export type DashWriterClient = Pick<WalletArkivClient, 'account' | 'createEntity
 export type DashReader = Pick<ArkivRpc, 'query' | 'blockNumber'>
 export type OpsDeps = { client: DashWriterClient; reader: DashReader; wallet: string; queue: WriteQueue }
 const hex = (value: string) => value.toLowerCase() as `0x${string}`
+
+function requireUser(deps: OpsDeps, session: Session): void {
+  if (isOfficialUser(session.address, deps.wallet)) throw dashErrors.forbidden()
+}
 
 export function extendTarget(expiresAt: number, head: number, lifetimeDays: number): number {
   return Math.min(expiresAt + lifetimeDays * BLOCKS_PER_DAY, head + MAX_REMAINING_DAYS * BLOCKS_PER_DAY)
@@ -52,6 +57,7 @@ function requireOwner(user: string, session: Session): void {
 }
 export function createWidget(deps: OpsDeps, s: Session, input: { widget: WidgetPayload; addTo?: { dashboard: string; size: Size } }): Promise<WriteResult> {
   return deps.queue.run(async () => {
+    requireUser(deps, s)
     const create = { attributes: widgetAttributes(input.widget, s), payload: jsonPayload(input.widget), contentType: CONTENT_TYPE,
       expires: ExpirationTime.fromSeconds(input.widget.lifetimeDays * 86400) }
     if (!input.addTo) {
@@ -79,6 +85,7 @@ export function createWidget(deps: OpsDeps, s: Session, input: { widget: WidgetP
 }
 export function updateWidget(deps: OpsDeps, s: Session, entityKey: string, widget: WidgetPayload): Promise<WriteResult> {
   return deps.queue.run(async () => {
+    requireUser(deps, s)
     const current = await readWidget(deps, entityKey)
     requireOwner(current.widget.user, s)
     const result = await write(() => deps.client.patchEntity({ entityKey: hex(entityKey), set: { name: widget.name, chart: widget.chart },
@@ -88,6 +95,7 @@ export function updateWidget(deps: OpsDeps, s: Session, entityKey: string, widge
 }
 export function extendWidget(deps: OpsDeps, s: Session, entityKey: string): Promise<WriteResult> {
   return deps.queue.run(async () => {
+    requireUser(deps, s)
     const { head, entities, widget } = await readWidget(deps, entityKey, widgetExtendExpr(deps.wallet, entityKey, s.address.toLowerCase()))
     const linked = entities.filter(e => e.expiresAt > head).map(e => asLink(e, deps.wallet))
       .some(l => l !== null && l.widgetKey === widget.key && l.user === s.address.toLowerCase())
@@ -100,6 +108,7 @@ export function extendWidget(deps: OpsDeps, s: Session, entityKey: string): Prom
 }
 export function deleteWidget(deps: OpsDeps, s: Session, entityKey: string): Promise<WriteResult> {
   return deps.queue.run(async () => {
+    requireUser(deps, s)
     const { head, widget } = await readWidget(deps, entityKey)
     requireOwner(widget.user, s)
     const result = await write(() => deps.client.deleteEntity({ entityKey: hex(entityKey) }))
@@ -175,6 +184,7 @@ function linkCreate(dashboard: DashboardEntity, item: { widget: string; size: Si
 }
 export function createDashboard(deps: OpsDeps, s: Session, input: { title: string; description?: string }): Promise<WriteResult> {
   return deps.queue.run(async () => {
+    requireUser(deps, s)
     const head = await read(() => deps.reader.blockNumber())
     const result = await write(() => deps.client.createEntity({ attributes: { type: 'dashboard', project: DASH_PROJECT, user: addr(hex(s.address)), login: s.login, title: input.title },
       payload: jsonPayload({ v: 1, title: input.title, description: input.description ?? '' }), contentType: CONTENT_TYPE, expires: ExpirationTime.fromSeconds(DASHBOARD_LIFETIME_DAYS * 86400) }))
@@ -183,6 +193,7 @@ export function createDashboard(deps: OpsDeps, s: Session, input: { title: strin
 }
 export function updateDashboard(deps: OpsDeps, s: Session, entityKey: string, input: { title: string; description?: string }): Promise<WriteResult> {
   return deps.queue.run(async () => {
+    requireUser(deps, s)
     const { head } = await readDashboard(deps, s, entityKey)
     const result = await write(() => deps.client.patchEntity({ entityKey: hex(entityKey), set: { title: input.title },
       payload: jsonPayload({ v: 1, title: input.title, description: input.description ?? '' }), contentType: CONTENT_TYPE }))
@@ -191,6 +202,7 @@ export function updateDashboard(deps: OpsDeps, s: Session, entityKey: string, in
 }
 export function deleteDashboard(deps: OpsDeps, s: Session, entityKey: string): Promise<WriteResult> {
   return deps.queue.run(async () => {
+    requireUser(deps, s)
     const { head, dashboard, links } = await readDashboard(deps, s, entityKey)
     const result = await write(() => deps.client.executeBatch({ deletes: [dashboard, ...links].map(e => ({ entityKey: hex(e.key) })) }))
     return { txHash: result.txHash, afterBlock: head }
@@ -198,6 +210,7 @@ export function deleteDashboard(deps: OpsDeps, s: Session, entityKey: string): P
 }
 export function organizeDashboard(deps: OpsDeps, s: Session, entityKey: string, input: OrganizeInput): Promise<WriteResult> {
   return deps.queue.run(async () => {
+    requireUser(deps, s)
     const state = await readDashboard(deps, s, entityKey, input.items.filter(i => i.link === null).map(i => i.widget))
     const plan = planOrganize(state, input)
     const patches = plan.patches.map(p => ({ entityKey: hex(p.link), payload: jsonPayload({ v: 1, size: p.size, position: p.position, name: p.name }), contentType: CONTENT_TYPE }))
@@ -210,6 +223,7 @@ export function organizeDashboard(deps: OpsDeps, s: Session, entityKey: string, 
 }
 export function addLink(deps: OpsDeps, s: Session, dashboardKey: string, input: { widget: string; size: Size }): Promise<WriteResult> {
   return deps.queue.run(async () => {
+    requireUser(deps, s)
     const { head, dashboard, links, widgets } = await readDashboard(deps, s, dashboardKey, [input.widget])
     const widget = widgets.get(hex(input.widget))
     if (!widget) throw dashErrors.notFound()

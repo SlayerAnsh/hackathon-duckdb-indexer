@@ -195,3 +195,9 @@ Every expression is sent through `queryAll` as `arkiv_query(expression, { limit:
 | Browser widget page, dashboard widget payloads, explorer previews, home lifetime data | `keysExprs(W, keys)` in chunks of 50; explorer preview batches contain 12 keys per page |
 
 Dashboard reads always filter `$creator` on the configured dashboard wallet as well as project. Another wallet can copy every attribute, so attributes alone are never trusted identity. Decoders recheck creator, project, type, required attributes and payload validity before accepting an entity. Lists, counts and activity use creator and project scoped local DuckDB SQL; RPC reads supply payloads only where needed. Stored widget SQL must pass `checkWidgetSql` before execution in the viewer's DuckDB, capped at 5,000 result rows.
+
+## Official entities
+
+An entity is Official when its `user` attribute equals the app wallet address. Readers still require the app wallet as creator and the dashboard project tag. Official widgets and dashboards use `login = arkiv`. Official dashboards also carry a string `slug` attribute with at most 64 bytes, matching `^[a-z0-9]+(?:-[a-z0-9]+)*$`.
+
+Official dashboards, widgets and links have 90 day lifetimes and are renewed by the app wallet. A user cannot forge an Official entity through the API: the server derives `user` from the verified session, refuses app wallet sessions and rejects app wallet addresses in every user write operation. Readers accept `login = arkiv` only when `user` equals the app wallet.

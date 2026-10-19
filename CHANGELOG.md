@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Official dashboards: entities whose user is the app wallet, defined from the former showcase queries.
+
 * Stacked bar and histogram widgets; time range pickers removed.
 
 * Console theme with dark and light modes, calm navigation and the index status bar on every page.

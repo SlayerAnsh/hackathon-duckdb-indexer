@@ -149,3 +149,13 @@ test('client IP uses the final proxy entry and groups IPv6 by prefix', () => {
   ]) expect(clientIp(request('nonce', 'POST', undefined, { 'x-forwarded-for': forwarded }))).toBe(expected)
   expect(clientIp(request('nonce', 'POST', undefined, { 'x-real-ip': '203.0.113.9' }))).toBe('203.0.113.9')
 })
+
+
+test('app wallet cannot create a user session or cookie', async () => {
+  const { deps } = fixture()
+  Object.assign(deps.config, { wallet: account.address })
+  const res = await handleCreateSession(request('session', 'POST', await signed(deps), { authorization: 'Bearer good' }), deps)
+  expect(res.status).toBe(403)
+  expect((await res.json()).error).toBe('forbidden')
+  expect(res.headers.get('set-cookie')).toBeNull()
+})
