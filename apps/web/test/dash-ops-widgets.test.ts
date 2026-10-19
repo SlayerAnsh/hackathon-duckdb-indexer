@@ -112,7 +112,7 @@ test('read throttling preserves Retry After and SDK missing errors become not_fo
     await expect(read === 'query' ? deleteWidget(f.deps, S, K) : createWidget(f.deps, S, { widget: validWidget })).rejects.toMatchObject({ code: 'busy', status: 503, retryAfterSec: 37 })
     expect(f.calls).toEqual([])
   }
-  for (const message of ['EntityNotFound', 'EntityExpired', 'No live entity with key', `entity ${K} expired`]) {
+  for (const message of ['EntityNotFound', 'EntityExpired', 'Transaction failed: no entity 0xabcdef12…345678 — it may have been deleted, or have expired', 'Transaction failed: entity 0xabcdef12…345678 expired at block 123']) {
     const f = fakeChain([widgetRow()])
     f.deps.client.deleteEntity = async () => { throw new Error(message) }
     await expect(deleteWidget(f.deps, S, K)).rejects.toMatchObject({ code: 'not_found' })
@@ -120,4 +120,13 @@ test('read throttling preserves Retry After and SDK missing errors become not_fo
   const f = fakeChain([widgetRow()]), error = new Error('Unknown SDK failure')
   f.deps.client.deleteEntity = async () => { throw error }
   await expect(deleteWidget(f.deps, S, K)).rejects.toBe(error)
+})
+
+test('SDK structured missing entity errors are found through causes', async () => {
+  for (const error of [new Error('unrelated', { cause: { data: { errorName: 'EntityNotFound' } } }),
+    { cause: { cause: { errorName: 'EntityExpired' } } }]) {
+    const f = fakeChain([widgetRow()])
+    f.deps.client.deleteEntity = async () => { throw error }
+    await expect(deleteWidget(f.deps, S, K)).rejects.toMatchObject({ code: 'not_found', status: 404 })
+  }
 })

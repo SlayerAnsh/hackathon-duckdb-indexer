@@ -3,7 +3,7 @@ import { privateKeyToAccount } from 'viem/accounts'
 import type { Hex } from 'viem'
 import { readServerDashConfig } from '../lib/dash/server/config'
 import { createPrivyVerifier, identityFromUser, type PrivyIdentity } from '../lib/dash/server/privy'
-import { assertWriteRequest, clientIp, isSecure, readJson, handleNonce, handleCreateSession, handleGetSession, handleDeleteSession, type AuthDeps } from '../lib/dash/server/auth'
+import { assertWriteRequest, publicHost, clientIp, isSecure, readJson, handleNonce, handleCreateSession, handleGetSession, handleDeleteSession, type AuthDeps } from '../lib/dash/server/auth'
 import { NonceStore } from '../lib/dash/server/nonce'
 import { NONCE_RULES, RateLimiter } from '../lib/dash/server/rate-limit'
 import { deriveSessionSecret, SESSION_TTL_SECONDS } from '../lib/dash/server/session'
@@ -70,7 +70,7 @@ test('nonce endpoint is rate limited per IP', async () => {
     expect(body.nonce).toMatch(/^[0-9a-f]{64}$/)
     expect(body.message).toContain('Domain: web.test')
   }
-  const limited = await handleNonce(request('nonce', 'POST', undefined, { 'x-forwarded-for': '1.2.3.4' }), deps)
+  const limited = await handleNonce(request('nonce', 'POST', undefined, { 'x-forwarded-for': '9.9.9.9, 5.6.7.8' }), deps)
   expect(limited.status).toBe(429); expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0)
   expect((await handleNonce(request('nonce', 'POST', undefined, { 'x-forwarded-for': '2.3.4.5' }), deps)).status).toBe(200)
 })
@@ -124,4 +124,28 @@ test('JSON parsing rejects malformed and oversized streamed bodies', async () =>
   expect(await readJson(request('session', 'POST', { ok: true }))).toEqual({ ok: true })
   const { deps } = fixture()
   expect((await handleCreateSession(request('session', 'POST', {}, { authorization: 'Bearer good' }), deps)).status).toBe(400)
+})
+
+test('public host drives origin checks and nonce domains behind the proxy', async () => {
+  const make = (headers: Record<string, string>) => new Request('http://0.0.0.0:3000/api/dash/session', {
+    method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://app.example.com', ...headers },
+  })
+  for (const headers of [{ host: 'app.example.com' }, { host: 'web:3000', 'x-forwarded-host': 'APP.EXAMPLE.COM, internal' }] as Record<string, string>[]) {
+    const req = make(headers)
+    expect(publicHost(req)).toBe('app.example.com')
+    expect(() => assertWriteRequest(req)).not.toThrow()
+    const res = await handleNonce(req, fixture().deps)
+    expect(res.status).toBe(200)
+    expect((await res.json()).message).toContain('Domain: app.example.com')
+  }
+  expect(() => assertWriteRequest(make({ host: 'app.example.com', origin: 'https://evil.example' }))).toThrow(expect.objectContaining({ code: 'forbidden' }))
+  expect(publicHost(new Request('https://fallback.example/path'))).toBe('fallback.example')
+})
+test('client IP uses the final proxy entry and groups IPv6 by prefix', () => {
+  for (const [forwarded, expected] of [
+    ['1.2.3.4, 203.0.113.9', '203.0.113.9'],
+    ['2001:db8:1:2:aaaa::1', '2001:0db8:0001:0002::/64'],
+    ['2001:db8::1, ,', '2001:0db8:0000:0000::/64'],
+  ]) expect(clientIp(request('nonce', 'POST', undefined, { 'x-forwarded-for': forwarded }))).toBe(expected)
+  expect(clientIp(request('nonce', 'POST', undefined, { 'x-real-ip': '203.0.113.9' }))).toBe('203.0.113.9')
 })

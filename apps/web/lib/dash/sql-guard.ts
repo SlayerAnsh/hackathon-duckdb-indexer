@@ -24,6 +24,11 @@ export function checkWidgetSql(sql: string): string | null {
       }
       if (depth > 0) return SINGLE_QUERY
       tokens.push(' ')
+    } else if (/^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/.test(sql.slice(i))) {
+      return 'Widgets cannot use dollar quoted strings'
+    } else if ((sql[i] === 'E' || sql[i] === 'e') && sql[i + 1] === "'" &&
+      (i === 0 || !/[A-Za-z0-9_$]/.test(sql[i - 1]))) {
+      return 'Widgets cannot use escape string literals'
     } else if (sql[i] === "'" || sql[i] === '"') {
       const quote = sql[i++]
       let value = ''
@@ -36,7 +41,10 @@ export function checkWidgetSql(sql: string): string | null {
         } else value += sql[i++]
       }
       if (!closed) return SINGLE_QUERY
-      if (quote === "'") literals.push(value)
+      if (quote === '"') {
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) return 'Widgets require simple quoted identifiers'
+        if (FILE_IDENTIFIERS.test(value.toLowerCase())) return FILE_ACCESS
+      } else literals.push(value)
       tokens.push(' ? ')
     } else tokens.push(sql[i++])
   }

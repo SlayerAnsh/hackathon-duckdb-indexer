@@ -29,7 +29,7 @@ test('widget validation uses the guard by default and permits an injected check'
 
 test('tokenizes comments and escaped quotes without hiding SQL tokens', () => {
   for (const sql of ["SELECT '-- DROP; /*'", '/* DELETE; */ SELECT 1; -- DROP',
-    'SELECT 1 /* outer /* DELETE */ comment */', 'SELECT "a""set" FROM entities']) {
+    'SELECT 1 /* outer /* DELETE */ comment */']) {
     expect(checkWidgetSql(sql)).toBeNull()
   }
   for (const sql of ['SELECT 1; /* comment */ SELECT 2', 'SELECT 1;;', 'SELECT 1 /* unfinished',
@@ -47,4 +47,16 @@ test('rejects every specified file access identifier and literal pattern', () =>
     'json', 'jsonl', 'ndjson', 'txt', 'db', 'duckdb'].map(ext => `file.${ext.toUpperCase()}`)]) {
     expect(checkWidgetSql(`SELECT '${value}'`)).not.toBeNull()
   }
+})
+
+test('rejects alternate quoting and unsafe quoted identifiers', () => {
+  for (const sql of [
+    'SELECT * FROM "https://evil.example/x.csv"', `SELECT * FROM "read_csv"('a')`,
+    'SELECT * FROM "data.parquet"', 'SELECT read_text($$https://evil/a$$)',
+    String.raw`SELECT E'\'' ; INSTALL httpfs; SELECT E'\''`,
+    "SELECT $$'$$; ATTACH 'x.db'; SELECT $$'$$", 'SELECT "a""set" FROM entities',
+    'SELECT $tag$value$tag$', "SELECT e'value'",
+  ]) expect(checkWidgetSql(sql)).not.toBeNull()
+  for (const sql of ['SELECT "creator", count(*) AS "n" FROM entities GROUP BY 1',
+    "SELECT 'it''s' AS s", 'SELECT a."key" FROM entities a']) expect(checkWidgetSql(sql)).toBeNull()
 })

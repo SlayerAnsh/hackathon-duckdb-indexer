@@ -29,7 +29,15 @@ async function read<T>(work: () => Promise<T>): Promise<T> {
 }
 async function write<T>(work: () => Promise<T>): Promise<T> {
   try { return await work() } catch (error) {
-    if (error instanceof Error && /EntityNotFound|EntityExpired|No live entity with key|entity 0x[\da-f]+ expired/i.test(error.message)) throw dashErrors.notFound()
+    let current: unknown = error
+    for (let depth = 0; depth <= 5 && current && typeof current === 'object'; depth++) {
+      const entry = current as { data?: { errorName?: unknown }; errorName?: unknown; message?: unknown; cause?: unknown }
+      if ([entry.data?.errorName, entry.errorName].some(name => name === 'EntityNotFound' || name === 'EntityExpired') ||
+        (typeof entry.message === 'string' && /no entity 0x|entity 0x\S+ expired at block|EntityNotFound|EntityExpired/i.test(entry.message))) {
+        throw dashErrors.notFound()
+      }
+      current = entry.cause
+    }
     throw error
   }
 }

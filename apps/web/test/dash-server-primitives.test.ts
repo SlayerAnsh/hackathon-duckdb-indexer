@@ -20,12 +20,12 @@ test('session round trip, tamper, expiry and cookie flags', () => {
 test('nonces are single use and expire after five minutes', () => {
   let now = 0
   const store = new NonceStore({ now: () => now })
-  const a = store.issue('arkiv-sql.example')
+  const a = store.issue('arkiv-sql.example', 'a')
   expect(a.nonce).toMatch(/^[0-9a-f]{64}$/)
   expect(a.message.split('\n')).toEqual(['Sign in to Arkiv SQL dashboards', 'Domain: arkiv-sql.example', `Nonce: ${a.nonce}`,
     'Issued at: 1970-01-01T00:00:00.000Z', 'This signature proves you control this wallet. It costs nothing and sends no transaction.'])
   expect(store.consume(a.nonce)).toEqual({ message: a.message }); expect(store.consume(a.nonce)).toBeNull()
-  const b = store.issue('h'); now = 300_001; expect(store.consume(b.nonce)).toBeNull()
+  const b = store.issue('h', 'a'); now = 300_001; expect(store.consume(b.nonce)).toBeNull()
 })
 test('rate limiter applies every rule and reports retry after', () => {
   let now = 0
@@ -73,16 +73,24 @@ test('session rejects signed invalid fields and cookies match exact names', () =
   expect(sessionCookie('tok', false)).not.toContain('Secure')
 })
 
-test('nonce capacity evicts the oldest and expiry is exact', () => {
+test('nonce quota drops only the oldest nonce for the same IP', () => {
+  const store = new NonceStore({ perIp: 2 })
+  const first = store.issue('h', 'a'), other = store.issue('h', 'b')
+  const second = store.issue('h', 'a'), third = store.issue('h', 'a')
+  expect(store.consume(first.nonce)).toBeNull()
+  for (const value of [other, second, third]) expect(store.consume(value.nonce)).toEqual({ message: value.message })
+})
+test('global nonce capacity preserves other users and expiry is exact', () => {
   let now = 0
   const store = new NonceStore({ max: 2, ttlMs: 100, now: () => now })
-  const first = store.issue('h'), second = store.issue('h'), third = store.issue('h')
-  expect(first.nonce).not.toBe(second.nonce)
-  expect(store.consume(first.nonce)).toBeNull()
+  const first = store.issue('h', 'a'), second = store.issue('h', 'b')
+  expect(() => store.issue('h', 'c')).toThrow(expect.objectContaining({ code: 'busy' }))
+  expect(store.consume(first.nonce)).toEqual({ message: first.message })
   expect(store.consume(second.nonce)).toEqual({ message: second.message })
+  const expired = store.issue('h', 'a')
   now = 100
-  expect(store.consume(third.nonce)).toBeNull()
-  const next = store.issue('h')
+  expect(store.consume(expired.nonce)).toBeNull()
+  const next = store.issue('h', 'a')
   expect(store.consume(next.nonce)).toEqual({ message: next.message })
 })
 

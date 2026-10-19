@@ -1,3 +1,4 @@
+import { isIP } from 'node:net'
 import { recoverMessageAddress, type Hex } from 'viem'
 import type { ServerDashConfig } from './config'
 import type { PrivyVerifier } from './privy'
@@ -7,14 +8,32 @@ import { dashErrors, errorResponse, json } from './errors'
 import { clearSessionCookie, readCookie, SESSION_COOKIE, SESSION_TTL_SECONDS, sessionCookie, signSession, verifySession, type Session } from './session'
 
 export type AuthDeps = { config: Pick<ServerDashConfig, 'sessionSecret'>; privy: PrivyVerifier; nonces: NonceStore; nonceLimiter: RateLimiter; now: () => number }
-export function clientIp(req: Request): string { return req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown' }
+export function publicHost(req: Request): string {
+  return (req.headers.get('x-forwarded-host')?.split(',')[0].trim() ||
+    req.headers.get('host')?.trim() || new URL(req.url).host).toLowerCase()
+}
+export function clientIp(req: Request): string {
+  const ip = req.headers.get('x-forwarded-for')?.split(',').map(value => value.trim()).filter(Boolean).at(-1) ||
+    req.headers.get('x-real-ip')?.trim() || 'unknown'
+  if (isIP(ip) !== 6) return ip
+  // Expand compressed IPv6, including the optional dotted IPv4 tail, before grouping.
+  const address = ip.toLowerCase().split('%')[0].replace(/(\d+\.\d+\.\d+\.\d+)$/, tail => {
+    const bytes = tail.split('.').map(Number)
+    return `${((bytes[0] << 8) | bytes[1]).toString(16)}:${((bytes[2] << 8) | bytes[3]).toString(16)}`
+  })
+  const [left, right] = address.split('::')
+  const start = left ? left.split(':') : []
+  const end = right ? right.split(':') : []
+  const parts = right === undefined ? start : [...start, ...Array(8 - start.length - end.length).fill('0'), ...end]
+  return parts.slice(0, 4).map(part => part.padStart(4, '0')).join(':') + '::/64'
+}
 export function isSecure(req: Request): boolean { return new URL(req.url).protocol === 'https:' }
 export function assertWriteRequest(req: Request): void {
   const origin = req.headers.get('origin')
   if (origin !== null) {
     let host: string
     try { host = new URL(origin).host } catch { throw dashErrors.forbidden() }
-    if (host !== new URL(req.url).host) throw dashErrors.forbidden()
+    if (host.toLowerCase() !== publicHost(req)) throw dashErrors.forbidden()
   }
   if (req.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json') {
     throw dashErrors.invalid('Content-Type must be application/json')
@@ -55,7 +74,7 @@ export async function handleNonce(req: Request, deps: AuthDeps): Promise<Respons
   try {
     const limit = deps.nonceLimiter.take(clientIp(req))
     if (!limit.ok) throw dashErrors.rateLimited(limit.retryAfterSec)
-    return json(deps.nonces.issue(new URL(req.url).host))
+    return json(deps.nonces.issue(publicHost(req), clientIp(req)))
   } catch (e) { return errorResponse(e) }
 }
 export async function handleCreateSession(req: Request, deps: AuthDeps): Promise<Response> {
