@@ -1,5 +1,7 @@
 'use client'
-import { useSyncExternalStore } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { useTimedQuery } from '../use-query'
+import { syncedSql } from './sql'
 
 export type PendingWrite = { key: string; kind: 'widget' | 'dashboard' | 'link'; op: 'upsert' | 'delete'; afterBlock: number; at: number; txHash?: string; fields?: Record<string, string | number> }
 const TTL = 5 * 60 * 1000
@@ -30,7 +32,15 @@ export function usePending(): PendingWrite[] {
   return useSyncExternalStore(subscribe, () => writes, () => empty)
 }
 
-// Task 4 supplies syncedSql and the DuckDB query. Keep pending writes until then.
-export function useSynced(write: PendingWrite | undefined, _version: number): boolean {
-  return write === undefined
+export function useSynced(write: PendingWrite | undefined, version: number): boolean {
+  const sql = write ? syncedSql(write.key, write.afterBlock, write.op) : 'SELECT 1 AS n'
+  const query = useTimedQuery(sql, version)
+  // useTimedQuery retains the previous result until its effect starts the new SQL.
+  const previous = useRef({ sql, stale: query.data })
+  if (previous.current.sql !== sql) previous.current = { sql, stale: query.data }
+  const synced = !write || (query.data !== previous.current.stale && !query.loading && !query.error && Number(query.data?.rows[0]?.[0]) === 1)
+  useEffect(() => {
+    if (write && synced && writes.includes(write)) clearPending(write.key)
+  }, [write, synced])
+  return synced
 }
