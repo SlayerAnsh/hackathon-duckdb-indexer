@@ -1,3 +1,5 @@
+import { checkWidgetSql } from './sql-guard'
+
 export const DASH_PROJECT = 'arkiv-sql-indexer-dash'
 export const CONTENT_TYPE = 'application/json'
 export const CHART_TYPES = ['table', 'counter', 'bar', 'hbar', 'line', 'area', 'donut'] as const
@@ -87,7 +89,7 @@ function parse<T>(build: () => T): Parsed<T> {
   }
 }
 
-export function parseWidgetPayload(input: unknown, checkSql: (sql: string) => string | null = () => null): Parsed<WidgetPayload> {
+export function parseWidgetPayload(input: unknown, checkSql: (sql: string) => string | null = checkWidgetSql): Parsed<WidgetPayload> {
   return parse(() => {
     const p = object(input, 'widget')
     const v = choice(p.v, [1] as const, 'v')
