@@ -33,7 +33,7 @@ Why it matters: widgets and dashboards are stored as Arkiv entities. The indexer
 - Personal data on chain. Entity attributes are public; no email address, social handle or Privy user id goes on chain. **(call)**
 - A user editing, deleting or reordering something they do not own.
 - The backend wallet drained or flooded by one account.
-- The existing logged out experience getting slower or more cluttered. The landing, showcase and playground stay as they are apart from one nav button. **(user)** The project memory also says the UI is an end user demo with no operator or debug controls.
+- The existing logged out experience getting slower or more cluttered. The landing, showcase and playground stay as they are apart from one nav button. **(user)** Overridden by owner decision, 20 October 2026: the showcase is removed and Official dashboards replace it on the landing page (9.8); `/showcase` redirects to `/explore`. The v5 theme applies to every page (9.10). The project memory also says the UI is an end user demo with no operator or debug controls.
 
 ## 5. Constraints and facts from the codebase
 
@@ -79,7 +79,7 @@ Payload (JSON, versioned with `v: 1`):
 }
 ```
 
-`chart` is one of `table`, `counter`, `bar`, `hbar`, `line`, `area`, `donut`. `mapping.y` is a list; `groupBy` and multiple `y` columns are mutually exclusive. `stacking` is `off`, `stack` or `percent`. `sort` is `query`, `x` or `ydesc`. `counter` holds `{ column, row, prefix, suffix, label, decimals, compact }` when `chart` is `counter`.
+`chart` is one of `table`, `counter`, `bar`, `hbar`, `line`, `area`, `donut`, plus `stacked-bar` and `histogram` (owner decision, 20 October 2026). A `stacked-bar` needs `stacking` of `stack` or `percent`. A `histogram` uses `mapping.x` as the numeric value column, an empty `mapping.y`, no `groupBy`, `stacking` `off`, and `mapping.bins` of 10, 20, 30 or 50 (default 20 when absent); bins are computed in the browser over the returned rows. `mapping.y` is a list; `groupBy` and multiple `y` columns are mutually exclusive. `stacking` is `off`, `stack` or `percent`. `sort` is `query`, `x` or `ydesc`. `counter` holds `{ column, row, prefix, suffix, label, decimals, compact }` when `chart` is `counter`.
 
 Lifetime: the creator picks 1, 7, 30 or 90 days. **(user picks per widget; the four values are a call)**
 
@@ -154,7 +154,7 @@ UI design decisions for each page go to an Opus 5.5 design pass before implement
 
 ### 9.1 Nav (existing pages)
 
-One new button "Build your dashboard" in the top bar. Logged out it opens Privy. Logged in it becomes an avatar menu with "My home" and "Log out". **(user for the button and Privy; menu contents are a call)**
+Owner decision, 20 October 2026: the nav becomes Home, Explore, Playground and About (UI §10.3); Showcase and Widgets leave the nav. One new button "Build your dashboard" in the top bar. Logged out it opens Privy. Logged in it becomes an avatar menu with "My home" and "Log out". **(user for the button and Privy; menu contents are a call)**
 
 ### 9.2 Home `/me` (login required) **(user: layout A)**
 
@@ -188,7 +188,7 @@ Left: ordered list, drag handle, name, chart type, size select, imported marker,
 
 ### 9.6 Widget explorer `/widgets` (public) **(user: page requested, mockup approved)**
 
-Widgets are the main unit, so they get their own browse page, linked from the top nav as "Widgets". **(call)**
+Widgets are the main unit, so they get their own browse page, linked from the top nav as "Widgets". **(call)** Overridden by owner decision, 20 October 2026: the explorer becomes the Widgets tab of `/explore` (tabs Dashboards and Widgets); `/widgets` redirects to `/explore?tab=widgets`; `/widgets/<key>` and `/widgets/new` keep their routes.
 
 - Header: live widget count, "+ New widget".
 - Controls: search by name or creator address; chart type filter; sort by Newest, Most used, Expiring soon; "Mine only" toggle when logged in.
@@ -205,6 +205,28 @@ Opened from the organize page.
 - Imports from the organize page join the unsaved draft and are written on Done. **(call)**
 
 From a widget page or explorer card, "+ Add to dashboard" opens a small picker of the user's dashboards plus "+ New dashboard", and writes the link immediately. **(call)**
+
+### 9.8 Official dashboards and seeding (owner decision, 20 October 2026)
+
+The showcase queries move into a few Official dashboards: normal dashboard, widget and link entities written by the dashboard wallet. They live in the same ecosystem as user content (anyone can open them at `/d/<key>`, import their widgets, and see them in `/explore`).
+
+Marker: an entity is official when its `user` attribute equals the dashboard wallet address. Official entities carry `login = arkiv`; official dashboards also carry a `slug` attribute. Why this marker is the safest choice:
+
+- The user write API builds every attribute on the server and sets `user` from the session address. A session address is proven by a personal_sign from the Privy embedded wallet linked to the logged in Privy user, so it can never be the dashboard wallet, whose key only the server holds. The server additionally refuses a session or a write whose address equals the wallet.
+- It needs no new secret, no config list and no deploy step, and it survives reseeding (a list of official keys in config would go stale every time a dashboard is recreated).
+- It is queryable in DuckDB (`usr = <wallet>`) and over RPC (`user = addr(<wallet>)`) with the existing attributes.
+
+Seeding: `apps/web/scripts/seed-official.ts`, run with Bun by the coordinator, writes each Official dashboard with its widgets and links in one `executeBatch` through the server operations module. It is idempotent: a dashboard whose `slug` already exists as a live official dashboard is skipped. Lifetimes: dashboard, links and widgets 90 days (widget `lifetimeDays` 90).
+
+Split of the former showcase views: "Arkiv network overview" (overview counters, creations per hour, entities by type, recently updated), "Expiry watch" (expiry counters, remaining lifetime histogram, expiry horizon, expiry bucket by type as a stacked bar, expiring next), "Creators" (creator counters, top creators, creators by distinct types, creator vs current owner), "Attributes and activity" (attribute usage, numeric statistics, top status values, updates per 10 minutes, create vs update, running count).
+
+### 9.9 Keeping Official items alive (owner decision, 20 October 2026)
+
+The app wallet extends official dashboards, widgets and links (all entities with `user` = wallet) before they expire. Mechanism: an in process timer started from `apps/web/instrumentation.ts` in the Node.js runtime. It runs 60 seconds after server start and then every 6 hours, through the same serial write queue as user writes. Each run makes one creator scoped `arkiv_query` for official entities and, when any has less than 30 days left, one `executeBatch` of extensions to head plus 90 days (chunks of 50). It is idempotent (a second run in a row extends nothing) and does nothing when dashboards are disabled. The seed script offers the same run on demand (`--keepalive`). Chosen over a cron route because it needs no new secret, no public endpoint and no Dokploy job; the deployment runs one web container, so one timer runs.
+
+### 9.10 Theme and shell (owner decision, 20 October 2026)
+
+The v5 console theme (UI §10) applies to every page: dark default, light theme with a persisted toggle that follows `prefers-color-scheme` when unset and never flashes on load, navbar option A, the status bar on every page, report style dashboard view, widget actions on hover or focus only, faint widget borders, share icon menu (Copy link, Post on X). Time range pickers are removed. Fork is out of scope.
 
 ## 10. Left to the builder
 

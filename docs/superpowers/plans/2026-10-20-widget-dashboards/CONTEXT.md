@@ -14,6 +14,8 @@ Plan order (each depends on the previous ones being merged):
 2. `02-login-and-widgets.md`: client auth (lazy Privy), nav button and avatar menu, client API, RPC reads, pending writes, chart extensions, widget editor `/widgets/new`, widget page `/widgets/<key>`, add to dashboard picker.
 3. `03-dashboards.md`: dashboard view `/d/<key>`, organize `/d/<key>/edit` with drag and drop, browse card, import modal.
 4. `04-explorer-home-docs.md`: explorer `/widgets`, home `/me` with activity, "Widgets" nav item, README, SPECS.md, DEVELOPER.md, CHANGELOG.md, `arkiv/schema.md`.
+5. `05` to `08`: review and fix plans.
+9. `09-live-dashboards-redesign.md`: v5 theme and shell, chart types `stacked-bar` and `histogram`, Official dashboards (marker, seed, keepalive), `/explore` with tabs, landing without the showcase, report style dashboard view, page sweep. Shared interfaces it adds are in section 11.
 
 ## 2. Executor rules (apply to every task)
 
@@ -278,3 +280,92 @@ Next.js loads `.env*` files from the Next project directory (`apps/web`), not fr
 - Lists, counts and activity come from local DuckDB through `lib/dash/sql.ts`.
 - After a write, the client adds a pending write (P2) so lists and pages show the result before the index catches up; `SyncChip` shows "Syncing" until `useSynced` reports the row in DuckDB.
 - Stored widget SQL from any user runs in the viewer's DuckDB only after `checkWidgetSql` passes, with at most 5,000 result rows.
+
+## 11. Live dashboards redesign interfaces (plan 09)
+
+Owner decisions of 20 October 2026 are recorded in UI §10 and spec §9.8 to §9.10. Plan 09 adds these shared interfaces; later tasks and plans may add exports but never change these signatures.
+
+### 11.1 Theme (`lib/theme.ts`, isomorphic, P9 Task 1)
+
+```ts
+export type Theme = 'light' | 'dark'
+export const THEME_KEY = 'arkiv-sql-theme'
+export type ThemeStore = { getItem(key: string): string | null; setItem(key: string, value: string): void }
+export function readStoredTheme(store: ThemeStore | undefined): Theme | null   // null when unset, invalid, or the store throws
+export function writeStoredTheme(store: ThemeStore | undefined, theme: Theme): void   // swallows storage errors
+export function resolveTheme(stored: Theme | null, prefersLight: boolean): Theme   // stored wins, else media, dark is the default
+export function nextTheme(current: Theme): Theme
+export const THEME_INIT_SCRIPT: string   // inline <head> script: sets document.documentElement.dataset.theme before paint, every storage access in try/catch
+```
+
+### 11.2 Chart types (`lib/dash/schema.ts`, P9 Task 2)
+
+```ts
+export const CHART_TYPES = ['table', 'counter', 'bar', 'stacked-bar', 'hbar', 'line', 'area', 'donut', 'histogram'] as const
+export const HISTOGRAM_BINS = [10, 20, 30, 50] as const
+export type WidgetMapping = { x: string | null; y: string[]; groupBy: string | null; stacking: Stacking; sort: Sort; bins?: number }   // bins only for histogram
+```
+
+`parseWidgetPayload` sets `mapping.bins` (default 20) only for `histogram` and drops it for every other chart, so existing payloads round trip unchanged. `lib/dash/chart.ts` adds `histogramData(data: ResultData, column: string, bins: number, fmt: NumberFormat): ResultData` (columns `bin`, `count`).
+
+### 11.3 Official marker (`lib/dash/official.ts`, isomorphic, P9 Task 3)
+
+```ts
+export const OFFICIAL_LOGIN = 'arkiv'
+export const OFFICIAL_AUTHOR = 'Arkiv SQL Indexer'
+export const OFFICIAL_KEEP_DAYS = 30          // extend when fewer days remain
+export function isOfficialUser(user: string, wallet: string): boolean   // case insensitive equality, false for invalid addresses
+export function officialExpr(wallet: string): string   // render(and(scope(wallet), eq('user', addr(wallet))))
+```
+
+Entity changes (`lib/dash/entities.ts`): `WidgetEntity` and `DashboardEntity` gain `official: boolean`; their `login` type widens to `Login | typeof OFFICIAL_LOGIN`; `asWidget` and `asDashboard` accept `login = 'arkiv'` only when `user` equals the wallet. `LinkEntity` gains `official: boolean` (link `user` equals the wallet). Official dashboards carry an extra `slug` attribute (str, at most 64 bytes, `^[a-z0-9]+(?:-[a-z0-9]+)*$`), exposed as `DashboardEntity.slug: string | null`.
+
+Server guard: `authenticate` (session creation) and every user write operation reject a session whose address equals the wallet with 403 `forbidden`.
+
+DuckDB: the `dash` CTE gains `max(a.value) FILTER (WHERE a.name = 'slug') AS slug`; official rows are `usr = <wallet>`.
+
+### 11.4 Official definitions and server operations (P9 Task 3)
+
+```ts
+// lib/dash/official-defs.ts (isomorphic)
+export type OfficialWidgetDef = { size: Size; widget: WidgetPayload }
+export type OfficialDashboardDef = { slug: string; title: string; description: string; widgets: OfficialWidgetDef[] }
+export const OFFICIAL_DASHBOARDS: OfficialDashboardDef[]
+
+// lib/dash/server/official.ts (server only)
+export type SeedResult = { created: { slug: string; key: string; txHash: string }[]; skipped: string[] }
+export function seedOfficial(deps: OpsDeps, defs?: OfficialDashboardDef[]): Promise<SeedResult>
+export type KeepaliveResult = { checked: number; extended: number; txHashes: string[] }
+export function keepOfficialAlive(deps: OpsDeps, opts?: { keepDays?: number }): Promise<KeepaliveResult>
+export function readOfficialEnv(env: Record<string, string | undefined>): { ok: true; privateKey: `0x${string}`; wallet: string; rpcUrl: string } | { ok: false; reason: string }
+
+// lib/dash/server/deps.ts gains
+export function buildOps(privateKey: `0x${string}`, rpcUrl: string): OpsDeps   // buildDashDeps uses it
+
+// lib/dash/server/keepalive.ts (server only)
+export type KeepaliveTimer = { stop(): void }
+export function startOfficialKeepalive(opts: { run(): Promise<unknown>; firstDelayMs?: number; intervalMs?: number;
+  setTimer?: (fn: () => void, ms: number) => { unref?(): void }; clearTimer?: (handle: unknown) => void; log?: (message: string) => void }): KeepaliveTimer
+export function startKeepaliveFromEnv(): void   // idempotent (globalThis guard); no-op when getDashDeps() is disabled or during next build
+```
+
+Defaults: first run after 60,000 ms, then every 21,600,000 ms (6 hours). `apps/web/instrumentation.ts` calls `startKeepaliveFromEnv()` from `register()` only when `process.env.NEXT_RUNTIME === 'nodejs'`, through a dynamic import.
+
+### 11.5 Shell and lists (P9 Tasks 1 and 4)
+
+```ts
+// components/dash/TopBar.tsx
+export const NAV_ITEMS: readonly { href: string; label: string; match: readonly string[] }[]   // Home '/', Explore '/explore' (match '/explore', '/d', '/widgets'), Playground '/playground', About '/about'
+export function isActiveRoute(pathname: string | null, item: { href: string; match?: readonly string[] }): boolean
+export function TopBar({ state }: { state?: IndexState }): JSX.Element   // falls back to useIndex().state, so the status bar renders on every page
+
+// lib/dash/sql.ts
+export type DashboardListQuery = { search: string; sort: 'newest' | 'oldest' | 'widgets' | 'expiring'; official: boolean; limit: number; offset: number }   // 'oldest' is seed order, used by the landing page
+export type DashboardListItem = { key: string; title: string; user: string; official: boolean; widgets: number; charts: ChartType[]; createdAt: number; updatedAt: number; expiresAt: number }
+export function dashboardListSql(wallet: string, q: DashboardListQuery): string   // columns key, title, usr, official, widgets, charts, created_at, updated_at, expires_at
+export function dashboardCountSql(wallet: string, q: Pick<DashboardListQuery, 'search' | 'official'>): string
+export function toDashboardItems(rows: unknown[][]): DashboardListItem[]
+
+// lib/dash/read.ts
+export function fetchDashboards(rpc: Rpc, wallet: string, keys: string[]): Promise<{ head: number; dashboards: Map<string, DashboardEntity> }>
+```
