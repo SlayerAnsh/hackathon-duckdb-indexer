@@ -1,4 +1,4 @@
-.editor{display:grid;gap:24px;padding-bottom:32px;min-width:0}
+.editor{position:relative;display:grid;gap:24px;padding-bottom:32px;min-width:0}
 .header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:16px 0;background:var(--card);border-bottom:1px solid var(--border)}
 .header a{color:var(--text-2);font-size:13px}
 .name{flex:1;min-width:160px;font-size:18px!important}
@@ -22,3 +22,6 @@
 .row{display:flex;gap:8px;flex-wrap:wrap}
 .row select{flex:1}
 @media(max-width:760px){.columns{grid-template-columns:minmax(0,1fr)}.header{gap:8px}.name{flex-basis:65%}.header>a{flex-basis:100%}.lifetime{flex:1;flex-wrap:wrap}.settings{padding:16px}}
+.picker{position:absolute;top:72px;right:0;z-index:10;width:300px;max-height:75vh;overflow:auto;padding:16px;display:grid;gap:12px;background:var(--card-2);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-pop)}
+.picker h2{font-size:15px;margin:0}.pickerRow{display:flex;gap:8px;align-items:center}.pickerRow>button{flex:1;display:flex;justify-content:space-between;gap:8px}.pickerRow small{display:block;color:var(--text-2)}.picker form{display:grid;gap:8px}.picker label{display:grid;gap:8px}
+@media(max-width:760px){.picker{position:fixed;top:auto;bottom:0;left:0;right:0;width:auto;border-radius:var(--r-lg) var(--r-lg) 0 0}}
