@@ -4,7 +4,6 @@ import { formatNumber } from '../../lib/dash/chart'
 import type { Widget } from '../../lib/views'
 import type { TableData } from './DataTable'
 import { compact, shortHex } from '../../lib/format'
-import { bucketTimeLabel } from '../../lib/views'
 import s from '../showcase/showcase.module.css'
 
 const colors = Array.from({ length: 8 }, (_, i) => `var(--c${i + 1})`)
@@ -18,11 +17,6 @@ export function QueryChart({ widget, data }: ChartProps) {
  let rows: Record<string, string | number>[] = data.rows.map(row => Object.fromEntries(
   data.columns.map((c, i) => [c, y.includes(c) ? numeric(row[i]) : String(row[i] ?? '')])
  ))
- const range = widget.activeRange
- if (range) {
-  const now = Date.now()
-  rows = rows.map(row => ({ ...row, [x]: bucketTimeLabel(Number(row[x]), Number(row.head_block), range, now) }))
- }
  let keys = y
  if (widget.series) {
   keys = [...new Set(rows.map(r => String(r[widget.series!])))]
@@ -62,7 +56,7 @@ export function QueryChart({ widget, data }: ChartProps) {
      <CartesianGrid stroke="var(--grid)" horizontal={false}/><XAxis type="number" tickFormatter={tickFormatter} tickLine={false} axisLine={false} label={widget.xTitle ? { value: widget.xTitle, position: 'insideBottom' } : undefined}/>
      <YAxis dataKey={x} type="category" width={100} tickLine={false} axisLine={false} tickFormatter={v => shortHex(String(v))} label={widget.yTitle ? { value: widget.yTitle, angle: -90, position: 'insideLeft' } : undefined}/>
      {keys.map((k, i) => <Bar key={k} dataKey={k} stackId={stackId} fill={color(k, i)} radius={[0, 3, 3, 0]} isAnimationActive={false}>{valueLabel}</Bar>)}{tip}
-    </BarChart> : <BarChart stackOffset={widget.stacking === 'percent' ? 'expand' : undefined} data={rows} margin={{ right: 16 }}>
+    </BarChart> : <BarChart barCategoryGap={widget.kind === 'histogram' ? 0 : undefined} stackOffset={widget.stacking === 'percent' ? 'expand' : undefined} data={rows} margin={{ right: 16 }}>
      {axes}{keys.map((k, i) => <Bar key={k} dataKey={k} stackId={stackId} fill={color(k, i)} radius={[3, 3, 0, 0]} isAnimationActive={false}>{valueLabel}</Bar>)}{tip}
     </BarChart>}
    </ResponsiveContainer>

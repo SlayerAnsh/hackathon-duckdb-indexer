@@ -86,3 +86,13 @@ test('stat card renders label, value, context note and meter from the measured r
  expect(empty).not.toContain('NaN')
  expect(empty).not.toContain('role="meter"')
 })
+
+test('showcase cards have fixed windows without range controls', async () => {
+ const { readFileSync } = await import('node:fs')
+ for (const file of ['WidgetCard.tsx', 'AreaChart.tsx']) {
+  const source = readFileSync(new URL('../components/dash/' + file, import.meta.url), 'utf8')
+  for (const name of ['TIME_RANGES', 'resolveWidget', 'bucketTimeLabel']) expect(source).not.toContain(name)
+ }
+ const { WidgetCard } = await import('../components/dash/WidgetCard')
+ expect(renderToStaticMarkup(<WidgetCard widget={VIEWS[0].widgets.find(w => w.id === 'creations')!} version={0}/>)).not.toContain('Time range')
+})

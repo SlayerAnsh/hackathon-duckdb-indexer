@@ -2,7 +2,7 @@ import { checkWidgetSql } from './sql-guard'
 
 export const DASH_PROJECT = 'arkiv-sql-indexer-dash'
 export const CONTENT_TYPE = 'application/json'
-export const CHART_TYPES = ['table', 'counter', 'bar', 'hbar', 'line', 'area', 'donut'] as const
+export const CHART_TYPES = ['table', 'counter', 'bar', 'stacked-bar', 'hbar', 'line', 'area', 'donut', 'histogram'] as const
 export type ChartType = (typeof CHART_TYPES)[number]
 export const SIZES = ['xs', 'sm', 'md', 'xl'] as const
 export type Size = (typeof SIZES)[number]
@@ -25,7 +25,8 @@ export const DASHBOARD_LIFETIME_DAYS = 90
 export const MAX_LINKS_PER_DASHBOARD = 48
 export const LIMITS = { name: 80, attrBytes: 128, sql: 10000, description: 500, payloadBytes: 16384,
   axisTitle: 60, yColumns: 8, colors: 16, column: 128, affix: 16, counterLabel: 60, counterRow: 999, decimals: 6 }
-export type WidgetMapping = { x: string | null; y: string[]; groupBy: string | null; stacking: Stacking; sort: Sort }
+export const HISTOGRAM_BINS = [10, 20, 30, 50] as const
+export type WidgetMapping = { x: string | null; y: string[]; groupBy: string | null; stacking: Stacking; sort: Sort; bins?: number }
 export type CounterConfig = { column: string; row: number; prefix: string; suffix: string; label: string; decimals: number; compact: boolean }
 export type WidgetFormat = { number: NumberFormat; xTitle: string | null; yTitle: string | null; legend: boolean; labels: boolean; colors: Record<string, ColorToken> }
 export type WidgetPayload = { v: 1; name: string; sql: string; chart: ChartType; mapping: WidgetMapping; counter: CounterConfig | null; format: WidgetFormat; lifetimeDays: LifetimeDays }
@@ -104,6 +105,14 @@ export function parseWidgetPayload(input: unknown, checkSql: (sql: string) => st
     const mapping: WidgetMapping = { x: nullableColumn(m.x, 'mapping.x'), y: m.y.map(y => column(y, 'mapping.y')),
       groupBy: nullableColumn(m.groupBy, 'mapping.groupBy'), stacking: choice(m.stacking, STACKINGS, 'mapping.stacking'), sort: choice(m.sort, SORTS, 'mapping.sort') }
     if (mapping.groupBy !== null && mapping.y.length > 1) invalid('mapping.groupBy cannot use several Y columns')
+    if (chart === 'stacked-bar' && mapping.stacking === 'off') invalid('mapping.stacking must be stack or percent for stacked-bar')
+    if (chart === 'histogram') {
+      if (mapping.x === null) invalid('mapping.x is required for histogram')
+      if (mapping.y.length) invalid('mapping.y must be empty for histogram')
+      if (mapping.groupBy !== null) invalid('mapping.groupBy must be null for histogram')
+      if (mapping.stacking !== 'off') invalid('mapping.stacking must be off for histogram')
+      mapping.bins = choice(m.bins === undefined ? 20 : m.bins, HISTOGRAM_BINS, 'mapping.bins')
+    }
     let counter: CounterConfig | null = null
     if (chart === 'counter') {
       const c = object(p.counter, 'counter')

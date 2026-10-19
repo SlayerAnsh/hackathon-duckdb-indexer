@@ -2,12 +2,12 @@
 import { CHART_TYPES, type ChartType } from '../../lib/dash/schema'
 import { ChartIcon } from './ChartIcon'
 
-export const CHART_LABELS: Record<ChartType, string> = { table: 'Table', counter: 'Counter', bar: 'Bar', hbar: 'H bar', line: 'Line', area: 'Area', donut: 'Donut' }
+export const CHART_LABELS: Record<ChartType, string> = { table: 'Table', counter: 'Counter', bar: 'Bar', 'stacked-bar': 'Stacked bar', histogram: 'Histogram', hbar: 'H bar', line: 'Line', area: 'Area', donut: 'Donut' }
 export function pickerIndex(key: string, index: number): number {
  if (key === 'Home') return 0
- if (key === 'End') return 6
- if (key === 'ArrowRight' || key === 'ArrowDown') return (index + 1) % 7
- if (key === 'ArrowLeft' || key === 'ArrowUp') return (index + 6) % 7
+ if (key === 'End') return CHART_TYPES.length - 1
+ if (key === 'ArrowRight' || key === 'ArrowDown') return (index + 1) % CHART_TYPES.length
+ if (key === 'ArrowLeft' || key === 'ArrowUp') return (index + CHART_TYPES.length - 1) % CHART_TYPES.length
  return index
 }
 export function ChartPicker({ value, onChange }: { value: ChartType; onChange(c: ChartType): void }) {

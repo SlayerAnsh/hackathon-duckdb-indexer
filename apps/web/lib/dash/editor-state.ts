@@ -1,3 +1,4 @@
+import { numericColumns } from '../table'
 import { autoChart } from './chart'
 import { checkWidgetSql } from './sql-guard'
 import { defaultSize, emptyWidget, parseWidgetPayload, type WidgetPayload, type Size, type LifetimeDays, type ChartType, type WidgetMapping, type WidgetFormat, type CounterConfig } from './schema'
@@ -27,7 +28,15 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
   case 'runError': return { ...state, runError: action.error, ranSql: null }
   case 'chart': {
    const automatic = state.result ? autoChart(state.result) : null
-   return { ...state, chartTouched: true, addTo: chartSize(state, action.value), draft: { ...draft, chart: action.value, counter: action.value === 'counter' ? draft.counter ?? automatic?.counter ?? { column: state.result?.columns.find((_, i) => ['integer', 'float', 'decimal'].includes(state.result?.types[i] ?? '')) ?? state.result?.columns[0] ?? '', row: 0, prefix: '', suffix: '', label: '', decimals: 0, compact: false } : null } }
+   const { bins: _bins, ...withoutBins } = draft.mapping
+   let mapping: WidgetMapping = action.value === 'histogram' ? draft.mapping : withoutBins
+   if (action.value === 'stacked-bar' && mapping.stacking === 'off') mapping = { ...mapping, stacking: 'stack' }
+   if (action.value === 'histogram') {
+    const numeric = state.result ? numericColumns(state.result.columns, state.result.rows) : []
+    const columns = state.result?.columns ?? []
+    mapping = { ...withoutBins, x: numeric[columns.indexOf(draft.mapping.x ?? '')] ? draft.mapping.x : columns.find((_, i) => numeric[i]) ?? null, y: [], groupBy: null, stacking: 'off', bins: 20 }
+   }
+   return { ...state, chartTouched: true, addTo: chartSize(state, action.value), draft: { ...draft, chart: action.value, mapping, counter: action.value === 'counter' ? draft.counter ?? automatic?.counter ?? { column: state.result?.columns.find((_, i) => ['integer', 'float', 'decimal'].includes(state.result?.types[i] ?? '')) ?? state.result?.columns[0] ?? '', row: 0, prefix: '', suffix: '', label: '', decimals: 0, compact: false } : null } }
   }
   case 'mapping': return { ...state, draft: { ...draft, mapping: { ...draft.mapping, ...action.patch } } }
   case 'format': return { ...state, draft: { ...draft, format: { ...draft.format, ...action.patch } } }

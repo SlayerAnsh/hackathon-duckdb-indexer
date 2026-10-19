@@ -11,9 +11,9 @@ const finite = (v: unknown): number | null => {
 }
 export function toChartWidget(p: WidgetPayload, id: string): Widget {
  const kind = p.chart === 'counter' ? 'stat' : p.chart === 'hbar' ? 'bar' : p.chart === 'bar' ? (p.mapping.groupBy || p.mapping.stacking !== 'off' ? 'stacked-bar' : 'histogram') : p.chart
- return { id, title: p.name, sql: p.sql, kind, x: p.mapping.x ?? undefined, y: p.mapping.y, series: p.mapping.groupBy ?? undefined,
-  stacking: p.mapping.stacking, numberFormat: p.format.number, colors: Object.fromEntries(Object.entries(p.format.colors).map(([k,v]) => [k, `var(--${v})`])),
-  legend: p.format.legend, labels: p.format.labels, xTitle: p.format.xTitle ?? undefined, yTitle: p.format.yTitle ?? undefined }
+ return { id, title: p.name, sql: p.sql, kind, x: p.chart === 'histogram' ? 'bin' : p.mapping.x ?? undefined, y: p.chart === 'histogram' ? ['count'] : p.mapping.y, series: p.mapping.groupBy ?? undefined,
+  stacking: p.chart === 'stacked-bar' && p.mapping.stacking === 'off' ? 'stack' : p.mapping.stacking, numberFormat: p.format.number, colors: Object.fromEntries(Object.entries(p.format.colors).map(([k,v]) => [k, `var(--${v})`])),
+  legend: p.chart === 'histogram' ? false : p.format.legend, labels: p.format.labels, xTitle: p.format.xTitle ?? undefined, yTitle: p.format.yTitle ?? undefined }
 }
 export function formatNumber(value: unknown, fmt: NumberFormat): string {
  const n = finite(value)
@@ -52,4 +52,18 @@ export function counterSummary(cfg: CounterConfig, data: ResultData): { text: st
  if (n === null) return null
  const value = cfg.compact ? compact(n) : n.toLocaleString('en-US', { minimumFractionDigits: cfg.decimals, maximumFractionDigits: cfg.decimals })
  return { text: cfg.prefix + value + cfg.suffix, label: cfg.label }
+}
+
+export function stackReady(mapping: WidgetMapping): boolean { return !!mapping.groupBy || mapping.y.length >= 2 }
+export function histogramData(data: ResultData, column: string, bins: number, fmt: NumberFormat): ResultData {
+ const index = data.columns.indexOf(column)
+ const values = data.rows.map(row => finite(row[index])).filter((v): v is number => v !== null)
+ const result: ResultData = { columns: ['bin', 'count'], types: ['text', 'integer'], rows: [] }
+ if (!values.length) return result
+ const min = Math.min(...values), max = Math.max(...values)
+ if (min === max) return { ...result, rows: [[formatNumber(min, fmt), values.length]] }
+ const width = (max - min) / bins
+ const counts = Array<number>(bins).fill(0)
+ for (const value of values) counts[Math.min(bins - 1, Math.floor((value - min) / width))]++
+ return { ...result, rows: counts.map((count, i) => [`${formatNumber(min + i * width, fmt)}–${formatNumber(i === bins - 1 ? max : min + (i + 1) * width, fmt)}`, count]) }
 }

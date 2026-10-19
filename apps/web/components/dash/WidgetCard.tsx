@@ -1,12 +1,11 @@
 'use client'
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useState, type CSSProperties } from 'react'
 import Link from 'next/link'
-import { TIME_RANGES, resolveWidget, type Widget } from '../../lib/views'
+import { type Widget } from '../../lib/views'
 import { useTimedQuery, type TimedResult } from '../../lib/use-query'
 import { statSummary } from '../../lib/stat'
 import { encodeSqlHash } from '../../lib/hash-state'
 import { baseSpan, type CardSpan } from '../showcase/layout'
-import { rangeFromSearch, searchForRange } from '../showcase/view-state'
 import s from '../showcase/showcase.module.css'
 import { RunBadge } from './RunBadge'
 import { NotInArkivQueryBadge } from './NotInArkivQueryBadge'
@@ -26,12 +25,9 @@ const RefreshIcon = ({ spin }: { spin: number }) => <svg key={spin} className={s
 const OpenIcon = () => <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3.5h6.5V10M12.5 3.5 4 12"/></svg>
 
 /** One showcase query as a card. `paused` holds the last result when the data changes; `resume` reruns it when increased. */
-export function WidgetCard({ widget: base, version, span, paused = false, resume = 0 }: { widget: Widget; version: number; span?: CardSpan; paused?: boolean; resume?: number }) {
+export function WidgetCard({ widget, version, span, paused = false, resume = 0 }: { widget: Widget; version: number; span?: CardSpan; paused?: boolean; resume?: number }) {
  const [showSql, setShowSql] = useState(false)
- const [rangeId, setRangeId] = useState<string | undefined>(undefined)
  const [refresh, setRefresh] = useState(0)
- useEffect(() => { if (base.timeRange) setRangeId(rangeFromSearch(window.location.search, base)) }, [base])
- const widget = resolveWidget(base, rangeId)
  const q = useTimedQuery(widget.sql, version, { paused, nonce: refresh + resume })
  const isStat = widget.kind === 'stat'
  const fallback = baseSpan(widget)
@@ -39,16 +35,11 @@ export function WidgetCard({ widget: base, version, span, paused = false, resume
  const kind = widget.kind === 'table' ? s.table : isStat ? s.stat : s.chart
  const sqlId = widget.id + '-sql'
  const sqlLabel = showSql ? 'Show result' : 'View SQL'
- function selectRange(id: string) {
-  setRangeId(id)
-  window.history.replaceState(null, '', window.location.pathname + searchForRange(window.location.search, base, id) + window.location.hash)
- }
  return <article className={`${s.card}${isStat ? ' ' + s.statCard : ''}`} id={widget.id} style={style} aria-busy={q.loading} aria-labelledby={widget.id + '-t'}>
   <header className={s.head}>
    <div className={s.titleRow}><h3 id={widget.id + '-t'}>{widget.title}</h3><NotInArkivQueryBadge reason={widget.notInArkivQuery}/></div>
-   {(widget.subtitle || widget.activeRange) && <div className={s.subRow}>
+   {widget.subtitle && <div className={s.subRow}>
     {widget.subtitle && <p>{widget.subtitle}</p>}
-    {widget.activeRange && <RangePicker selected={widget.activeRange.id} onSelect={selectRange}/>}
    </div>}
   </header>
   <div className={`${s.body} ${kind}${showSql ? ' ' + s.sql : ''}`}>
@@ -63,12 +54,6 @@ export function WidgetCard({ widget: base, version, span, paused = false, resume
    </div>
   </footer>
  </article>
-}
-
-function RangePicker({ selected, onSelect }: { selected: string; onSelect: (id: string) => void }) {
- return <div className={s.ranges} role="group" aria-label="Time range">
-  {TIME_RANGES.map(r => <button key={r.id} type="button" aria-pressed={r.id === selected} onClick={() => onSelect(r.id)}>{r.label}</button>)}
- </div>
 }
 
 export function StatBody({ widget, data }: { widget: Widget; data: NonNullable<TimedResult['data']> }) {

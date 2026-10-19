@@ -12,14 +12,14 @@ import { BLOCKS_PER_DAY as DAY, CHART_TYPES } from '../lib/dash/schema'
 test('chart picker labels, selection and keyboard navigation', () => {
  const html = render(<ChartPicker value="bar" onChange={() => {}}/> )
  expect(html).toContain('role="radiogroup" aria-label="Chart type"')
- expect(html.match(/role="radio"/g)).toHaveLength(7)
+ expect(html.match(/role="radio"/g)).toHaveLength(9)
  expect(html.match(/aria-checked="true"/g)).toHaveLength(1)
  expect(html.match(/tabindex="0"/g)).toHaveLength(1)
  for (const type of CHART_TYPES) { expect(html).toContain(CHART_LABELS[type]); expect(render(<ChartIcon type={type}/>)).toContain('stroke-width="1.6"') }
- for (const key of ['ArrowRight', 'ArrowDown']) expect(pickerIndex(key, 6)).toBe(0)
- for (const key of ['ArrowLeft', 'ArrowUp']) expect(pickerIndex(key, 0)).toBe(6)
+ for (const key of ['ArrowRight', 'ArrowDown']) expect(pickerIndex(key, 8)).toBe(0)
+ for (const key of ['ArrowLeft', 'ArrowUp']) expect(pickerIndex(key, 0)).toBe(8)
  expect(pickerIndex('Home', 3)).toBe(0)
- expect(pickerIndex('End', 3)).toBe(6)
+ expect(pickerIndex('End', 3)).toBe(8)
  expect(pickerIndex('Enter', 3)).toBe(3)
 })
 test('expiry chips use the required tones', () => {

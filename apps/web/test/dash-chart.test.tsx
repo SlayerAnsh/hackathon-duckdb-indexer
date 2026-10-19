@@ -79,3 +79,23 @@ test('chart legends retain defaults and respect colors and visibility', () => {
  expect(renderToStaticMarkup(<QueryChart widget={{ ...widget, legend: false }} data={data}/>)).not.toContain('chart-key')
  expect(renderToStaticMarkup(<QueryChart widget={{ ...widget, colors: { a: 'var(--c3)' } }} data={data}/>)).toContain('background:var(--c3)')
 })
+
+test('histogram bins numeric finite values and includes the maximum', async () => {
+ const { histogramData, stackReady } = await import('../lib/dash/chart')
+ const data = (values: unknown[]) => ({ columns: ['n'], rows: values.map(v => [v]) })
+ const bins = histogramData(data(Array.from({ length: 10 }, (_, i) => i)), 'n', 5, '0,0')
+ expect(bins.columns).toEqual(['bin', 'count']); expect(bins.types).toEqual(['text', 'integer'])
+ expect(bins.rows.map(r => r[1])).toEqual([2, 2, 2, 2, 2]); expect(bins.rows[0][0]).toBe('0–2')
+ expect(histogramData(data([3, 3, 3]), 'n', 20, '0,0').rows).toEqual([['3', 3]])
+ expect(histogramData(data([null, 'x', NaN, Infinity]), 'n', 20, '0,0').rows).toEqual([])
+ expect(histogramData(data([]), 'n', 20, '0,0').rows).toEqual([])
+ expect(stackReady(emptyWidget().mapping)).toBe(false)
+ expect(stackReady({ ...emptyWidget().mapping, groupBy: 'g' })).toBe(true)
+ expect(stackReady({ ...emptyWidget().mapping, y: ['a', 'b'] })).toBe(true)
+ const base = emptyWidget()
+ expect(toChartWidget({ ...base, chart: 'stacked-bar' }, 's')).toMatchObject({ kind: 'stacked-bar', stacking: 'stack' })
+ expect(toChartWidget({ ...base, chart: 'histogram' }, 'h')).toMatchObject({ kind: 'histogram', x: 'bin', y: ['count'], legend: false })
+ const query = { loading: false, data: data([1, 2, 3]), ms: 1 }
+ expect(renderToStaticMarkup(<WidgetPreview payload={{ ...base, chart: 'histogram', mapping: { ...base.mapping, x: 'n' } }} query={query} id="h"/>)).toContain('Binned from 3 rows')
+ expect(renderToStaticMarkup(<WidgetPreview payload={{ ...base, chart: 'stacked-bar' }} query={query} id="s"/>)).toContain('Pick a Group by column or a second Y column to stack.')
+})

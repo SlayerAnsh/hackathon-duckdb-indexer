@@ -81,3 +81,17 @@ test('checks serialized UTF-8 bytes and preserves SQL whitespace', () => {
   expect(emptyWidget().mapping.y).toEqual([])
   expect(emptyWidget().format.colors).toEqual({})
 })
+
+test('new chart payload validation preserves old payloads', () => {
+ const stacked = { ...valid, chart: 'stacked-bar', mapping: { ...valid.mapping, groupBy: 'type', stacking: 'stack' } }
+ expect(parseWidgetPayload(stacked).ok).toBe(true)
+ expect(parseWidgetPayload({ ...stacked, mapping: { ...stacked.mapping, stacking: 'off' } })).toEqual({ ok: false, error: 'mapping.stacking must be stack or percent for stacked-bar' })
+ const histogram = { ...valid, chart: 'histogram', mapping: { ...valid.mapping, x: 'hours', y: [] } }
+ expect(parseWidgetPayload(histogram)).toMatchObject({ ok: true, value: { mapping: { bins: 20 } } })
+ for (const patch of [{ bins: 15 }, { y: ['n'] }, { x: null }, { groupBy: 'type' }, { stacking: 'stack' }]) expect(parseWidgetPayload({ ...histogram, mapping: { ...histogram.mapping, ...patch } }).ok).toBe(false)
+ for (const bins of [10, 20, 30, 50]) expect(parseWidgetPayload({ ...histogram, mapping: { ...histogram.mapping, bins } }).ok).toBe(true)
+ const bar = parseWidgetPayload({ ...valid, chart: 'bar', mapping: { ...valid.mapping, bins: 30 } })
+ expect(bar.ok && 'bins' in bar.value.mapping).toBe(false)
+ const old = parseWidgetPayload(valid)
+ expect(old.ok && JSON.stringify(old.value)).toBe(JSON.stringify(valid))
+})

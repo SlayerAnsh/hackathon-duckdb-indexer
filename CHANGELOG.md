@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Stacked bar and histogram widgets; time range pickers removed.
+
 * Console theme with dark and light modes, calm navigation and the index status bar on every page.
 
 * Removed the demo writer; the dashboard wallet is the only writer and widgets, dashboards and links are the live application data.

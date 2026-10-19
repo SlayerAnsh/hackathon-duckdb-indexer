@@ -115,7 +115,9 @@ Link payload:
 { "v": 1, "size": "xl", "position": 3, "name": "Top 10 creators" }
 ```
 
-Charts: `table`, `counter`, `bar`, `hbar`, `line`, `area`, `donut`. Mapping has an optional X column, Y columns and optional `groupBy`; grouping and multiple Y columns are mutually exclusive. Stacking: `off`, `stack`, `percent`. Sort: `query`, `x`, `ydesc`. Number formats: `0,0`, `0.0a`, `0.00%`. Colors map series names to `c1` through `c8`.
+Charts: `table`, `counter`, `bar`, `stacked-bar`, `hbar`, `line`, `area`, `donut`, `histogram`. Mapping has an optional X column, Y columns and optional `groupBy`; grouping and multiple Y columns are mutually exclusive. Stacking: `off`, `stack`, `percent`. Sort: `query`, `x`, `ydesc`. Number formats: `0,0`, `0.0a`, `0.00%`. Colors map series names to `c1` through `c8`.
+
+Histogram widgets use `mapping.bins` with a value of 10, 20, 30 or 50, defaulting to 20. This field is stored only for histogram charts. A histogram maps one numeric value column through `mapping.x`, with no Y columns, no group column and stacking off. Stacked bar widgets use stack or percent stacking.
 
 For a counter chart, `counter` holds a value column, zero based row, prefix, suffix, label, decimals and compact flag, for example:
 
