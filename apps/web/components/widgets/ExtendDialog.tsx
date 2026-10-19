@@ -20,7 +20,7 @@ export function ExtendDialog({ name, expiresAt, head, lifetimeDays, phase, onCan
   return () => previous?.focus()
  }, [])
  return <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'grid', placeItems: 'center', background: 'color-mix(in srgb, var(--surface) 70%, transparent)' }}>
-  <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby={title} aria-describedby={body} aria-busy={busy} tabIndex={-1} style={{ width: 'calc(100% - 32px)', maxWidth: 380, padding: 24, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: 'var(--shadow-pop)' }} onKeyDown={event => {
+  <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby={title} aria-describedby={body} aria-busy={busy} tabIndex={-1} style={{ width: 'calc(100% - 32px)', maxWidth: 380, padding: 24, background: 'var(--card)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-lg)', boxShadow: 'var(--shadow-pop)' }} onKeyDown={event => {
    if (event.key === 'Escape') { event.preventDefault(); if (!busy) onCancel() }
    if (event.key !== 'Tab') return
    const buttons = Array.from(dialog.current!.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'))

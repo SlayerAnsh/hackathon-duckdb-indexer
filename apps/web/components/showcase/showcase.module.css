@@ -34,7 +34,7 @@
 .statCard .head h3{font-size:13px;font-weight:500;color:var(--text-2)}
 .stat{padding-top:4px;padding-bottom:16px;justify-content:flex-end}
 .stat :global(.stat-value){font-size:32px;line-height:40px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.stat :global(.empty){margin:0;line-height:40px;font-size:13px;color:var(--text-3)}
+.stat :global(.empty){margin:0;line-height:40px;font-size:13px;color:var(--text-3b)}
 .note{display:flex;align-items:center;gap:8px;min-height:16px;margin-top:4px;font-size:12px;line-height:16px;color:var(--text-2);font-variant-numeric:tabular-nums;min-width:0}
 .noteText{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .subject{margin-top:2px;font-size:12px;line-height:16px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
@@ -52,12 +52,12 @@
 .meta{display:flex;align-items:center;min-width:0;overflow:hidden}
 .meta :global(.run){font-size:12px}
 .actions{display:flex;align-items:center;gap:4px;margin-left:auto;flex:none}
-.action{display:inline-flex;align-items:center;justify-content:center;gap:4px;height:28px;padding:0 8px;border-radius:var(--r-md);border:1px solid transparent;background:none;color:var(--text-2);font:500 12px/1 var(--font-ui);text-decoration:none;white-space:nowrap;cursor:pointer}
+.action{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:32px;padding:0 8px;border-radius:var(--r-md);border:1px solid transparent;background:none;color:var(--text-2);font:500 12px/1 var(--font-ui);text-decoration:none;white-space:nowrap;cursor:pointer}
 .action svg{width:14px;height:14px;flex:none}
 .action:hover{color:var(--text);background:var(--card);border-color:var(--border)}
 .action:disabled{cursor:progress}
 .action[aria-expanded="true"]{color:var(--text);background:var(--accent-soft)}
-.icon{width:28px;padding:0}
+.icon{width:32px;padding:0}
 .primary{color:var(--text);background:var(--accent-soft)}
 .primary:hover{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .spinOnce{animation:spin .6s ease-out}
@@ -105,10 +105,12 @@
 .segment button[aria-pressed="true"]{background:var(--card);color:var(--text);box-shadow:0 0 0 1px var(--border-strong)}
 .segment button[data-mode="live"][aria-pressed="true"] svg{color:var(--ok)}
 .segment button[data-mode="paused"][aria-pressed="true"] svg{color:var(--warn)}
-.intro .liveNote{margin:0;font-size:12px;line-height:16px;color:var(--text-3);font-variant-numeric:tabular-nums}
+.intro .liveNote{margin:0;font-size:12px;line-height:16px;color:var(--text-3b);font-variant-numeric:tabular-nums}
 .counts div{display:flex;flex-direction:column}
-.counts dt{order:2;font-size:12px;color:var(--text-3)}
+.counts dt{order:2;font-size:12px;color:var(--text-3b)}
 .counts dd{order:1;margin:0;font:600 24px/1.2 var(--font-mono);font-variant-numeric:tabular-nums;color:var(--text)}
 .panelDesc{margin:24px 0;color:var(--text-2);font-size:14px;max-width:80ch}
 .fallback{min-height:480px}
 @media (max-width:760px){.introSide,.live{align-items:flex-start}.page{padding-top:32px;padding-bottom:48px}.intro{margin-bottom:24px}.intro h1{font-size:26px}.panelDesc{margin:16px 0}}
+
+@media(hover:none){.action{min-width:44px;min-height:44px}}

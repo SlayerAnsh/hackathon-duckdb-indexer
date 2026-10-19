@@ -5,18 +5,18 @@ import type { WidgetEntity } from '../../lib/dash/entities'
 import { initEditor } from '../../lib/dash/editor-state'
 import { usePending } from '../../lib/dash/pending'
 import { fetchWidget } from '../../lib/dash/read'
-import { isEntityKey, type WidgetPayload, type WriteResult } from '../../lib/dash/schema'
+import { isEntityKey, type ChartType, type LifetimeDays, type WidgetPayload, type WriteResult } from '../../lib/dash/schema'
 import { checkWidgetSql } from '../../lib/dash/sql-guard'
-import { widgetUsageSql } from '../../lib/dash/sql'
+import { widgetUsageSql, widgetDashboardsSql, toUsedOn } from '../../lib/dash/sql'
 import { createBrowserRpc } from '../../lib/rpc-browser'
 import { useIndex } from '../../lib/use-index'
 import { useTimedQuery, type TimedResult } from '../../lib/use-query'
-import { shortHex } from '../../lib/format'
 import { AddressLink } from '../dash/AddressLink'
 import { DataTable } from '../dash/DataTable'
 import { RunBadge } from '../dash/RunBadge'
-import { SqlBlock } from '../dash/SqlBlock'
 import { playgroundHref } from '../dash/WidgetCard'
+import { CHART_LABELS } from './ChartPicker'
+import { ChartIcon } from './ChartIcon'
 import { WidgetEditor } from './WidgetEditor'
 import { WidgetPreview } from './WidgetPreview'
 import { TimeLeft } from './TimeLeft'
@@ -48,15 +48,42 @@ export function MissingWidget() { return <section><p>This widget has expired. It
 export function ViewerHeader({ name, sql, onAdd }: { name: string; sql: string; onAdd(): void }) {
  return <header className={s.header}><h1>{name}</h1><button className="btn btn-primary" onClick={onAdd}>+ Add to my dashboard</button><a className="btn btn-quiet" href={playgroundHref(sql)}>Open in playground</a></header>
 }
-type Runner = (sql: string, version: number, control: { maxRows: number }) => TimedResult
-function StoredQuery({ payload, version, run }: { payload: WidgetPayload; version: number; run: Runner }) {
- const query = run(payload.sql, version, { maxRows: 5000 })
- return <><section className={s.settings} aria-label="Widget preview"><WidgetPreview id="saved-widget-preview" payload={payload} query={query}/></section><SqlBlock sql={payload.sql}/><section className={s.results}><div className={s.meta}><RunBadge ms={query.ms} rows={query.data?.rows.length}/>{query.data && <span>{query.data.rows.length} rows</span>}</div>{query.data && <div className={s.table}><DataTable data={query.data}/></div>}</section></>
+async function copyText(text: string, done: () => void) {
+ try { await navigator.clipboard.writeText(text); done() } catch { /* Keep the action available for retry. */ }
 }
-export function StoredWidgetPreview({ payload, version, run = useTimedQuery }: { payload: WidgetPayload; version: number; run?: Runner }) {
+export function WidgetHeader({ name, chart, user, official, uses, expiresAt, head, ms, widgetKey, sql, canAdd, onAdd }: {
+ name: string; chart: ChartType; user: string; official: boolean; uses: number; expiresAt: number; head?: number; ms?: number; widgetKey: string; sql: string; canAdd: boolean; onAdd?(): void
+}) {
+ const [copied, setCopied] = useState(false)
+ useEffect(() => { if (copied) { const timer = setTimeout(() => setCopied(false), 2000); return () => clearTimeout(timer) } }, [copied])
+ return <header className={s.widgetHeader}>
+  <nav aria-label="Breadcrumb"><a href="/explore">Explore</a> / <a href="/explore?tab=widgets">Widgets</a> / <span>{name}</span></nav>
+  <div className={s.titleRow}><h1>{name}</h1><span className="chip"><ChartIcon type={chart}/>{CHART_LABELS[chart]}</span></div>
+  <div className={s.facts}>by {official ? <><span className="chip chip-official">⛨ Official</span> Arkiv SQL Indexer</> : <AddressLink address={user}/>}<span>on {uses} dashboards</span>{official ? <span className="chip">◷ Kept live</span> : <TimeLeft expiresAt={expiresAt} head={head}/>}<span className={s.live}><i aria-hidden="true"/>Live, computed in your browser</span>{ms !== undefined && <RunBadge ms={ms}/>}</div>
+  <div className={s.widgetActions}><button className="btn btn-quiet" onClick={() => void copyText(`${location.origin}/widgets/${widgetKey}`, () => setCopied(true))}>{copied ? '✓ Link copied' : 'Copy link'}</button><span className={s.srOnly} aria-live="polite">{copied ? 'Link copied' : ''}</span><a className="btn" href={playgroundHref(sql)}>Open in playground</a>{canAdd && <button className="btn btn-primary" onClick={onAdd}>+ Add to dashboard</button>}</div>
+ </header>
+}
+export function UsedOnPanel({ items, total, expanded = false }: { items: ReturnType<typeof toUsedOn>; total: number; expanded?: boolean }) {
+ const [open, setOpen] = useState(expanded)
+ return <section className={s.panel}><h2>Used on {total} dashboards</h2><ul className={s.uses}>{(open ? items : items.slice(0, 4)).map(item => <li key={item.key}><a href={`/d/${item.key}`}><span><strong>{item.title}</strong><small>{item.widgets} widgets</small></span>{item.official && <span className="chip chip-official">⛨ Official</span>}</a></li>)}</ul>{!open && total > 4 && <button className="btn btn-quiet" aria-expanded={false} onClick={() => setOpen(true)}>Show all {total}</button>}</section>
+}
+export function LifetimePanel({ official, expiresAt, head, lifetimeDays, widgetKey, canExtend, reason, onExtended }: {
+ official: boolean; expiresAt: number; head?: number; lifetimeDays: LifetimeDays; widgetKey: string; canExtend: boolean; reason?: string; onExtended?(result: WriteResult): void
+}) {
+ return <section className={s.panel}><h2>Lifetime</h2>{official ? <span className="chip">◷ Kept live</span> : <><TimeLeft expiresAt={expiresAt} head={head}/><p>Lives for {lifetimeDays} days per extend</p></>}<p className={s.entityKey}>{widgetKey}</p>{!official && <>{canExtend && <div className={s.extend}><ExtendButton widgetKey={widgetKey} expiresAt={expiresAt} head={head} lifetimeDays={lifetimeDays} canExtend={canExtend} label={`Extend by ${lifetimeDays} days`} onExtended={onExtended}/></div>}<p>{reason ?? (canExtend ? 'You can extend widgets you created or added to one of your dashboards.' : 'Add this widget to your dashboard to extend it.')}</p></>}</section>
+}
+type Runner = (sql: string, version: number, control: { maxRows: number }) => TimedResult
+function StoredQuery({ payload, version, run, onTiming }: { payload: WidgetPayload; version: number; run: Runner; onTiming?(ms?: number): void }) {
+ const query = run(payload.sql, version, { maxRows: 5000 })
+ const [table, setTable] = useState(false), [copied, setCopied] = useState(false)
+ useEffect(() => { onTiming?.(query.ms) }, [query.ms, onTiming])
+ useEffect(() => { if (copied) { const timer = setTimeout(() => setCopied(false), 2000); return () => clearTimeout(timer) } }, [copied])
+ return <div className={s.widgetMain}><section className={s.panel} aria-label="Widget preview"><div className={s.segment} role="group" aria-label="Preview view"><button aria-pressed={!table} onClick={() => setTable(false)}>Chart</button><button aria-pressed={table} onClick={() => setTable(true)}>Table</button></div>{table ? query.data ? <div className={s.table}><DataTable data={query.data}/></div> : <p>{query.error ? 'Preview unavailable' : 'Loading the index into your browser…'}</p> : <WidgetPreview id="saved-widget-preview" payload={payload} query={query}/>}</section><section className={s.panel}><div className={s.titleRow}><h2>SQL</h2><button className="btn btn-quiet" onClick={() => void copyText(payload.sql, () => setCopied(true))}>{copied ? '✓ SQL copied' : 'Copy SQL'}</button><span className={s.srOnly} aria-live="polite">{copied ? 'SQL copied' : ''}</span></div><pre className={s.readSql} tabIndex={0}><code>{payload.sql}</code></pre></section></div>
+}
+export function StoredWidgetPreview({ payload, version, run = useTimedQuery, onTiming }: { payload: WidgetPayload; version: number; run?: Runner; onTiming?(ms?: number): void }) {
  const reason = checkWidgetSql(payload.sql)
  if (reason) return <p className="error">{reason}</p>
- return <StoredQuery payload={payload} version={version} run={run}/>
+ return <StoredQuery payload={payload} version={version} run={run} onTiming={onTiming}/>
 }
 export function WidgetPage({ widgetKey }: { widgetKey: string }) {
  const key = widgetKey.toLowerCase(), auth = useDashAuth(), config = auth.config
@@ -66,6 +93,7 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
  const [refresh, setRefresh] = useState(0), [editorRevision, setEditorRevision] = useState(0)
  const [attemptState, setAttemptState] = useState({ key, count: 0 })
  const attempts = attemptState.key === key ? attemptState.count : 0
+ const [ms, setMs] = useState<number | undefined>(undefined)
  const [picker, setPicker] = useState(false)
  const closePicker = useCallback(() => setPicker(false), [])
  const latestLocal = useRef<{ key: string; txHash: string; afterBlock: number; updatedAt?: number } | null>(null)
@@ -75,6 +103,7 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
  const widget = record?.key === key ? record.widget : null
  const loadState = widgetLoadState({ authStatus: auth.status, widget, pending: !!write, attempts, loadError: !!loadError })
  const usage = useTimedQuery(config?.enabled && isEntityKey(key) ? widgetUsageSql(config.wallet, key, auth.address ?? null) : 'SELECT 0, false', version)
+ const usedOn = useTimedQuery(config?.enabled && isEntityKey(key) ? widgetDashboardsSql(config.wallet, key, Number.MAX_SAFE_INTEGER) : 'SELECT NULL WHERE false', version)
  useEffect(() => {
   const current = ++sequence.current
   setLoadError(null)
@@ -126,11 +155,16 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
  const name = String(write?.fields?.name ?? widget.widget.name)
  const expiresAt = Math.max(widget.expiresAt, Number(write?.fields?.expiresAt ?? widget.expiresAt))
  if (expiresAt <= head) return <MissingWidget/>
- const localTx = latestLocal.current?.key === key && (latestLocal.current.updatedAt === undefined || widget.updatedAt === latestLocal.current.updatedAt) ? latestLocal.current.txHash : undefined
- const txHash = write?.txHash && widget.updatedAt <= write.afterBlock ? write.txHash : localTx
- const meta = <div className={s.meta}>by <AddressLink address={widget.user}/><TimeLeft expiresAt={expiresAt} head={head}/><ExtendButton widgetKey={key} expiresAt={expiresAt} head={head} lifetimeDays={widget.widget.lifetimeDays} canExtend={mode === 'owner' || usage.data?.rows[0]?.[1] === true} onExtended={written}/>{txHash && <span title={txHash}>tx {shortHex(txHash)}</span>}<span>on {Number(usage.data?.rows[0]?.[0] ?? 0)} dashboards</span><SyncChip write={write} version={version}/></div>
+ const official = widget.official
+ const owner = mode === 'owner' && !official
+ const uses = Number(usage.data?.rows[0]?.[0] ?? 0)
  return <div className={s.editor}>
-  {mode === 'owner' ? <>{meta}<WidgetEditor key={`${key}:${editorRevision}`} mode="edit" widgetKey={key} initial={initEditor({ ...widget.widget, name })} onSaved={written}/></> : <><ViewerHeader name={name} sql={widget.widget.sql} onAdd={() => void openPicker()}/>{meta}<StoredWidgetPreview key={key} payload={widget.widget} version={version}/></>}
+  <WidgetHeader name={name} chart={widget.chart} user={widget.user} official={official} uses={uses} expiresAt={expiresAt} head={head} ms={ms} widgetKey={key} sql={widget.widget.sql} canAdd onAdd={() => void openPicker()}/>
+  <SyncChip write={write} version={version}/>
+  <div className={s.widgetColumns}>
+   {owner ? <WidgetEditor key={`${key}:${editorRevision}`} mode="edit" widgetKey={key} initial={initEditor({ ...widget.widget, name })} onSaved={written}/> : <StoredWidgetPreview key={key} payload={widget.widget} version={version} onTiming={setMs}/>}
+   <aside><UsedOnPanel key={key} items={toUsedOn(usedOn.data?.rows ?? [], config.wallet)} total={uses}/><LifetimePanel official={official} expiresAt={expiresAt} head={head} lifetimeDays={widget.widget.lifetimeDays} widgetKey={key} canExtend={owner || usage.data?.rows[0]?.[1] === true} onExtended={written}/></aside>
+  </div>
   {auth.error && <p className="error">{auth.error}</p>}
   {picker && auth.status === 'authenticated' && <AddToDashboardPicker widgetKey={key} chart={widget.widget.chart} onClose={closePicker}/>}
  </div>

@@ -57,3 +57,9 @@ test('home shows payload errors and retry inside My widgets while retaining rows
  expect(html.indexOf('RPC budget exhausted')).toBeGreaterThan(html.indexOf('My widgets'))
  for (const text of ['RPC budget exhausted, retry later', 'Try again', 'Saved widget', 'Extend']) expect(html).toContain(text)
 })
+
+test('home dashboard cards share Explore styles and retain syncing', async () => {
+ const source = await Bun.file(new URL('../components/widgets/DashboardCard.tsx', import.meta.url)).text()
+ expect(source).toContain('../explore/explore.module.css')
+ expect(render(<DashboardCard item={{key:'key',title:'Title',widgets:4,updatedAt:100,syncing:true}} head={3700}/>)).toContain('Syncing')
+})

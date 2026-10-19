@@ -2,7 +2,7 @@
 .header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:16px 0;background:var(--card);border-bottom:1px solid var(--border)}
 .header a{color:var(--text-2);font-size:13px}
 .name{flex:1;min-width:160px;font-size:18px!important}
-.editor input:not([type=checkbox]),.editor select{border:1px solid var(--border);border-radius:var(--r-md);padding:8px;background:var(--inset);color:var(--text);font:inherit;min-width:0}
+.editor input:not([type=checkbox]),.editor select{min-height:34px;border:1px solid var(--ui-edge);border-radius:var(--r-md);padding:8px;background:var(--inset);color:var(--text);font:inherit;min-width:0}
 .editor input:focus-visible,.editor select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .lifetime{display:flex;gap:4px;align-items:center}
 .editor fieldset{border:0;padding:0;margin:0}
@@ -22,6 +22,41 @@
 .row{display:flex;gap:8px;flex-wrap:wrap}
 .row select{flex:1}
 @media(max-width:760px){.columns{grid-template-columns:minmax(0,1fr)}.header{gap:8px}.name{flex-basis:65%}.header>a{flex-basis:100%}.lifetime{flex:1;flex-wrap:wrap}.settings{padding:16px}}
-.picker{position:absolute;top:72px;right:0;z-index:10;width:300px;max-height:75vh;overflow:auto;padding:16px;display:grid;gap:12px;background:var(--card-2);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-pop)}
+.picker{position:absolute;top:72px;right:0;z-index:10;width:300px;max-height:75vh;overflow:auto;padding:16px;display:grid;gap:12px;background:var(--card);border:1px solid var(--border-strong);border-radius:var(--r-lg);box-shadow:var(--shadow-pop)}
 .picker h2{font-size:15px;margin:0}.pickerRow{display:flex;gap:8px;align-items:center}.pickerRow>button{flex:1;display:flex;justify-content:space-between;gap:8px}.pickerRow small{display:block;color:var(--text-2)}.picker form{display:grid;gap:8px}.picker label{display:grid;gap:8px}
 @media(max-width:760px){.picker{position:fixed;top:auto;bottom:0;left:0;right:0;width:auto;border-radius:var(--r-lg) var(--r-lg) 0 0}}
+.widgetHeader{padding-top:32px;display:grid;gap:16px}
+.widgetHeader nav{font-size:13px;color:var(--text-3b)}
+.widgetHeader nav a{color:inherit}
+.titleRow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.titleRow h1{font-size:24px;font-weight:600;letter-spacing:-.02em;margin:0}
+.titleRow h2{margin-right:auto}
+.facts{display:flex;align-items:center;gap:12px;flex-wrap:wrap;color:var(--text-2);font-size:13px}
+.live{display:inline-flex;align-items:center;gap:6px}
+.live i{width:6px;height:6px;border-radius:50%;background:var(--ok);animation:pulse 2s infinite}
+@keyframes pulse{50%{opacity:.4}}
+.widgetActions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.widgetColumns{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:start}
+.widgetMain{display:grid;gap:16px;min-width:0}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;min-width:0}
+.panel+.panel{margin-top:16px}
+.panel h2{font-size:14px;margin:0 0 12px}
+.panel p{font-size:13px;color:var(--text-3b)}
+.uses{list-style:none;margin:0;padding:0}
+.uses li+li{border-top:1px solid var(--border)}
+.uses a{display:flex;align-items:center;gap:10px;min-height:48px;padding:6px 4px;text-decoration:none;border-radius:var(--r-md)}
+.uses a:hover{background:var(--card-2)}
+.uses a>span:first-child{flex:1;min-width:0}
+.uses strong{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.uses small{display:block;color:var(--text-3b)}
+.entityKey{overflow-wrap:anywhere;font-family:var(--font-mono)}
+.extend :global(.btn){width:100%}
+.segment{display:inline-flex;border:1px solid var(--ui-edge);border-radius:var(--r-md);overflow:hidden;margin-bottom:16px}
+.segment button{border:0;background:transparent;color:var(--text-2);font:600 12.5px var(--font-ui);min-height:34px;padding:0 12px;cursor:pointer}
+.segment button+button{border-left:1px solid var(--ui-edge)}
+.segment button[aria-pressed=true]{background:var(--card-2);color:var(--text)}
+.readSql{background:var(--inset);border:1px solid var(--border);border-radius:var(--r-md);padding:16px;overflow:auto;max-height:400px;font:12px/1.7 var(--font-mono)}
+.srOnly{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+@media(max-width:1100px){.widgetColumns{grid-template-columns:minmax(0,1fr)}}
+@media(hover:none){.segment button{min-height:44px}}
+@media(prefers-reduced-motion:reduce){.live i{animation:none}}

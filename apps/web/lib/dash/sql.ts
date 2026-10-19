@@ -170,3 +170,19 @@ export function dashboardCountSql(wallet: string, q: Pick<DashboardListQuery, 's
 export function toDashboardItems(rows: unknown[][]): DashboardListItem[] {
  return rows.map(([key, title, user, official, widgets, charts, createdAt, updatedAt, expiresAt]) => ({ key: String(key).toLowerCase(), title: String(title), user: String(user).toLowerCase(), official: official === true || official === 1 || official === BigInt(1) || official === 'true', widgets: Number(widgets), charts: Array.isArray(charts) ? charts as DashboardListItem['charts'] : [], createdAt: Number(createdAt), updatedAt: Number(updatedAt), expiresAt: Number(expiresAt) }))
 }
+
+export function widgetDashboardsSql(wallet: string, widgetKey: string, limit: number): string {
+ if (!Number.isSafeInteger(limit) || limit < 0) throw new Error('Invalid pagination')
+ return `${dashCte(wallet)}
+ SELECT d.key, d.title, d.usr, count(DISTINCT all_links.key) AS widgets
+ FROM dash d LEFT JOIN dash all_links ON all_links.type = 'link' AND all_links.dashboard = d.key
+ AND all_links.expires_at > (SELECT block FROM live_head)
+ WHERE d.type = 'dashboard' AND d.expires_at > (SELECT block FROM live_head)
+ AND EXISTS (SELECT 1 FROM dash l WHERE l.type = 'link' AND l.dashboard = d.key
+ AND l.widget = ${entityKey(widgetKey)} AND l.expires_at > (SELECT block FROM live_head))
+ GROUP BY d.key, d.title, d.usr
+ ORDER BY (d.usr = ${address(wallet)}) DESC, d.title, d.key LIMIT ${limit}`
+}
+export function toUsedOn(rows: unknown[][], wallet: string): { key: string; title: string; user: string; official: boolean; widgets: number }[] {
+ return rows.map(([key, title, user, widgets]) => ({ key: String(key).toLowerCase(), title: String(title), user: String(user).toLowerCase(), official: String(user).toLowerCase() === wallet.toLowerCase(), widgets: Number(widgets) }))
+}

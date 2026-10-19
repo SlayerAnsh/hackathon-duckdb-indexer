@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Widget page and remaining pages restyled; official widgets show Kept live instead of Extend.
+
 * Dashboards read like reports: numbered figures, quiet icon actions, share menu with Copy link and Post on X.
 
 * Landing shows Official dashboards; the showcase page is removed and redirects to Explore.

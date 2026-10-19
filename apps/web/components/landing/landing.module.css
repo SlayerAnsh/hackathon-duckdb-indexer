@@ -113,9 +113,9 @@
 .hero::before{content:"";position:absolute;z-index:-1;top:-56px;bottom:-48px;left:calc(50% - 50vw);right:calc(50% - 50vw);pointer-events:none;
  background-image:linear-gradient(to right,var(--border-strong) 1px,transparent 1px),linear-gradient(to bottom,var(--border-strong) 1px,transparent 1px);
  background-size:48px 48px;background-position:center top;
- -webkit-mask-image:radial-gradient(ellipse 60% 65% at 50% 45%,transparent 25%,#000 85%),linear-gradient(to bottom,#000 70%,transparent);
+ -webkit-mask-image:radial-gradient(ellipse 60% 65% at 50% 45%,transparent 25%,var(--text) 85%),linear-gradient(to bottom,var(--text) 70%,transparent);
  -webkit-mask-composite:source-in;
- mask-image:radial-gradient(ellipse 60% 65% at 50% 45%,transparent 25%,#000 85%),linear-gradient(to bottom,#000 70%,transparent);
+ mask-image:radial-gradient(ellipse 60% 65% at 50% 45%,transparent 25%,var(--text) 85%),linear-gradient(to bottom,var(--text) 70%,transparent);
  mask-composite:intersect}
 
 /* Per figure run time and their average. */

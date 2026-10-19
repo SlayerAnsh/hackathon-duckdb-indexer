@@ -1,6 +1,6 @@
 .board{padding:48px 0 64px}
 .header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:32px}
-.title{flex:1;min-width:180px;font-size:26px;font-weight:600;background:transparent;color:var(--text);border:1px solid var(--border);border-radius:var(--r-md);padding:8px}
+.title{flex:1;min-width:180px;font-size:24px;font-weight:600;background:var(--inset);color:var(--text);border:1px solid var(--ui-edge);border-radius:var(--r-md);padding:8px}
 .dirty{color:var(--warn)}
 .body{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:24px;align-items:start}
 .list{display:flex;flex-direction:column;gap:8px;min-width:0}
@@ -11,10 +11,12 @@
 .dragging{position:relative;z-index:1;box-shadow:var(--shadow-pop);border-radius:var(--r-md)}
 .dragging .row{border-color:var(--accent)}
 .over{border-top:2px solid var(--accent)}
-.expired{color:var(--text-3)}
+.expired{color:var(--text-3b)}
 .tabs{display:none}
 .srOnly{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 .flash{animation:flash 1.2s ease-out}
 @keyframes flash{from{background:var(--accent-soft)}to{background:var(--card)}}
 @media(prefers-reduced-motion:reduce){.flash{animation:none}}
 @media(max-width:760px){.board{padding-top:32px}.body{display:block}.tabs{display:flex;gap:8px;margin-bottom:16px}.body[data-tab="order"] .preview,.body[data-tab="preview"] .list{display:none}}
+
+.row select{min-height:34px;padding:0 8px;background:var(--inset);border:1px solid var(--ui-edge);border-radius:var(--r-md);color:var(--text);font:inherit}

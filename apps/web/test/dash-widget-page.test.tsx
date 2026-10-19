@@ -70,3 +70,61 @@ test('syncing widget page body shows the pending name without expired copy', () 
  expect(html).toContain('state-disk')
  expect(html).not.toContain('expired')
 })
+
+test('widget detail header, used on and lifetime panels', async () => {
+ const { WidgetHeader, UsedOnPanel, LifetimePanel } = await import('../components/widgets/WidgetPage')
+ const props = {name:'Count',chart:'bar' as const,user:U,official:false,uses:12,expiresAt:999999,head:10,widgetKey:K,sql:'SELECT 1',canAdd:true}
+ const html = render(<WidgetHeader {...props}/>)
+ for (const text of ['href="/explore"','href="/explore?tab=widgets"','<h1','Bar','on 12 dashboards','Live, computed in your browser','Copy link','Open in playground','+ Add to dashboard','btn-primary']) expect(html).toContain(text)
+ expect(html).toContain(`href="${playgroundHref(props.sql)}"`)
+ const official = render(<WidgetHeader {...props} official/> )
+ for (const text of ['Arkiv SQL Indexer','Kept live']) expect(official).toContain(text)
+ const items = Array.from({length:6},(_,i)=>({key:String(i),title:`Report ${i}`,user:U,official:i===0,widgets:4}))
+ const panel = render(<UsedOnPanel items={items} total={6}/> )
+ for (const text of ['Used on 6 dashboards','Show all 6','Official']) expect(panel).toContain(text)
+ expect((panel.match(/href="\/d\//g)??[]).length).toBe(4)
+ expect((render(<UsedOnPanel items={items} total={6} expanded/>).match(/href="\/d\//g)??[]).length).toBe(6)
+ const lifetime = {...props,lifetimeDays:7 as const,canExtend:true}
+ const kept = render(<LifetimePanel {...lifetime} official/> )
+ expect(kept).toContain('Kept live'); expect(kept).not.toContain('Extend')
+ const user = render(<LifetimePanel {...lifetime}/> )
+ for (const text of ['Extend by 7 days','Lives for 7 days per extend','You can extend']) expect(user).toContain(text)
+})
+
+test('used on SQL scopes live links and dashboards and orders official first', async () => {
+ const { nativeDb } = await import('./dash-duckdb')
+ const { widgetDashboardsSql, toUsedOn } = await import('../lib/dash/sql')
+ const { DASH_PROJECT } = await import('../lib/dash/schema')
+ const key = (n:number) => '0x'+n.toString(16).padStart(64,'0')
+ const wallet = '0x'+'ab'.repeat(20)
+ const base = {project:DASH_PROJECT,user:U}
+ const rows = [1,2,3,4,5,6].map(n=>({key:key(n),creator:n===5?U:wallet,expires_at:n===4?5:100,attrs:{...base,user:n===1?wallet:U,type:'dashboard',title:`Report ${n}`}}))
+ const links = [1,2,3,4,5,6].map(n=>({key:key(n+10),creator:wallet,expires_at:n===3?5:100,attrs:{...base,type:'link',widget:K,dashboard:key(n)}}))
+ const {db,close} = await nativeDb([...rows,...links])
+ try {
+  await db.run('CREATE TABLE live_head AS SELECT 10 AS block')
+  const result = (await db.runAndReadAll(widgetDashboardsSql(wallet,K,10))).getRowsJson()
+  expect(result.map(r=>r[0])).toEqual([key(1),key(2),key(6)])
+  expect((await db.runAndReadAll(widgetDashboardsSql(wallet,K,2))).getRowsJson()).toHaveLength(2)
+ } finally {close()}
+ expect(toUsedOn([['0xAB','Title',wallet.toUpperCase(),BigInt(4)]],wallet)[0]).toEqual({key:'0xab',title:'Title',user:wallet,official:true,widgets:4})
+ expect(()=>widgetDashboardsSql(wallet,K,-1)).toThrow()
+})
+
+
+test('stored widget preview offers chart and table plus focusable read only SQL', () => {
+ const html = render(<StoredWidgetPreview payload={widget.widget} version={1} run={() => ({loading:false,ms:1,data:{columns:['n'],rows:[[1]]}})}/> )
+ for (const text of ['aria-label="Preview view"','aria-pressed="true"','aria-pressed="false"','Chart','Table','Copy SQL','tabindex="0"','<pre']) expect(html).toContain(text)
+})
+
+test('organize rows show Kept live and hide Extend for official widgets', async () => {
+ const { OrganizeRow } = await import('../components/widgets/OrganizeRow')
+ const { DashAuthContext } = await import('../components/auth/DashAuthProvider')
+ const wallet = '0x'+'ab'.repeat(20)
+ const auth = {config:{enabled:true,wallet,privyAppId:'test',rpcUrl:'offline'},status:'authenticated' as const,address:U,confirming:false,error:null,requestLogin:async()=>true,logout:async()=>{},refresh:async()=>{}}
+ const item = {id:'row',link:D,widget:K,name:'Official count',chart:'counter' as const,size:'xs' as const,imported:true,expiresAt:999999,lifetimeDays:7 as const,expired:false,flash:false}
+ const html = render(<DashAuthContext.Provider value={auth}><OrganizeRow item={item} index={0} count={1} head={10} importedUser={wallet} onResize={()=>{}} onRemove={()=>{}}/></DashAuthContext.Provider>)
+ expect(html).toContain('Kept live')
+ expect(html).toContain('Arkiv SQL Indexer')
+ expect(html).not.toContain('Extend')
+})

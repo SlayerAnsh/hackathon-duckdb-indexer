@@ -22,8 +22,8 @@ export function extendStep(phase: ExtendPhase, event: ExtendEvent): ExtendPhase 
  if (phase === 'done' && event === 'settled') return 'idle'
  return phase
 }
-export function ExtendButton({ widgetKey, expiresAt, head: suppliedHead, lifetimeDays, canExtend, onExtended }: {
- widgetKey: string; expiresAt: number; head?: number; lifetimeDays: LifetimeDays; canExtend: boolean; onExtended?(r: WriteResult): void
+export function ExtendButton({ widgetKey, expiresAt, head: suppliedHead, lifetimeDays, canExtend, onExtended, label = 'Extend' }: {
+ widgetKey: string; expiresAt: number; head?: number; lifetimeDays: LifetimeDays; canExtend: boolean; label?: string; onExtended?(r: WriteResult): void
 }) {
  const auth = useDashAuth()
  const { state } = useIndex()
@@ -56,7 +56,7 @@ export function ExtendButton({ widgetKey, expiresAt, head: suppliedHead, lifetim
  if (!canExtend || (head !== undefined && expiry <= head)) return null
  const atCap = head !== undefined && extendPreview(expiry, head, lifetimeDays).atCap
  return <>
-  <button ref={button} type="button" className="btn btn-quiet" title={atCap ? 'Already at the 90 day maximum' : undefined} disabled={atCap || head === undefined || phase === 'done'} onClick={() => setPhase(p => extendStep(p, 'click'))}>{phase === 'done' ? 'Extended ✓' : 'Extend'}</button>
+  <button ref={button} type="button" className="btn btn-quiet" title={atCap ? 'Already at the 90 day maximum' : undefined} disabled={atCap || head === undefined || phase === 'done'} onClick={() => setPhase(p => extendStep(p, 'click'))}>{phase === 'done' ? 'Extended ✓' : label}</button>
   {(phase === 'confirm' || phase === 'extending' || phase === 'error') && head !== undefined && <ExtendDialog expiresAt={expiry} head={head} lifetimeDays={lifetimeDays} phase={phase} onCancel={close} onConfirm={() => { void confirm() }}/>}
  </>
 }

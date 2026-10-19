@@ -393,3 +393,7 @@ Public MIT repository with setup in the README (wallet addresses, live URL and v
 
 - Host machine and public domain for the compose stack.
 Production indexes every entity with a blank expression. Self hosters may scope to the dashboard wallet.
+
+## Theme and shell
+
+Owner decisions of 20 October 2026 apply the console theme throughout the app, with dark and light mode, a calm navbar and the status bar on every page. Dashboards use a report view with numbered figures and a share menu for Copy link and Post on X. Chart types include stacked bar and histogram; time ranges are removed. Explore has Dashboards and Widgets tabs. Official dashboards and widgets are authored by Arkiv SQL Indexer and maintained by automatic keepalive. Official widgets show Kept live and offer no Extend action.
