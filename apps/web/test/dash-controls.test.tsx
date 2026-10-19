@@ -33,6 +33,7 @@ test('extend state machine keeps failures in the dialog', () => {
  for (const event of ['cancel', 'escape', 'timeout'] as const) expect(extendStep('confirm', event)).toBe('idle')
  expect(extendStep('confirm', 'confirm')).toBe('extending')
  expect(extendStep('extending', 'success')).toBe('done')
+ expect(extendStep('extending', 'rejected')).toBe('confirm')
  expect(extendStep('extending', 'failure')).toBe('error')
  expect(extendStep('error', 'confirm')).toBe('extending')
  expect(extendStep('done', 'settled')).toBe('idle')
@@ -41,10 +42,10 @@ test('extend state machine keeps failures in the dialog', () => {
 test('extend dialog copy and progress', () => {
  const props = { name: 'Top 10 creators', expiresAt: 7 * DAY, head: 0, lifetimeDays: 7 as const, onCancel() {}, onConfirm() {} }
  const html = render(<ExtendDialog {...props} phase="confirm"/> )
- for (const text of ['role="dialog"', 'aria-modal="true"', 'Extend “Top 10 creators”?', 'Adds 7 days', 'New expiry: in 14d 0h.', 'Our wallet pays, you pay nothing.', '>Cancel<', '>Extend<']) expect(html).toContain(text)
+ for (const text of ['role="dialog"', 'aria-modal="true"', 'Extend “Top 10 creators”?', 'Adds 7 days', 'New expiry: in 14d 0h.', 'Your wallet signs and pays a small network fee.', '>Cancel<', '>Extend<']) expect(html).toContain(text)
  expect(render(<ExtendDialog {...props} lifetimeDays={1} phase="confirm"/>)).toContain('Adds 1 day.')
- expect(render(<ExtendDialog {...props} phase="extending"/>)).toContain('Extending…')
- expect(render(<ExtendDialog {...props} phase="error"/>)).toContain('Couldn&#x27;t extend. Try again.')
+ expect(render(<ExtendDialog {...props} phase="extending"/>)).toContain('Waiting for wallet…')
+ expect(render(<ExtendDialog {...props} phase="error"/>)).toContain('Your wallet couldn&#x27;t sign. Try again.')
 })
 test('extend availability and cap', () => {
  const props = { widgetKey: '0x' + 'a'.repeat(64), expiresAt: 7 * DAY, head: 0, lifetimeDays: 7 as const, canExtend: true }
@@ -56,4 +57,24 @@ test('extend availability and cap', () => {
 test('sync chip only shows a pending write', () => {
  expect(render(<SyncChip version={0}/>)).toBe('')
  expect(render(<SyncChip version={0} write={{key: '0x' + 'a'.repeat(64), kind: 'widget', op: 'upsert', at: 0, afterBlock: 1}}/>)).toContain('Syncing')
+})
+
+test('extension eligibility excludes app owned, official, expired and anonymous widgets', async () => {
+ const { canExtendWidget } = await import('../lib/dash/widget-actions')
+ const { U, OTHER, W } = await import('./dash-fakes')
+ const w = { owner: U, expiresAt: 2000, official: false }
+ expect(canExtendWidget(w, 1000, OTHER, W)).toBe(true)
+ expect(canExtendWidget({ ...w, owner: W.toUpperCase() }, 1000, U, W)).toBe(false)
+ expect(canExtendWidget({ ...w, official: true }, 1000, U, W)).toBe(false)
+ expect(canExtendWidget(w, 1000, null, W)).toBe(false)
+ expect(canExtendWidget({ ...w, expiresAt: 900 }, 1000, U, W)).toBe(false)
+ expect(canExtendWidget(w, undefined, U, W)).toBe(true)
+ const error = 'Not enough GLM to pay the network fee. Fund your wallet and try again.'
+ const html = render(<ExtendDialog expiresAt={2000} head={1000} lifetimeDays={7} phase="error" error={error} onCancel={() => {}} onConfirm={() => {}}/>)
+ expect(html).toContain(error); expect(html).toContain('role="alert"')
+})
+
+test('extension disabled reason disables signing with an explanatory title', () => {
+ const html = render(<ExtendButton widgetKey={'0x' + 'a'.repeat(64)} expiresAt={7 * DAY} head={0} lifetimeDays={7} canExtend disabledReason="Fund your wallet to sign"/>)
+ expect(html).toContain('title="Fund your wallet to sign" disabled=""')
 })

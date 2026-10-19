@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Widgets belong to the user's wallet: created readonly and transferred in one batch, edits save a new version, Extend is signed by the viewer.
+
 * Browser signing with the Privy wallet on Tiramisu, wallet error copy and balance checks.
 
 * Official items require app ownership; my widgets and the Mine filter follow the Arkiv owner.

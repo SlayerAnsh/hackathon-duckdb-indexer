@@ -86,9 +86,11 @@ test('widget detail header, used on and lifetime panels', async () => {
  expect((render(<UsedOnPanel items={items} total={6} expanded/>).match(/href="\/d\//g)??[]).length).toBe(6)
  const lifetime = {...props,lifetimeDays:7 as const,canExtend:true}
  const kept = render(<LifetimePanel {...lifetime} official/> )
+ const loggedOut = render(<LifetimePanel {...lifetime} canExtend={false} reason="Log in to extend this widget."/>)
+ expect(loggedOut).toContain('Log in to extend this widget.'); expect(loggedOut).not.toContain('Extend by')
  expect(kept).toContain('Kept live'); expect(kept).not.toContain('Extend')
  const user = render(<LifetimePanel {...lifetime}/> )
- for (const text of ['Extend by 7 days','Lives for 7 days per extend','You can extend']) expect(user).toContain(text)
+ for (const text of ['Extend by 7 days','Lives for 7 days per extend','Anyone can extend this widget. Your wallet signs and pays a small network fee.']) expect(user).toContain(text)
 })
 
 test('used on SQL scopes live links and dashboards and orders official first', async () => {
@@ -122,7 +124,7 @@ test('organize rows show Kept live and hide Extend for official widgets', async 
  const { DashAuthContext } = await import('../components/auth/DashAuthProvider')
  const wallet = '0x'+'ab'.repeat(20)
  const auth = {config:{enabled:true,wallet,privyAppId:'test',rpcUrl:'offline'},status:'authenticated' as const,address:U,confirming:false,error:null,sign:async()=>{throw Error('unused')},requestLogin:async()=>true,logout:async()=>{},refresh:async()=>{}}
- const item = {id:'row',link:D,widget:K,name:'Official count',chart:'counter' as const,size:'xs' as const,imported:true,expiresAt:999999,lifetimeDays:7 as const,expired:false,flash:false}
+ const item = {owner:wallet,id:'row',link:D,widget:K,name:'Official count',chart:'counter' as const,size:'xs' as const,imported:true,expiresAt:999999,lifetimeDays:7 as const,expired:false,flash:false}
  const html = render(<DashAuthContext.Provider value={auth}><OrganizeRow item={item} index={0} count={1} head={10} importedUser={wallet} onResize={()=>{}} onRemove={()=>{}}/></DashAuthContext.Provider>)
  expect(html).toContain('Kept live')
  expect(html).toContain('Arkiv SQL Indexer')
@@ -133,4 +135,27 @@ test('widget owner view follows current owner rather than author', () => {
  const moved = { ...widget, owner: '0x' + '12'.repeat(20) }
  expect(widgetPageMode({ loaded: true, widget: moved, address: U, authStatus: 'authenticated' })).toBe('viewer')
  expect(widgetPageMode({ loaded: true, widget: moved, address: moved.owner, authStatus: 'authenticated' })).toBe('owner')
+})
+
+test('new version notice offers explicit deletion and safe error copy', async () => {
+ const { NewVersionNotice } = await import('../components/widgets/WidgetPage')
+ const props = { oldKey: K, busy: false, disabled: false, error: null, onDelete() {} }
+ const html = render(<NewVersionNotice {...props}/>)
+ expect(html).toContain('role="status"')
+ expect(html).toContain('Saved as a new version. Your dashboards now use it. The old version stays until it expires, because other dashboards may still use it.')
+ expect(html).toContain('Delete old version')
+ expect(render(<NewVersionNotice {...props} disabled/>)).toContain('disabled=""')
+ const error = render(<NewVersionNotice {...props} error="Safe error"/>)
+ expect(error).toContain('role="alert"'); expect(error).toContain('Safe error')
+})
+
+test('organize rows allow any logged in viewer to extend user owned widgets and exclude legacy widgets', async () => {
+ const { OrganizeRow } = await import('../components/widgets/OrganizeRow')
+ const { DashAuthContext } = await import('../components/auth/DashAuthProvider')
+ const { U, OTHER, W } = await import('./dash-fakes')
+ const auth = { config: { enabled: true, wallet: W, privyAppId: 'test', rpcUrl: 'offline' }, status: 'authenticated', address: U, confirming: false, error: null, requestLogin: async () => true, logout: async () => {}, refresh: async () => {}, sign: async () => { throw Error('unused') } } as import('../components/auth/DashAuthProvider').DashAuth
+ const item = { id: 'row', link: null, widget: K, name: 'Imported', owner: OTHER, chart: 'table' as const, size: 'md' as const, imported: true, expiresAt: 999999, lifetimeDays: 7 as const, expired: false, flash: false }
+ const show = (owner: string) => render(<DashAuthContext.Provider value={auth}><OrganizeRow item={{ ...item, owner }} importedUser={OTHER} index={0} count={1} head={1000} onResize={() => {}} onRemove={() => {}}/></DashAuthContext.Provider>)
+ expect(show(OTHER)).toContain('>Extend<')
+ expect(show(W)).not.toContain('>Extend<')
 })

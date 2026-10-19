@@ -20,6 +20,7 @@ import { CHART_TYPES, type ChartType } from '../../lib/dash/schema'
 import { DashboardCard } from './DashboardCard'
 import { ActivityPanel } from './ActivityPanel'
 import { LoginGate } from './LoginGate'
+import { canExtendWidget } from '../../lib/dash/widget-actions'
 import { ExtendButton } from './ExtendButton'
 import { TimeLeft } from './TimeLeft'
 import { ChartIcon } from './ChartIcon'
@@ -87,7 +88,7 @@ function AuthenticatedHome() {
   if (!widget) return null
   const write = pending.find(w => w.key === key && w.op === 'upsert')
   const expiry = Math.max(widget.expiresAt, Number(write?.fields?.expiresAt ?? 0))
-  return <ExtendButton widgetKey={key} expiresAt={expiry} head={state.liveHead} lifetimeDays={widget.widget.lifetimeDays} canExtend={widget.user === address}/>
+  return <ExtendButton widgetKey={key} expiresAt={expiry} head={state.liveHead} lifetimeDays={widget.widget.lifetimeDays} canExtend={canExtendWidget({ ...widget, expiresAt: expiry }, state.liveHead, address ?? null, config.wallet)}/>
  }
  const countRow = counts.data?.rows[0]
  const activityCounts = countRow ? { live_widgets: Number(countRow[0]), live_dashboards: Number(countRow[1]), placements: Number(countRow[2]), active_days: Number(countRow[3]) } : null

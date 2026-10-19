@@ -51,17 +51,10 @@ export function handleCreateWidget(req: Request, deps: DashDeps): Promise<Respon
       const value = object(body.addTo)
       addTo = { dashboard: entityKey(value.dashboard), size: size(value.size) }
     }
-    return ops.createWidget(deps.ops, session, { widget, addTo })
+    const replaces = body.replaces === undefined ? undefined : entityKey(body.replaces)
+    if (addTo && replaces) throw dashErrors.invalid('Choose addTo or replaces, not both.')
+    return ops.createWidget(deps.ops, session, { widget, addTo, replaces })
   })
-}
-export function handleUpdateWidget(req: Request, deps: DashDeps, key: string): Promise<Response> {
-  return write(req, deps, (session, body) => ops.updateWidget(deps.ops, session, entityKey(key), parsed(parseWidgetPayload(body.widget))))
-}
-export function handleDeleteWidget(req: Request, deps: DashDeps, key: string): Promise<Response> {
-  return write(req, deps, session => ops.deleteWidget(deps.ops, session, entityKey(key)))
-}
-export function handleExtendWidget(req: Request, deps: DashDeps, key: string): Promise<Response> {
-  return write(req, deps, session => ops.extendWidget(deps.ops, session, entityKey(key)))
 }
 export function handleCreateDashboard(req: Request, deps: DashDeps): Promise<Response> {
   return write(req, deps, (session, body) => ops.createDashboard(deps.ops, session, dashboard(body)))

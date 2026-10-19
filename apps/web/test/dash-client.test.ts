@@ -13,8 +13,8 @@ test('api sends JSON with same origin credentials and maps errors', async () => 
     seen.push({ url, init })
     return new Response(JSON.stringify({ error: 'rate_limited', message: 'slow' }), { status: 429, headers: { 'retry-after': '30' } })
   }) as typeof fetch
-  await expect(createDashApi(fake, '').extendWidget('0xk')).rejects.toMatchObject({ code: 'rate_limited', status: 429, retryAfterSec: 30 })
-  expect(seen[0].url).toBe('/api/dash/widgets/0xk/extend')
+  await expect(createDashApi(fake, '').createWidget({ widget: emptyWidget() })).rejects.toMatchObject({ code: 'rate_limited', status: 429, retryAfterSec: 30 })
+  expect(seen[0].url).toBe('/api/dash/widgets')
   expect(seen[0].init?.method).toBe('POST')
   expect(new Headers(seen[0].init?.headers).get('content-type')).toBe('application/json')
   expect(seen[0].init?.credentials).toBe('same-origin')
@@ -32,15 +32,16 @@ test('all API methods follow the contract', async () => {
   const api = createDashApi((async (url, init) => { seen.push({ url, init }); return Response.json({ txHash: 'tx', afterBlock: 2 }) }) as typeof fetch, '/base')
   const widget = emptyWidget(), dashboard = { title: 'Title', description: 'Body' }, link = { widget: 'w', size: 'md' as const }, organize = { items: [{ link: null, ...link }] }
   await api.nonce(); await api.createSession('token', 'n', 'sig'); await api.logout()
-  await api.createWidget({ widget, addTo: { dashboard: 'd', size: 'md' } }); await api.updateWidget('w', widget); await api.deleteWidget('w'); await api.extendWidget('w')
+  await api.createWidget({ widget, addTo: { dashboard: 'd', size: 'md' } }); await api.createWidget({ widget, replaces: 'w' })
   await api.createDashboard(dashboard); await api.updateDashboard('d', dashboard); await api.deleteDashboard('d'); await api.organize('d', organize); await api.addLink('d', link)
   expect(seen.map(({ url, init }) => [url, init?.method])).toEqual([
     ['/base/api/dash/auth/nonce', 'POST'], ['/base/api/dash/auth/session', 'POST'], ['/base/api/dash/auth/session', 'DELETE'],
-    ['/base/api/dash/widgets', 'POST'], ['/base/api/dash/widgets/w', 'PUT'], ['/base/api/dash/widgets/w', 'DELETE'], ['/base/api/dash/widgets/w/extend', 'POST'],
+    ['/base/api/dash/widgets', 'POST'], ['/base/api/dash/widgets', 'POST'],
     ['/base/api/dash/dashboards', 'POST'], ['/base/api/dash/dashboards/d', 'PUT'], ['/base/api/dash/dashboards/d', 'DELETE'], ['/base/api/dash/dashboards/d/organize', 'POST'], ['/base/api/dash/dashboards/d/links', 'POST'],
   ])
   expect(new Headers(seen[1].init?.headers).get('authorization')).toBe('Bearer token')
-  expect(seen.map(s => JSON.parse(s.init!.body as string))).toEqual([{}, { nonce: 'n', signature: 'sig' }, {}, { widget, addTo: { dashboard: 'd', size: 'md' } }, { widget }, {}, {}, dashboard, dashboard, {}, organize, link])
+  expect(seen.map(s => JSON.parse(s.init!.body as string))).toEqual([{}, { nonce: 'n', signature: 'sig' }, {}, { widget, addTo: { dashboard: 'd', size: 'md' } }, { widget, replaces: 'w' }, dashboard, dashboard, {}, organize, link])
+  for (const name of ['updateWidget', 'deleteWidget', 'extendWidget']) expect(name in api).toBe(false)
   for (const { init } of seen) {
     expect(init?.credentials).toBe('same-origin')
     expect(new Headers(init?.headers).get('content-type')).toBe('application/json')

@@ -112,3 +112,15 @@ test('new chart choices normalize mappings and expose only applicable settings',
  expect(picker.match(/role="radio"/g)).toHaveLength(9); expect(picker).toContain('Stacked bar'); expect(picker).toContain('Histogram')
  expect(pickerIndex('End', 0)).toBe(8); expect(pickerIndex('ArrowRight', 8)).toBe(0); expect(pickerIndex('ArrowLeft', 0)).toBe(8)
 })
+
+
+test('editor saves edits as new versions with the readonly note', async () => {
+ const { WidgetEditor } = await import('../components/widgets/WidgetEditor')
+ const { DashAuthContext } = await import('../components/auth/DashAuthProvider')
+ const auth = { config: { enabled: true, wallet: '0x' + '11'.repeat(20), privyAppId: 'test', rpcUrl: 'offline' }, status: 'anonymous', confirming: false, error: null, requestLogin: async () => false, logout: async () => {}, refresh: async () => {}, sign: async () => { throw Error('unused') } } as import('../components/auth/DashAuthProvider').DashAuth
+ const show = (mode: 'edit' | 'create') => renderToStaticMarkup(<DashAuthContext.Provider value={auth}><WidgetEditor mode={mode} widgetKey={'0x' + '22'.repeat(32)} initial={initEditor()} onSaved={() => {}}/></DashAuthContext.Provider>)
+ expect(show('edit')).toContain('Save new version')
+ expect(show('edit')).toContain('Widgets are read only on Arkiv. Saving creates a new version and moves your dashboards to it.')
+ expect(show('create')).toContain('Save to Arkiv')
+ expect(show('create')).not.toContain('Widgets are read only on Arkiv.')
+})

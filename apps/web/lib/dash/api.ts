@@ -12,10 +12,7 @@ export type DashApi = {
   nonce(): Promise<{ nonce: string; message: string }>
   createSession(accessToken: string, nonce: string, signature: string): Promise<SessionInfo>
   logout(): Promise<void>
-  createWidget(body: { widget: WidgetPayload; addTo?: { dashboard: string; size: Size } }): Promise<WriteResult>
-  updateWidget(key: string, widget: WidgetPayload): Promise<WriteResult>
-  deleteWidget(key: string): Promise<WriteResult>
-  extendWidget(key: string): Promise<WriteResult>
+  createWidget(body: { replaces?: string; widget: WidgetPayload; addTo?: { dashboard: string; size: Size } }): Promise<WriteResult>
   createDashboard(body: { title: string; description?: string }): Promise<WriteResult>
   updateDashboard(key: string, body: { title: string; description?: string }): Promise<WriteResult>
   deleteDashboard(key: string): Promise<WriteResult>
@@ -40,7 +37,6 @@ export function createDashApi(fetchImpl: typeof fetch = fetch, base = ''): DashA
     }
     return response.json() as Promise<T>
   }
-  const widgetPath = (key: string) => `widgets/${encodeURIComponent(key)}`
   const dashboardPath = (key: string) => `dashboards/${encodeURIComponent(key)}`
   return {
     async session() {
@@ -51,9 +47,6 @@ export function createDashApi(fetchImpl: typeof fetch = fetch, base = ''): DashA
     createSession: (token, nonce, signature) => request('auth/session', 'POST', { nonce, signature }, token),
     async logout() { await request('auth/session', 'DELETE') },
     createWidget: body => request('widgets', 'POST', body),
-    updateWidget: (key, widget) => request(widgetPath(key), 'PUT', { widget }),
-    deleteWidget: key => request(widgetPath(key), 'DELETE'),
-    extendWidget: key => request(`${widgetPath(key)}/extend`, 'POST'),
     createDashboard: body => request('dashboards', 'POST', body),
     updateDashboard: (key, body) => request(dashboardPath(key), 'PUT', body),
     deleteDashboard: key => request(dashboardPath(key), 'DELETE'),

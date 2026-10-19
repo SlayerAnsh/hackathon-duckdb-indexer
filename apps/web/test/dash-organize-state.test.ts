@@ -5,18 +5,18 @@ import { emptyWidget } from '../lib/dash/schema'
 import { announcement, draftFromDashboard, isDirty, onDashboard, organizeReducer, remainingSlots, toOrganizeInput, type ImportCandidate } from '../lib/dash/organize-state'
 
 const dashboard = { user: 'owner', title: 'Top creators' } as DashboardEntity
-const widget = { user: 'other', chart: 'hbar', expiresAt: 123, widget: { ...emptyWidget(), lifetimeDays: 7 } } as WidgetEntity
+const widget = { owner: 'holder', user: 'other', chart: 'hbar', expiresAt: 123, widget: { ...emptyWidget(), lifetimeDays: 7 } } as WidgetEntity
 const slots: Slot[] = [
  { id: 'ignored', linkKey: 'l1', widgetKey: 'w1', name: 'Stored name', size: 'xl', status: 'live', widget },
  { id: 'l2', linkKey: 'l2', widgetKey: 'w2', name: 'Gone', size: 'xs', status: 'expired', widget: null },
 ]
 const initial = () => draftFromDashboard(dashboard, slots)
-const candidate = (key: string, chart: ImportCandidate['chart'] = 'counter'): ImportCandidate => ({ key, name: key, chart, user: 'owner', expiresAt: 456, lifetimeDays: 30 })
+const candidate = (key: string, chart: ImportCandidate['chart'] = 'counter'): ImportCandidate => ({ key, name: key, chart, owner: 'holder', user: 'owner', expiresAt: 456, lifetimeDays: 30 })
 
 test('draft preserves slot order, stored names, link ids and unavailable widget metadata', () => {
  expect(initial()).toEqual({ title: 'Top creators', items: [
-  { id: 'l1', link: 'l1', widget: 'w1', name: 'Stored name', chart: 'hbar', size: 'xl', imported: true, expiresAt: 123, lifetimeDays: 7, expired: false, flash: false },
-  { id: 'l2', link: 'l2', widget: 'w2', name: 'Gone', chart: null, size: 'xs', imported: false, expiresAt: null, lifetimeDays: null, expired: true, flash: false },
+  { id: 'l1', link: 'l1', widget: 'w1', name: 'Stored name', chart: 'hbar', size: 'xl', imported: true, owner: 'holder', expiresAt: 123, lifetimeDays: 7, expired: false, flash: false },
+  { id: 'l2', link: 'l2', widget: 'w2', name: 'Gone', chart: null, size: 'xs', imported: false, owner: null, expiresAt: null, lifetimeDays: null, expired: true, flash: false },
  ] })
  expect(draftFromDashboard(dashboard, [{ ...slots[0]!, widget: { ...widget, user: 'owner' } }]).items[0]!.imported).toBe(false)
  expect(draftFromDashboard(dashboard, [{ ...slots[1]!, status: 'loading' }]).items[0]!.expired).toBe(false)
@@ -36,9 +36,9 @@ test('move follows arrayMove semantics; resize and remove target ids without mut
 test('import skips placed and repeated keys, assigns metadata and defaults, and clears flashes', () => {
  const draft = organizeReducer(initial(), { type: 'import', owner: 'owner', widgets: [candidate('w1'), candidate('w3'), candidate('w3'), { ...candidate('w4', 'donut'), user: 'other', lifetimeDays: null }, candidate('w5', 'line')] })
  expect(draft.items.slice(2)).toEqual([
-  { id: 'new:w3', link: null, widget: 'w3', name: 'w3', chart: 'counter', size: 'xs', imported: false, expiresAt: 456, lifetimeDays: 30, expired: false, flash: true },
-  { id: 'new:w4', link: null, widget: 'w4', name: 'w4', chart: 'donut', size: 'sm', imported: true, expiresAt: 456, lifetimeDays: null, expired: false, flash: true },
-  { id: 'new:w5', link: null, widget: 'w5', name: 'w5', chart: 'line', size: 'md', imported: false, expiresAt: 456, lifetimeDays: 30, expired: false, flash: true },
+  { id: 'new:w3', link: null, widget: 'w3', name: 'w3', chart: 'counter', size: 'xs', imported: false, owner: 'holder', expiresAt: 456, lifetimeDays: 30, expired: false, flash: true },
+  { id: 'new:w4', link: null, widget: 'w4', name: 'w4', chart: 'donut', size: 'sm', imported: true, owner: 'holder', expiresAt: 456, lifetimeDays: null, expired: false, flash: true },
+  { id: 'new:w5', link: null, widget: 'w5', name: 'w5', chart: 'line', size: 'md', imported: false, owner: 'holder', expiresAt: 456, lifetimeDays: 30, expired: false, flash: true },
  ])
  expect(onDashboard(draft)).toEqual(new Set(['w1', 'w2', 'w3', 'w4', 'w5']))
  expect(remainingSlots(draft)).toBe(43)

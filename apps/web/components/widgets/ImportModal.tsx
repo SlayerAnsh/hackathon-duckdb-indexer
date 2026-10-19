@@ -61,7 +61,7 @@ export function ImportModal({ dashboardTitle, placed, remaining, onAdd, onClose,
  const title = useId()
  const remember = useCallback((list: List) => {
   for (const item of list.items) candidates.current.set(item.key, { key: item.key, name: item.name, chart: item.chart, user: item.user,
-   expiresAt: item.expiresAt, lifetimeDays: list.payloads?.get(item.key)?.widget.lifetimeDays ?? candidates.current.get(item.key)?.lifetimeDays ?? null })
+   owner: item.owner, expiresAt: item.expiresAt, lifetimeDays: list.payloads?.get(item.key)?.widget.lifetimeDays ?? candidates.current.get(item.key)?.lifetimeDays ?? null })
  }, [])
  const onCounts = useCallback((mine: number | null, all: number | null) => setCounts({ mine, all }), [])
  useEffect(() => {

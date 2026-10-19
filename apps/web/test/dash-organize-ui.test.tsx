@@ -9,7 +9,7 @@ import { shortHex } from '../lib/format'
 
 const user = '0x' + 'ab'.repeat(20)
 const data = { status: 'ready', dashboard: { user }, widgets: new Map(), links: [], reload() {} } as unknown as DashboardData
-const item: DraftItem = { id: 'link', link: 'link', widget: 'widget', name: 'Top 10 creators', chart: 'hbar', size: 'md', imported: false, expiresAt: null, lifetimeDays: null, expired: false, flash: false }
+const item: DraftItem = { id: 'link', link: 'link', widget: 'widget', name: 'Top 10 creators', owner: user, chart: 'hbar', size: 'md', imported: false, expiresAt: null, lifetimeDays: null, expired: false, flash: false }
 test('organize access waits for loading and restricts ownership', () => {
  expect(organizeAccess({ auth: 'loading', data })).toBe('loading')
  expect(organizeAccess({ auth: 'authenticated', address: user, data: { ...data, status: 'loading' } })).toBe('loading')
@@ -49,10 +49,10 @@ test('not owner state links back to the dashboard', () => {
 
 import { canExtendRow, isDirty, toOrganizeInput } from '../lib/dash/organize-state'
 import { OrganizeTitle } from '../components/widgets/OrganizeBoard'
-test('extend requires ownership or an existing link and a live widget', () => {
+test('extend requires login and a live widget', () => {
  expect(canExtendRow({ link: null, widgetUser: user, expired: false }, user)).toBe(true)
  expect(canExtendRow({ link: 'link', widgetUser: 'other', expired: false }, user)).toBe(true)
- expect(canExtendRow({ link: null, widgetUser: 'other', expired: false }, user)).toBe(false)
+ expect(canExtendRow({ link: null, widgetUser: 'other', expired: false }, user)).toBe(true)
  expect(canExtendRow({ link: 'link', widgetUser: user, expired: true }, user)).toBe(false)
  expect(canExtendRow({ link: null, widgetUser: user, expired: false }, null)).toBe(false)
 })

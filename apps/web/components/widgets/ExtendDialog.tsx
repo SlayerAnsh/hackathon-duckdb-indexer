@@ -4,8 +4,8 @@ import { BLOCKS_PER_DAY, MAX_REMAINING_DAYS, type LifetimeDays } from '../../lib
 import { extendPreview, timeLeftLabel } from '../../lib/dash/time'
 import type { ExtendPhase } from './ExtendButton'
 
-export function ExtendDialog({ name, expiresAt, head, lifetimeDays, phase, onCancel, onConfirm }: {
- name?: string; expiresAt: number; head: number; lifetimeDays: LifetimeDays; phase: ExtendPhase; onCancel(): void; onConfirm(): void
+export function ExtendDialog({ name, expiresAt, head, lifetimeDays, phase, error, onCancel, onConfirm }: {
+ name?: string; expiresAt: number; head: number; lifetimeDays: LifetimeDays; phase: ExtendPhase; error?: string | null; onCancel(): void; onConfirm(): void
 }) {
  const dialog = useRef<HTMLDivElement>(null)
  const title = useId()
@@ -30,11 +30,11 @@ export function ExtendDialog({ name, expiresAt, head, lifetimeDays, phase, onCan
    buttons[(index + (event.shiftKey ? buttons.length - 1 : 1)) % buttons.length]?.focus()
   }}>
    <h2 id={title}>{name ? `Extend “${name}”?` : 'Extend widget?'}</h2>
-   <p id={body}>Adds {preview.daysAdded} {preview.daysAdded === 1 ? 'day' : 'days'}. New expiry: in {expiry}. Our wallet pays, you pay nothing.</p>
-   {phase === 'error' && <p className="error" role="alert">Couldn't extend. Try again.</p>}
+   <p id={body}>Adds {preview.daysAdded} {preview.daysAdded === 1 ? 'day' : 'days'}. New expiry: in {expiry}. Your wallet signs and pays a small network fee.</p>
+   {phase === 'error' && <p className="error" role="alert">{error ?? "Your wallet couldn't sign. Try again."}</p>}
    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
     <button type="button" className="btn" disabled={busy} onClick={onCancel}>Cancel</button>
-    <button type="button" className="btn btn-primary" disabled={busy || preview.atCap} onClick={onConfirm}>{busy ? 'Extending…' : 'Extend'}</button>
+    <button type="button" className="btn btn-primary" disabled={busy || preview.atCap} onClick={onConfirm}>{busy ? 'Waiting for wallet…' : 'Extend'}</button>
    </div>
   </div>
  </div>

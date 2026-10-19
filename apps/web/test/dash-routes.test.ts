@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs'
+import * as ops from '../lib/dash/server/operations'
 import { privateKeyToAccount } from 'viem/accounts'
 import { readServerDashConfig } from '../lib/dash/server/config'
 import { expect, test } from 'bun:test'
@@ -6,7 +8,6 @@ import { NonceStore } from '../lib/dash/server/nonce'
 import { GLOBAL_WRITE_RULES, NONCE_RULES, RateLimiter, WRITE_RULES } from '../lib/dash/server/rate-limit'
 import type { DashDeps } from '../lib/dash/server/deps'
 import * as routes from '../lib/dash/server/routes'
-import { BLOCKS_PER_DAY } from '../lib/dash/schema'
 import { D, K, OTHER, PREDICTED_1, U, dashboardRow, fakeChain, validWidget, widgetRow } from './dash-fakes'
 
 const now = () => 1_000_000
@@ -26,7 +27,7 @@ function request(body: unknown = {}, options: { address?: string; cookie?: boole
 }
 const handlers = [
   routes.handleCreateWidget, routes.handleCreateDashboard,
-  ...[routes.handleUpdateWidget, routes.handleDeleteWidget, routes.handleExtendWidget, routes.handleUpdateDashboard,
+  ...[routes.handleUpdateDashboard,
     routes.handleDeleteDashboard, routes.handleOrganize, routes.handleAddLink].map(fn => (req: Request, deps: DashDeps) => fn(req, deps, K)),
 ]
 
@@ -50,7 +51,7 @@ test('every write handler checks request shape, session, rate limits, then valid
   const invalid = await routes.handleCreateWidget(request({ widget: {} }), deps)
   expect(invalid.status).toBe(400)
   expect(await invalid.json()).toMatchObject({ error: 'invalid' })
-  for (const fn of [routes.handleUpdateWidget, routes.handleDeleteWidget, routes.handleExtendWidget, routes.handleUpdateDashboard,
+  for (const fn of [routes.handleUpdateDashboard,
     routes.handleDeleteDashboard, routes.handleOrganize, routes.handleAddLink]) {
     const f = fixture()
     expect((await fn(request({ widget: validWidget, title: 'Overview', items: [] }), f.deps, '0x12')).status).toBe(400)
@@ -81,22 +82,20 @@ test('create widget returns the write result as JSON', async () => {
   const response = await routes.handleCreateWidget(request({ widget: validWidget }), deps)
   expect(response.status).toBe(200)
   expect(response.headers.get('content-type')).toBe('application/json')
-  expect(await response.json()).toEqual({ txHash: '0xtx', afterBlock: 1000, key: PREDICTED_1, expiresAt: 0 })
-  expect(calls.map(c => c.method)).toEqual(['create'])
+  expect(await response.json()).toEqual({ txHash: '0xtx', afterBlock: 1000, key: PREDICTED_1, expiresAt: 1000 + 7 * 43200 })
+  expect(calls.map(c => c.method)).toEqual(['batch'])
 })
 
 test('domain errors map to status codes', async () => {
-  const forbidden = fixture([widgetRow({ user: OTHER })])
+  const forbidden = fixture([widgetRow({ owner: OTHER })])
   const missing = fixture([])
-  const cap = fixture([widgetRow({ expiresAt: 1000 + 90 * BLOCKS_PER_DAY })])
   const busy = fixture()
   busy.deps.ops.queue.run = async () => { const { dashErrors } = await import('../lib/dash/server/errors'); throw dashErrors.busy() }
   const unknown = fixture()
-  unknown.deps.ops.client.createEntity = async () => { throw new Error('synthetic SDK failure') }
+  unknown.deps.ops.client.executeBatch = async () => { throw new Error('synthetic SDK failure') }
   for (const [response, status, error] of [
-    [await routes.handleDeleteWidget(request(), forbidden.deps, K), 403, 'forbidden'],
-    [await routes.handleDeleteWidget(request(), missing.deps, K), 404, 'not_found'],
-    [await routes.handleExtendWidget(request(), cap.deps, K), 409, 'at_cap'],
+    [await routes.handleCreateWidget(request({ widget: validWidget, replaces: K }), forbidden.deps), 403, 'forbidden'],
+    [await routes.handleCreateWidget(request({ widget: validWidget, replaces: K }), missing.deps), 404, 'not_found'],
     [await routes.handleCreateWidget(request({ widget: validWidget }), busy.deps), 503, 'busy'],
     [await routes.handleCreateWidget(request({ widget: validWidget }), unknown.deps), 502, 'chain'],
   ] as const) {
@@ -109,6 +108,8 @@ test('invalid bodies and references never reach the chain', async () => {
   for (const [fn, body] of [
     [routes.handleCreateWidget, { widget: validWidget, addTo: { dashboard: '0x12', size: 'md' } }],
     [routes.handleCreateWidget, { widget: validWidget, addTo: { dashboard: D, size: 'bad' } }],
+    [routes.handleCreateWidget, { widget: validWidget, replaces: 'nope' }],
+    [routes.handleCreateWidget, { widget: validWidget, replaces: K, addTo: { dashboard: D, size: 'md' } }],
     [routes.handleCreateDashboard, { title: '' }],
     [(r: Request, d: DashDeps) => routes.handleUpdateDashboard(r, d, D), { title: 42 }],
     [(r: Request, d: DashDeps) => routes.handleOrganize(r, d, D), { items: [{ link: null, widget: '0x12', size: 'md' }] }],
@@ -116,7 +117,9 @@ test('invalid bodies and references never reach the chain', async () => {
     [(r: Request, d: DashDeps) => routes.handleAddLink(r, d, D), { widget: '0x12', size: 'md' }],
   ] as const) {
     const { deps, calls, queries } = fixture()
-    expect((await fn(request(body), deps)).status).toBe(400)
+    const response = await fn(request(body), deps)
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ error: 'invalid' })
     expect(calls).toEqual([])
     expect(queries).toEqual([])
   }
@@ -129,9 +132,6 @@ test('invalid bodies and references never reach the chain', async () => {
 
 test('valid handlers invoke the existing operations', async () => {
   for (const [fn, body, key, method] of [
-    [routes.handleUpdateWidget, { widget: validWidget }, K, 'patch'],
-    [routes.handleDeleteWidget, {}, K, 'delete'],
-    [routes.handleExtendWidget, {}, K, 'extend'],
     [routes.handleUpdateDashboard, { title: 'Renamed' }, D, 'patch'],
     [routes.handleDeleteDashboard, {}, D, 'batch'],
     [routes.handleOrganize, { title: 'Renamed', items: [] }, D, 'batch'],
@@ -160,8 +160,7 @@ test('disabled deps answer 503 disabled', async () => {
 test('route files are thin and force dynamic without constructing production deps on import', async () => {
   for (const [path, methods] of [
     ['config', ['GET']], ['auth/nonce', ['POST']], ['auth/session', ['GET', 'POST', 'DELETE']], ['widgets', ['POST']],
-    ['widgets/[key]', ['PUT', 'DELETE']], ['widgets/[key]/extend', ['POST']], ['dashboards', ['POST']],
-    ['dashboards/[key]', ['PUT', 'DELETE']], ['dashboards/[key]/organize', ['POST']], ['dashboards/[key]/links', ['POST']],
+    ['dashboards', ['POST']], ['dashboards/[key]', ['PUT', 'DELETE']], ['dashboards/[key]/organize', ['POST']], ['dashboards/[key]/links', ['POST']],
   ] as const) {
     const module = await import(`../app/api/dash/${path}/route.ts`)
     expect(module.dynamic).toBe('force-dynamic')
@@ -181,3 +180,10 @@ test('route files are thin and force dynamic without constructing production dep
    expect(await response.json()).toEqual({ wallet: config ? privateKeyToAccount(privateKey).address.toLowerCase() : null })
   }
  })
+
+test('server widget mutation endpoints and exports are removed', () => {
+ for (const path of ['widgets/[key]/route.ts', 'widgets/[key]/extend/route.ts']) expect(existsSync(new URL('../app/api/dash/' + path, import.meta.url))).toBe(false)
+ const source = readFileSync(new URL('../lib/dash/server/routes.ts', import.meta.url), 'utf8')
+ for (const name of ['UpdateWidget', 'DeleteWidget', 'ExtendWidget']) expect(source).not.toContain('handle' + name)
+ for (const name of ['updateWidget', 'deleteWidget', 'extendWidget']) expect(name in ops).toBe(false)
+})

@@ -1,16 +1,15 @@
-import { extendTarget } from '../time'
 export { extendTarget } from '../time'
 import { isOfficialUser } from '../official'
 import { ExpirationTime, type AttributeInputs, type WalletArkivClient, type PublicArkivClient } from '@arkiv-network/sdk'
 import { addr, key } from '@arkiv-network/sdk/attr'
 import { RpcError, type ArkivRpc } from '@asi/core'
 import { type DashboardEntity, type LinkEntity, type WidgetEntity, asDashboard, asLink, asWidget, dashboardBundleExpr, jsonPayload, keysExprs, queryAll, widgetVersionExpr } from '../entities'
-import { BLOCKS_PER_DAY, DASHBOARD_LIFETIME_DAYS, SIZES, isEntityKey, parseDashboardPayload, type Parsed, CONTENT_TYPE, DASH_PROJECT, MAX_LINKS_PER_DASHBOARD, type Size, type WidgetPayload, type WriteResult } from '../schema'
+import { WIDGET_FLAGS, BLOCKS_PER_DAY, DASHBOARD_LIFETIME_DAYS, SIZES, isEntityKey, parseDashboardPayload, type Parsed, CONTENT_TYPE, DASH_PROJECT, MAX_LINKS_PER_DASHBOARD, type Size, type WidgetPayload, type WriteResult } from '../schema'
 import { dashErrors } from './errors'
 import type { WriteQueue } from './queue'
 import type { Session } from './session'
 
-export type DashWriterClient = Pick<WalletArkivClient, 'account' | 'createEntity' | 'patchEntity' | 'extendEntity' | 'deleteEntity' | 'executeBatch'> & Pick<PublicArkivClient, 'predictEntityKeys'>
+export type DashWriterClient = Pick<WalletArkivClient, 'account' | 'createEntity' | 'patchEntity' | 'executeBatch'> & Pick<PublicArkivClient, 'predictEntityKeys'>
 export type DashReader = Pick<ArkivRpc, 'query' | 'blockNumber'>
 export type OpsDeps = { client: DashWriterClient; reader: DashReader; wallet: string; queue: WriteQueue }
 const hex = (value: string) => value.toLowerCase() as `0x${string}`
@@ -45,73 +44,47 @@ export async function write<T>(work: () => Promise<T>): Promise<T> {
     throw error
   }
 }
-async function readWidget(deps: OpsDeps, entityKey: string, expression = keysExprs(deps.wallet, [entityKey])[0]) {
-  const { head, entities } = await read(() => queryAll(deps.reader, expression))
-  const widget = entities.filter(e => e.key === hex(entityKey) && e.expiresAt > head).map(e => asWidget(e, deps.wallet)).find(w => w !== null)
-  if (!widget) throw dashErrors.notFound()
-  return { head, entities, widget }
-}
 function requireOwner(user: string, session: Session): void {
   if (user !== session.address.toLowerCase()) throw dashErrors.forbidden()
 }
-export function createWidget(deps: OpsDeps, s: Session, input: { widget: WidgetPayload; addTo?: { dashboard: string; size: Size } }): Promise<WriteResult> {
+export function createWidget(deps: OpsDeps, s: Session, input: { widget: WidgetPayload; addTo?: { dashboard: string; size: Size }; replaces?: string }): Promise<WriteResult> {
   return deps.queue.run(async () => {
     requireUser(deps, s)
-    const create = { attributes: widgetAttributes(input.widget, s), payload: jsonPayload(input.widget), contentType: CONTENT_TYPE,
-      expires: ExpirationTime.fromSeconds(input.widget.lifetimeDays * 86400) }
-    if (!input.addTo) {
-      const head = await read(() => deps.reader.blockNumber())
-      const result = await write(() => deps.client.createEntity(create))
-      return { txHash: result.txHash, afterBlock: head, key: result.entityKey, expiresAt: Number(result.expiresAt) }
-    }
-    const addTo = input.addTo
-    const { head, entities } = await read(() => queryAll(deps.reader, dashboardBundleExpr(deps.wallet, addTo.dashboard)))
-    const dashboard = entities.filter(e => e.key === hex(addTo.dashboard) && e.expiresAt > head).map(e => asDashboard(e, deps.wallet)).find(d => d !== null)
-    if (!dashboard) throw dashErrors.notFound()
-    requireOwner(dashboard.user, s)
-    const links = entities.filter(e => e.expiresAt > head).map(e => asLink(e, deps.wallet))
-      .filter(l => l !== null && l.dashboardKey === dashboard.key && l.user === dashboard.user)
-    if (links.length >= MAX_LINKS_PER_DASHBOARD) throw dashErrors.conflict('full', 'Dashboard is full.')
-    const position = links.reduce((max, l) => Math.max(max, l!.link.position), -1) + 1
-    const [widgetKey, linkKey] = await read(() => deps.client.predictEntityKeys({ owner: deps.client.account!.address, count: 2 }))
-    const result = await write(() => deps.client.executeBatch({ creates: [
-      { ...create, salt: widgetKey.salt },
-      { salt: linkKey.salt, attributes: { type: 'link', project: DASH_PROJECT, user: addr(hex(s.address)), dashboard: key(hex(dashboard.key)), widget: key(widgetKey.key) },
-        payload: jsonPayload({ v: 1, size: addTo.size, position, name: input.widget.name }), contentType: CONTENT_TYPE, expires: ExpirationTime.atBlock(BigInt(dashboard.expiresAt)) },
-    ] }))
-    return { txHash: result.txHash, afterBlock: head, key: widgetKey.key, linkKey: linkKey.key, expiresAt: head + input.widget.lifetimeDays * BLOCKS_PER_DAY }
-  })
-}
-export function updateWidget(deps: OpsDeps, s: Session, entityKey: string, widget: WidgetPayload): Promise<WriteResult> {
-  return deps.queue.run(async () => {
-    requireUser(deps, s)
-    const current = await readWidget(deps, entityKey)
-    requireOwner(current.widget.user, s)
-    const result = await write(() => deps.client.patchEntity({ entityKey: hex(entityKey), set: { name: widget.name, chart: widget.chart },
-      payload: jsonPayload({ ...widget, lifetimeDays: current.widget.widget.lifetimeDays }), contentType: CONTENT_TYPE }))
-    return { txHash: result.txHash, afterBlock: current.head }
-  })
-}
-export function extendWidget(deps: OpsDeps, s: Session, entityKey: string): Promise<WriteResult> {
-  return deps.queue.run(async () => {
-    requireUser(deps, s)
-    const { head, entities, widget } = await readWidget(deps, entityKey, widgetVersionExpr(deps.wallet, entityKey, s.address.toLowerCase()))
-    const linked = entities.filter(e => e.expiresAt > head).map(e => asLink(e, deps.wallet))
-      .some(l => l !== null && l.widgetKey === widget.key && l.user === s.address.toLowerCase())
-    if (widget.user !== s.address.toLowerCase() && !linked) throw dashErrors.forbidden()
-    const target = extendTarget(widget.expiresAt, head, widget.widget.lifetimeDays)
-    if (target <= widget.expiresAt) throw dashErrors.conflict('at_cap', 'Widget already has 90 days remaining.')
-    const result = await write(() => deps.client.extendEntity({ entityKey: hex(entityKey), expires: ExpirationTime.atBlock(BigInt(target)) }))
-    return { txHash: result.txHash, afterBlock: head, expiresAt: target }
-  })
-}
-export function deleteWidget(deps: OpsDeps, s: Session, entityKey: string): Promise<WriteResult> {
-  return deps.queue.run(async () => {
-    requireUser(deps, s)
-    const { head, widget } = await readWidget(deps, entityKey)
-    requireOwner(widget.user, s)
-    const result = await write(() => deps.client.deleteEntity({ entityKey: hex(entityKey) }))
-    return { txHash: result.txHash, afterBlock: head }
+    if (input.addTo && input.replaces) throw dashErrors.invalid('Choose addTo or replaces, not both.')
+    let head: number
+    let dashboard: DashboardEntity | undefined
+    let position = 0
+    let relinks: LinkEntity[] = []
+    if (input.replaces) {
+      const result = await read(() => queryAll(deps.reader, widgetVersionExpr(deps.wallet, input.replaces!, s.address)))
+      head = result.head
+      const live = result.entities.filter(e => e.expiresAt > head)
+      const old = live.filter(e => e.key === hex(input.replaces!)).map(e => asWidget(e, deps.wallet)).find(w => w !== null)
+      if (!old) throw dashErrors.notFound()
+      requireOwner(old.owner, s)
+      relinks = live.map(e => asLink(e, deps.wallet)).filter((l): l is LinkEntity => l !== null && l.widgetKey === old.key && l.user === s.address.toLowerCase())
+      if (relinks.length > MAX_LINKS_PER_DASHBOARD) throw dashErrors.conflict('conflict', 'Too many dashboards use this widget.')
+    } else if (input.addTo) {
+      const result = await read(() => queryAll(deps.reader, dashboardBundleExpr(deps.wallet, input.addTo!.dashboard)))
+      head = result.head
+      dashboard = result.entities.filter(e => e.key === hex(input.addTo!.dashboard) && e.expiresAt > head).map(e => asDashboard(e, deps.wallet)).find(d => d !== null)
+      if (!dashboard) throw dashErrors.notFound()
+      requireOwner(dashboard.user, s)
+      const links = result.entities.filter(e => e.expiresAt > head).map(e => asLink(e, deps.wallet)).filter((l): l is LinkEntity => l !== null && l.dashboardKey === dashboard!.key && l.user === dashboard!.user)
+      if (links.length >= MAX_LINKS_PER_DASHBOARD) throw dashErrors.conflict('full', 'Dashboard is full.')
+      position = links.reduce((max, l) => Math.max(max, l.link.position), -1) + 1
+    } else head = await read(() => deps.reader.blockNumber())
+    const predicted = await read(() => deps.client.predictEntityKeys({ owner: deps.client.account!.address, count: (input.addTo ? 2 : 1) as number }))
+    const widgetKey = predicted[0]
+    const creates = [{ attributes: widgetAttributes(input.widget, s), payload: jsonPayload(input.widget), contentType: CONTENT_TYPE,
+      expires: ExpirationTime.fromSeconds(input.widget.lifetimeDays * 86400), flags: WIDGET_FLAGS, salt: widgetKey.salt }]
+    const patches = relinks.map(l => ({ entityKey: hex(l.key), set: { widget: key(widgetKey.key) }, payload: jsonPayload({ ...l.link, name: input.widget.name }), contentType: CONTENT_TYPE }))
+    const result = await write(() => deps.client.executeBatch({
+      creates: [...creates, ...(dashboard && input.addTo ? [{ ...linkCreate(dashboard, { widget: widgetKey.key, size: input.addTo.size, position, name: input.widget.name }, dashboard.expiresAt), salt: predicted[1].salt }] : [])],
+      ...(patches.length ? { patches } : {}), ownershipChanges: [{ entityKey: widgetKey.key, newOwner: hex(s.address) }],
+    }))
+    return { txHash: result.txHash, afterBlock: head, key: widgetKey.key, expiresAt: head + input.widget.lifetimeDays * BLOCKS_PER_DAY,
+      ...(input.addTo ? { linkKey: predicted[1].key } : {}), ...(input.replaces ? { relinked: relinks.map(l => l.key) } : {}) }
   })
 }
 

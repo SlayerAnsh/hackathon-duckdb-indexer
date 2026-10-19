@@ -1,3 +1,4 @@
+export const WIDGET_FLAGS = { readonly: true, permissionlessExtension: true } as const
 import { checkWidgetSql } from './sql-guard'
 
 export const DASH_PROJECT = 'arkiv-sql-indexer-dash'
@@ -35,7 +36,7 @@ export type LinkPayload = { v: 1; size: Size; position: number; name: string }
 export type Parsed<T> = { ok: true; value: T } | { ok: false; error: string }
 export type DashErrorCode = 'invalid' | 'unauthenticated' | 'forbidden' | 'not_found' | 'conflict' | 'at_cap' | 'full' | 'rate_limited' | 'busy' | 'disabled' | 'chain'
 export type SessionInfo = { address: string; login: Login }
-export type WriteResult = { txHash: string; afterBlock: number; key?: string; linkKey?: string; expiresAt?: number }
+export type WriteResult = { relinked?: string[]; txHash: string; afterBlock: number; key?: string; linkKey?: string; expiresAt?: number }
 
 export function utf8Bytes(value: string): number { return new TextEncoder().encode(value).length }
 export function isHexAddress(value: string): boolean { return /^0x[0-9a-fA-F]{40}$/.test(value) }

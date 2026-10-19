@@ -1,9 +1,11 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { canExtendWidget, deleteWidgetDirect, walletErrorKind, walletErrorMessage } from '../../lib/dash/widget-actions'
 import { useDashAuth } from '../auth/DashAuthProvider'
 import type { WidgetEntity } from '../../lib/dash/entities'
 import { initEditor } from '../../lib/dash/editor-state'
-import { usePending } from '../../lib/dash/pending'
+import { addPending, usePending } from '../../lib/dash/pending'
 import { fetchWidget } from '../../lib/dash/read'
 import { isEntityKey, type ChartType, type LifetimeDays, type WidgetPayload, type WriteResult } from '../../lib/dash/schema'
 import { checkWidgetSql } from '../../lib/dash/sql-guard'
@@ -70,7 +72,10 @@ export function UsedOnPanel({ items, total, expanded = false }: { items: ReturnT
 export function LifetimePanel({ official, expiresAt, head, lifetimeDays, widgetKey, canExtend, reason, onExtended }: {
  official: boolean; expiresAt: number; head?: number; lifetimeDays: LifetimeDays; widgetKey: string; canExtend: boolean; reason?: string; onExtended?(result: WriteResult): void
 }) {
- return <section className={s.panel}><h2>Lifetime</h2>{official ? <span className="chip">◷ Kept live</span> : <><TimeLeft expiresAt={expiresAt} head={head}/><p>Lives for {lifetimeDays} days per extend</p></>}<p className={s.entityKey}>{widgetKey}</p>{!official && <>{canExtend && <div className={s.extend}><ExtendButton widgetKey={widgetKey} expiresAt={expiresAt} head={head} lifetimeDays={lifetimeDays} canExtend={canExtend} label={`Extend by ${lifetimeDays} days`} onExtended={onExtended}/></div>}<p>{reason ?? (canExtend ? 'You can extend widgets you created or added to one of your dashboards.' : 'Add this widget to your dashboard to extend it.')}</p></>}</section>
+ return <section className={s.panel}><h2>Lifetime</h2>{official ? <span className="chip">◷ Kept live</span> : <><TimeLeft expiresAt={expiresAt} head={head}/><p>Lives for {lifetimeDays} days per extend</p></>}<p className={s.entityKey}>{widgetKey}</p>{!official && <>{canExtend && <div className={s.extend}><ExtendButton widgetKey={widgetKey} expiresAt={expiresAt} head={head} lifetimeDays={lifetimeDays} canExtend={canExtend} label={`Extend by ${lifetimeDays} days`} onExtended={onExtended}/></div>}<p>{reason ?? (canExtend ? 'Anyone can extend this widget. Your wallet signs and pays a small network fee.' : 'Log in to extend this widget.')}</p></>}</section>
+}
+export function NewVersionNotice({ oldKey, busy, disabled, error, onDelete }: { oldKey: string; busy: boolean; disabled: boolean; error: string | null; onDelete(): void }) {
+ return <section><p role="status">Saved as a new version. Your dashboards now use it. The old version stays until it expires, because other dashboards may still use it.</p><button type="button" className="btn btn-quiet" data-old-key={oldKey} disabled={disabled || busy} onClick={onDelete}>{busy ? 'Waiting for wallet…' : 'Delete old version'}</button>{error && <p className="error" role="alert">{error}</p>}</section>
 }
 type Runner = (sql: string, version: number, control: { maxRows: number }) => TimedResult
 function StoredQuery({ payload, version, run, onTiming }: { payload: WidgetPayload; version: number; run: Runner; onTiming?(ms?: number): void }) {
@@ -86,8 +91,38 @@ export function StoredWidgetPreview({ payload, version, run = useTimedQuery, onT
  return <StoredQuery payload={payload} version={version} run={run} onTiming={onTiming}/>
 }
 export function WidgetPage({ widgetKey }: { widgetKey: string }) {
+ const router = useRouter()
  const key = widgetKey.toLowerCase(), auth = useDashAuth(), config = auth.config
  const { version, state } = useIndex()
+ const [replaced, setReplaced] = useState<string | null>(null)
+ const [oldWidget, setOldWidget] = useState<WidgetEntity | null>(null)
+ const [deletingOld, setDeletingOld] = useState(false)
+ const [deleteError, setDeleteError] = useState<string | null>(null)
+ const deleteBusy = useRef(false)
+ useEffect(() => {
+  const value = new URLSearchParams(window.location.search).get('replaced')
+  setReplaced(value && isEntityKey(value) && value.toLowerCase() !== key ? value.toLowerCase() : null)
+  setOldWidget(null); setDeleteError(null)
+ }, [key])
+ useEffect(() => {
+  let active = true
+  setOldWidget(null)
+  if (replaced && config?.enabled && auth.address) void fetchWidget(createBrowserRpc(config.rpcUrl), config.wallet, replaced).then(result => {
+   if (active && result.widget && result.widget.expiresAt > result.head && result.widget.owner === auth.address?.toLowerCase()) setOldWidget(result.widget)
+  }).catch(() => {})
+  return () => { active = false }
+ }, [replaced, config?.enabled, config?.wallet, config?.rpcUrl, auth.address])
+ async function deleteOld() {
+  if (!oldWidget || deleteBusy.current || oldWidget.owner !== auth.address?.toLowerCase()) return
+  deleteBusy.current = true; setDeletingOld(true); setDeleteError(null)
+  try {
+   const result = await auth.sign(c => deleteWidgetDirect(c, oldWidget.key))
+   addPending({ key: oldWidget.key, kind: 'widget', op: 'delete', afterBlock: result.afterBlock, txHash: result.txHash })
+   setOldWidget(null)
+  } catch (error) { setDeleteError(walletErrorMessage(walletErrorKind(error))) }
+  finally { deleteBusy.current = false; setDeletingOld(false) }
+ }
+
  const [record, setRecord] = useState<{ key: string; widget: WidgetEntity | null; head: number } | null>(null)
  const [loadError, setLoadError] = useState<string | null>(null)
  const [refresh, setRefresh] = useState(0), [editorRevision, setEditorRevision] = useState(0)
@@ -135,6 +170,7 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
   if (local?.key === key && local.updatedAt === undefined && value && value.updatedAt > local.afterBlock) local.updatedAt = value.updatedAt
  }
  function written(result: WriteResult, payload?: WidgetPayload) {
+  if (result.key && result.key !== key && isEntityKey(result.key)) { router.push('/widgets/' + result.key + '?replaced=' + key); return }
   sequence.current++
   latestLocal.current = { key, txHash: result.txHash, afterBlock: result.afterBlock }
   setRecord(previous => previous?.key === key && previous.widget ? { ...previous, widget: { ...previous.widget, ...(payload ? { widget: payload, name: payload.name, chart: payload.chart } : {}), expiresAt: result.expiresAt ?? previous.widget.expiresAt } } : previous)
@@ -161,9 +197,10 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
  return <div className={s.editor}>
   <WidgetHeader name={name} chart={widget.chart} user={widget.user} official={official} uses={uses} expiresAt={expiresAt} head={head} ms={ms} widgetKey={key} sql={widget.widget.sql} canAdd onAdd={() => void openPicker()}/>
   <SyncChip write={write} version={version}/>
+  {oldWidget && oldWidget.owner === auth.address?.toLowerCase() && <NewVersionNotice oldKey={oldWidget.key} busy={deletingOld} disabled={false} error={deleteError} onDelete={() => void deleteOld()}/>}
   <div className={s.widgetColumns}>
    {owner ? <WidgetEditor key={`${key}:${editorRevision}`} mode="edit" widgetKey={key} initial={initEditor({ ...widget.widget, name })} onSaved={written}/> : <StoredWidgetPreview key={key} payload={widget.widget} version={version} onTiming={setMs}/>}
-   <aside><UsedOnPanel key={key} items={toUsedOn(usedOn.data?.rows ?? [], config.wallet)} total={uses}/><LifetimePanel official={official} expiresAt={expiresAt} head={head} lifetimeDays={widget.widget.lifetimeDays} widgetKey={key} canExtend={owner || usage.data?.rows[0]?.[1] === true} onExtended={written}/></aside>
+   <aside><UsedOnPanel key={key} items={toUsedOn(usedOn.data?.rows ?? [], config.wallet)} total={uses}/><LifetimePanel official={official} expiresAt={expiresAt} head={head} lifetimeDays={widget.widget.lifetimeDays} widgetKey={key} canExtend={canExtendWidget({ ...widget, expiresAt }, head, auth.address ?? null, config.wallet)} onExtended={written}/></aside>
   </div>
   {auth.error && <p className="error">{auth.error}</p>}
   {picker && auth.status === 'authenticated' && <AddToDashboardPicker widgetKey={key} chart={widget.widget.chart} onClose={closePicker}/>}

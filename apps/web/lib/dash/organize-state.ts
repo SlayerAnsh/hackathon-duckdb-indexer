@@ -4,9 +4,9 @@ import { defaultSize, MAX_LINKS_PER_DASHBOARD, type ChartType, type LifetimeDays
 import type { Slot } from './slots'
 
 export type DraftItem = { id: string; link: string | null; widget: string; name: string; chart: ChartType | null; size: Size; imported: boolean;
- expiresAt: number | null; lifetimeDays: LifetimeDays | null; expired: boolean; flash: boolean }
+ owner: string | null; expiresAt: number | null; lifetimeDays: LifetimeDays | null; expired: boolean; flash: boolean }
 export type OrganizeDraft = { title: string; items: DraftItem[] }
-export type ImportCandidate = { key: string; name: string; chart: ChartType; user: string; expiresAt: number; lifetimeDays: LifetimeDays | null }
+export type ImportCandidate = { key: string; name: string; chart: ChartType; user: string; owner: string | null; expiresAt: number; lifetimeDays: LifetimeDays | null }
 export type OrganizeAction = { type: 'move'; from: number; to: number } | { type: 'resize'; id: string; size: Size } | { type: 'remove'; id: string }
  | { type: 'import'; widgets: ImportCandidate[]; owner: string } | { type: 'title'; value: string } | { type: 'clearFlash' }
 
@@ -14,7 +14,7 @@ export function draftFromDashboard(dashboard: DashboardEntity, slots: Slot[]): O
  return { title: dashboard.title, items: slots.map(slot => ({
   id: slot.linkKey, link: slot.linkKey, widget: slot.widgetKey, name: slot.name, chart: slot.widget?.chart ?? null,
   size: slot.size, imported: slot.widget ? slot.widget.user !== dashboard.user : false,
-  expiresAt: slot.widget?.expiresAt ?? null, lifetimeDays: slot.widget?.widget.lifetimeDays ?? null,
+  owner: slot.widget?.owner ?? null, expiresAt: slot.widget?.expiresAt ?? null, lifetimeDays: slot.widget?.widget.lifetimeDays ?? null,
   expired: slot.status === 'expired', flash: false,
  })) }
 }
@@ -34,7 +34,7 @@ export function organizeReducer(draft: OrganizeDraft, action: OrganizeAction): O
     if (placed.has(widget.key)) continue
     placed.add(widget.key)
     items.push({ id: 'new:' + widget.key, link: null, widget: widget.key, name: widget.name, chart: widget.chart,
-     size: defaultSize(widget.chart), imported: widget.user !== action.owner, expiresAt: widget.expiresAt,
+     size: defaultSize(widget.chart), imported: widget.user !== action.owner, owner: widget.owner, expiresAt: widget.expiresAt,
      lifetimeDays: widget.lifetimeDays, expired: false, flash: true })
    }
    return { ...draft, items }
@@ -67,5 +67,5 @@ export function announcement(kind: 'start' | 'move' | 'drop' | 'cancel', name: s
 }
 
 export function canExtendRow(row: { link: unknown | null; widgetUser: string; expired: boolean }, caller: string | null): boolean {
- return !row.expired && (row.widgetUser === caller || row.link !== null)
+ return !row.expired && caller !== null
 }

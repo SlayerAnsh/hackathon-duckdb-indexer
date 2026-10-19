@@ -2,21 +2,26 @@ import { expect, test } from 'bun:test'
 import { ExpirationTime } from '@arkiv-network/sdk'
 import { addr, key } from '@arkiv-network/sdk/attr'
 import { RpcError } from '@asi/core'
-import { createWidget, updateWidget, extendWidget, deleteWidget, extendTarget } from '../lib/dash/server/operations'
-import { dashboardBundleExpr, keysExprs, widgetVersionExpr } from '../lib/dash/entities'
+import { createWidget, write } from '../lib/dash/server/operations'
+import { dashboardBundleExpr, widgetVersionExpr } from '../lib/dash/entities'
 import { fakeChain, widgetRow, dashboardRow, linkRow, validWidget, U, OTHER, K, D, W, PREDICTED_1, PREDICTED_2 } from './dash-fakes'
 const S = { address: U, login: 'google' as const, exp: 9e9 }
 const payload = (data: any) => JSON.parse(new TextDecoder().decode(data.payload))
 
-test('create widget without a dashboard is one createEntity with attributes and JSON payload', async () => {
+test('create widget without a dashboard is one transferred readonly batch with attributes and JSON payload', async () => {
   const { deps, calls } = fakeChain([])
   const r = await createWidget(deps, S, { widget: validWidget })
-  expect(calls.map(c => c.method)).toEqual(['create'])
-  expect(calls[0].data.attributes).toEqual({ type: 'widget', project: 'arkiv-sql-indexer-dash', user: addr(U), login: 'google', name: 'Top 10 creators', chart: 'hbar' })
-  expect(calls[0].data.contentType).toBe('application/json')
-  expect(payload(calls[0].data)).toEqual(validWidget)
-  expect(calls[0].data.expires).toEqual(ExpirationTime.fromSeconds(7 * 86400))
-  expect(r).toEqual({ txHash: '0xtx', afterBlock: 1000, key: PREDICTED_1, expiresAt: 0 })
+  expect(calls.map(c => c.method)).toEqual(['batch'])
+  expect(calls[0].data.creates).toHaveLength(1)
+  expect(calls[0].data.creates[0].flags).toEqual({ readonly: true, permissionlessExtension: true })
+  expect(calls[0].data.creates[0].salt).toBe(BigInt(1))
+  expect(calls[0].data.patches ?? []).toEqual([])
+  expect(calls[0].data.ownershipChanges).toEqual([{ entityKey: PREDICTED_1, newOwner: U }])
+  expect(calls[0].data.creates[0].attributes).toEqual({ type: 'widget', project: 'arkiv-sql-indexer-dash', user: addr(U), login: 'google', name: 'Top 10 creators', chart: 'hbar' })
+  expect(calls[0].data.creates[0].contentType).toBe('application/json')
+  expect(payload(calls[0].data.creates[0])).toEqual(validWidget)
+  expect(calls[0].data.creates[0].expires).toEqual(ExpirationTime.fromSeconds(7 * 86400))
+  expect(r).toEqual({ txHash: '0xtx', afterBlock: 1000, key: PREDICTED_1, expiresAt: 1000 + 7 * 43200 })
 })
 test('create with add to dashboard is one batch referencing predicted keys and dashboard expiry', async () => {
   const { deps, calls, queries } = fakeChain([dashboardRow(), linkRow({ position: 4 })])
@@ -24,6 +29,8 @@ test('create with add to dashboard is one batch referencing predicted keys and d
   expect(queries).toEqual([dashboardBundleExpr(W, D)])
   expect(calls.map(c => c.method)).toEqual(['batch'])
   const [w, l] = calls[0].data.creates
+  expect(w.flags).toEqual({ readonly: true, permissionlessExtension: true }); expect(l).not.toHaveProperty('flags')
+  expect(calls[0].data.ownershipChanges).toEqual([{ entityKey: PREDICTED_1, newOwner: U }])
   expect(w.salt).toBe(BigInt(1)); expect(l.salt).toBe(BigInt(2))
   expect(payload(w)).toEqual(validWidget)
   expect(w.expires).toEqual(ExpirationTime.fromSeconds(7 * 86400))
@@ -40,42 +47,6 @@ test('add to dashboard refuses a missing, foreign or full dashboard before writi
     expect(calls).toEqual([])
   }
 })
-test('update keeps lifetime, patches payload and attributes, owner only', async () => {
-  const { deps, calls, queries } = fakeChain([widgetRow()])
-  const widget = { ...validWidget, name: 'Changed', chart: 'table' as const, lifetimeDays: 90 as const }
-  expect(await updateWidget(deps, S, K, widget)).toEqual({ txHash: '0xtx', afterBlock: 1000 })
-  expect(queries).toEqual(keysExprs(W, [K]))
-  expect(calls.map(c => c.method)).toEqual(['patch'])
-  expect(calls[0].data).toEqual({ entityKey: K, set: { name: 'Changed', chart: 'table' }, payload: expect.any(Uint8Array), contentType: 'application/json' })
-  expect(payload(calls[0].data)).toEqual({ ...widget, lifetimeDays: 7 })
-  for (const [rows, code] of [[[widgetRow({ user: OTHER })], 'forbidden'], [[], 'not_found']] as const) {
-    const f = fakeChain([...rows])
-    await expect(updateWidget(f.deps, S, K, widget)).rejects.toMatchObject({ code })
-    expect(f.calls).toEqual([])
-  }
-})
-test('extend: creator or owner of a live link may extend, capped, never past 90 days', async () => {
-  for (const rows of [[widgetRow()], [widgetRow({ user: OTHER }), linkRow()]]) {
-    const { deps, calls, queries } = fakeChain(rows)
-    const target = extendTarget(5000, 1000, 7)
-    expect(await extendWidget(deps, S, K)).toEqual({ txHash: '0xtx', afterBlock: 1000, expiresAt: target })
-    expect(queries).toEqual([widgetVersionExpr(W, K, U)])
-    expect(calls).toEqual([{ method: 'extend', data: { entityKey: K, expires: ExpirationTime.atBlock(BigInt(target)) } }])
-  }
-  for (const [rows, code, status] of [ [[widgetRow({ user: OTHER })], 'forbidden', 403], [[widgetRow({ expiresAt: 1000 + 90 * 43200 })], 'at_cap', 409], [[], 'not_found', 404] ] as const) {
-    const f = fakeChain([...rows])
-    await expect(extendWidget(f.deps, S, K)).rejects.toMatchObject({ code, status })
-    expect(f.calls).toEqual([])
-  }
-})
-test('delete is owner only', async () => {
-  const f = fakeChain([widgetRow()])
-  expect(await deleteWidget(f.deps, S, K)).toEqual({ txHash: '0xtx', afterBlock: 1000 })
-  expect(f.calls).toEqual([{ method: 'delete', data: { entityKey: K } }])
-  const other = fakeChain([widgetRow({ user: OTHER })])
-  await expect(deleteWidget(other.deps, S, K)).rejects.toMatchObject({ code: 'forbidden' })
-  expect(other.calls).toEqual([])
-})
 test('reads and writes happen inside the queue', async () => {
   const f = fakeChain([dashboardRow()])
   let release!: () => void
@@ -87,16 +58,6 @@ test('reads and writes happen inside the queue', async () => {
   expect(f.queries).toHaveLength(1); expect(f.calls).toHaveLength(1)
 })
 test('over broad results cannot authorize unrelated, expired or untrusted entities', async () => {
-  for (const rows of [[widgetRow({ key: D })], [widgetRow({ creator: OTHER })], [widgetRow({ expiresAt: 1000 })]]) {
-    const f = fakeChain(rows)
-    await expect(deleteWidget(f.deps, S, K)).rejects.toMatchObject({ code: 'not_found' })
-    expect(f.calls).toEqual([])
-  }
-  for (const link of [linkRow({ widget: D }), linkRow({ user: OTHER }), linkRow({ expiresAt: 1000 }), linkRow({ creator: OTHER })]) {
-    const f = fakeChain([widgetRow({ user: OTHER }), link])
-    await expect(extendWidget(f.deps, S, K)).rejects.toMatchObject({ code: 'forbidden' })
-    expect(f.calls).toEqual([])
-  }
   const f = fakeChain([dashboardRow(), linkRow({ dashboard: K }), linkRow({ user: OTHER }), linkRow({ expiresAt: 1000 })])
   await createWidget(f.deps, S, { widget: validWidget, addTo: { dashboard: D, size: 'md' } })
   expect(payload(f.calls[0].data.creates[1]).position).toBe(0)
@@ -105,25 +66,23 @@ test('read throttling preserves Retry After and SDK missing errors become not_fo
   for (const read of ['query', 'blockNumber'] as const) {
     const f = fakeChain([widgetRow()])
     f.deps.reader[read] = async () => { throw new RpcError('Limited', 429, 429, '37') }
-    await expect(read === 'query' ? deleteWidget(f.deps, S, K) : createWidget(f.deps, S, { widget: validWidget })).rejects.toMatchObject({ code: 'busy', status: 503, retryAfterSec: 37 })
+    await expect(read === 'query' ? createWidget(f.deps, S, { widget: validWidget, replaces: K }) : createWidget(f.deps, S, { widget: validWidget })).rejects.toMatchObject({ code: 'busy', status: 503, retryAfterSec: 37 })
     expect(f.calls).toEqual([])
   }
   for (const message of ['EntityNotFound', 'EntityExpired', 'Transaction failed: no entity 0xabcdef12…345678 — it may have been deleted, or have expired', 'Transaction failed: entity 0xabcdef12…345678 expired at block 123']) {
-    const f = fakeChain([widgetRow()])
-    f.deps.client.deleteEntity = async () => { throw new Error(message) }
-    await expect(deleteWidget(f.deps, S, K)).rejects.toMatchObject({ code: 'not_found' })
+    const fail = async () => { throw new Error(message) }
+    await expect(write(fail)).rejects.toMatchObject({ code: 'not_found' })
   }
-  const f = fakeChain([widgetRow()]), error = new Error('Unknown SDK failure')
-  f.deps.client.deleteEntity = async () => { throw error }
-  await expect(deleteWidget(f.deps, S, K)).rejects.toBe(error)
+  const error = new Error('Unknown SDK failure')
+  const fail = async () => { throw error }
+  await expect(write(fail)).rejects.toBe(error)
 })
 
 test('SDK structured missing entity errors are found through causes', async () => {
   for (const error of [new Error('unrelated', { cause: { data: { errorName: 'EntityNotFound' } } }),
     { cause: { cause: { errorName: 'EntityExpired' } } }]) {
-    const f = fakeChain([widgetRow()])
-    f.deps.client.deleteEntity = async () => { throw error }
-    await expect(deleteWidget(f.deps, S, K)).rejects.toMatchObject({ code: 'not_found', status: 404 })
+    const fail = async () => { throw error }
+    await expect(write(fail)).rejects.toMatchObject({ code: 'not_found', status: 404 })
   }
 })
 
@@ -132,9 +91,7 @@ test('every user write rejects the app wallet before reading or writing', async 
   const { createDashboard, updateDashboard, deleteDashboard, organizeDashboard, addLink } = await import('../lib/dash/server/operations')
   const operations = [
     (d: ReturnType<typeof fakeChain>['deps'], s: typeof S) => createWidget(d, s, { widget: validWidget }),
-    (d: ReturnType<typeof fakeChain>['deps'], s: typeof S) => updateWidget(d, s, K, validWidget),
-    (d: ReturnType<typeof fakeChain>['deps'], s: typeof S) => extendWidget(d, s, K),
-    (d: ReturnType<typeof fakeChain>['deps'], s: typeof S) => deleteWidget(d, s, K),
+    (d: ReturnType<typeof fakeChain>['deps'], s: typeof S) => createWidget(d, s, { widget: validWidget, replaces: K }),
     (d: ReturnType<typeof fakeChain>['deps'], s: typeof S) => createDashboard(d, s, { title: 'Overview' }),
     (d: ReturnType<typeof fakeChain>['deps'], s: typeof S) => updateDashboard(d, s, D, { title: 'Overview' }),
     (d: ReturnType<typeof fakeChain>['deps'], s: typeof S) => deleteDashboard(d, s, D),
@@ -149,4 +106,37 @@ test('every user write rejects the app wallet before reading or writing', async 
     expect(f.calls).toEqual([])
     expect(f.queries).toEqual([])
   }
+})
+
+test('replacement patches only live trusted links by the session and transfers the new widget', async () => {
+ const L1 = '0x' + '44'.repeat(32)
+ const f = fakeChain([widgetRow({ owner: U }), linkRow({ key: L1, position: 2 }), linkRow({ key: D, user: OTHER }), linkRow({ key: K, expiresAt: 999 }), linkRow({ key: PREDICTED_2, creator: OTHER })])
+ const result = await createWidget(f.deps, S, { widget: validWidget, replaces: K })
+ expect(f.queries).toEqual([widgetVersionExpr(W, K, U)])
+ expect(f.calls.map(c => c.method)).toEqual(['batch'])
+ const batch = f.calls[0].data
+ expect(batch.creates).toHaveLength(1)
+ expect(batch.creates[0].flags).toEqual({ readonly: true, permissionlessExtension: true })
+ expect(batch.ownershipChanges).toEqual([{ entityKey: PREDICTED_1, newOwner: U }])
+ expect(batch.patches).toHaveLength(1)
+ expect(batch.patches[0]).toMatchObject({ entityKey: L1, set: { widget: key(PREDICTED_1) }, contentType: 'application/json' })
+ expect(payload(batch.patches[0])).toEqual({ v: 1, size: 'md', position: 2, name: validWidget.name })
+ expect(result.relinked).toEqual([L1])
+})
+test('replacement refusals send nothing and use ownership rather than authorship', async () => {
+ for (const [rows, code] of [
+  [[widgetRow({ owner: OTHER })], 'forbidden'], [[], 'not_found'],
+  [[widgetRow({ owner: U, expiresAt: 1000 })], 'not_found'], [[widgetRow({ owner: U, creator: OTHER })], 'not_found'],
+  [[widgetRow({ owner: U }), ...Array.from({ length: 49 }, (_, i) => linkRow({ key: '0x' + i.toString(16).padStart(64, '0') }))], 'conflict'],
+ ] as const) {
+  const f = fakeChain([...rows])
+  await expect(createWidget(f.deps, S, { widget: validWidget, replaces: K })).rejects.toMatchObject({ code })
+  expect(f.calls).toEqual([])
+ }
+ const f = fakeChain([])
+ await expect(createWidget(f.deps, S, { widget: validWidget, replaces: K, addTo: { dashboard: D, size: 'md' } })).rejects.toMatchObject({ code: 'invalid' })
+ expect(f.calls).toEqual([])
+ const owned = fakeChain([widgetRow({ owner: U, user: OTHER })])
+ await createWidget(owned.deps, S, { widget: validWidget, replaces: K })
+ expect(owned.calls).toHaveLength(1)
 })

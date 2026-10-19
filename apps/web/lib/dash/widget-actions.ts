@@ -75,3 +75,7 @@ export function walletErrorMessage(kind: WalletErrorKind): string | null {
   wallet: "Your wallet couldn't sign. Try again.",
  }[kind]
 }
+
+export function canExtendWidget(w: { owner: string; expiresAt: number; official: boolean }, head: number | undefined, viewer: string | null, wallet: string): boolean {
+  return viewer !== null && !w.official && w.owner.toLowerCase() !== wallet.toLowerCase() && (head === undefined || w.expiresAt > head)
+}

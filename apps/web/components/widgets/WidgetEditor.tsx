@@ -56,10 +56,11 @@ export function WidgetEditor({ mode, initial, widgetKey, onSaved }: { mode: 'cre
   saveBusy.current = true; setSaving(true); setSaveError(null)
   const widget = state.draft, addTo = state.addTo
   try {
-   const result = await withSession(() => mode === 'create' ? dashApi.createWidget({ widget, ...(addTo ? { addTo } : {}) }) : widgetKey ? dashApi.updateWidget(widgetKey, widget) : Promise.reject(new Error('Missing widget key')), auth.requestLogin)
+   const result = await withSession(() => mode === 'create' ? dashApi.createWidget({ widget, ...(addTo ? { addTo } : {}) }) : widgetKey ? dashApi.createWidget({ widget, replaces: widgetKey }) : Promise.reject(new Error('Missing widget key')), auth.requestLogin)
    const key = result.key ?? widgetKey
-   if (key) addPending({ key, kind: 'widget', op: 'upsert', afterBlock: result.afterBlock, txHash: result.txHash, fields: { name: widget.name, chart: widget.chart, ...(auth.address ? { user: auth.address } : {}) } })
+   if (key) addPending({ key, kind: 'widget', op: 'upsert', afterBlock: result.afterBlock, txHash: result.txHash, fields: { name: widget.name, chart: widget.chart, ...(auth.address ? { user: auth.address, owner: auth.address } : {}) } })
    if (result.linkKey && key && addTo) addPending({ key: result.linkKey, kind: 'link', op: 'upsert', afterBlock: result.afterBlock, txHash: result.txHash, fields: { dashboard: addTo.dashboard, widget: key, name: widget.name, size: addTo.size } })
+   for (const link of result.relinked ?? []) if (key) addPending({ key: link, kind: 'link', op: 'upsert', afterBlock: result.afterBlock, txHash: result.txHash, fields: { widget: key, name: widget.name } })
    onSaved(result, widget)
   } catch (error) { setSaveError(saveErrorMessage(error)) }
   finally { saveBusy.current = false; setSaving(false) }
@@ -71,8 +72,9 @@ export function WidgetEditor({ mode, initial, widgetKey, onSaved }: { mode: 'cre
    <a href="/me">← My home</a>
    <input className={s.name} aria-label="Widget name" placeholder="Untitled widget" maxLength={LIMITS.name} value={state.draft.name} onChange={e => dispatch({ type: 'name', value: e.target.value })}/>
    <fieldset className={s.lifetime}><legend>Lives for</legend>{LIFETIME_DAYS.map(days => <button type="button" className="btn btn-quiet" key={days} aria-pressed={state.draft.lifetimeDays === days} onClick={() => dispatch({ type: 'lifetime', value: days })}>{days} {days === 1 ? 'day' : 'days'}</button>)}</fieldset>
-   <button type="button" className="btn btn-primary" disabled={!eligibility.ok || saving || running} title={eligibility.ok ? undefined : eligibility.reason} onClick={() => void save()}>{saving ? 'Saving…' : mode === 'create' ? 'Save to Arkiv' : 'Save changes'}</button>
+   <button type="button" className="btn btn-primary" disabled={!eligibility.ok || saving || running} title={eligibility.ok ? undefined : eligibility.reason} onClick={() => void save()}>{saving ? 'Saving…' : mode === 'create' ? 'Save to Arkiv' : 'Save new version'}</button>
   </header>
+  {mode === 'edit' && <p style={{ color: 'var(--text-3)' }}>Widgets are read only on Arkiv. Saving creates a new version and moves your dashboards to it.</p>}
   {saveError && <p className="error" role="alert">{saveError}</p>}
   <section className={pg.editorCard} aria-label="SQL editor"><div className={pg.runbar}><span className={pg.hint}><kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>Enter</kbd></span><button type="button" className="btn btn-primary" disabled={!db || running || saving} onClick={() => void run()}>{running ? 'Running…' : '▶ Run'}</button></div><CodeMirror aria-label="SQL query" value={state.draft.sql} height="240px" theme={theme} extensions={extensions} onChange={value => dispatch({ type: 'sql', value })} basicSetup={{ foldGutter: false }}/></section>
   {state.runError && <p className="error" role="alert">{state.runError}</p>}
