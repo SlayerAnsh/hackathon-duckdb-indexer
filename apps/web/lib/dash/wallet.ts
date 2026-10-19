@@ -12,7 +12,7 @@ export function tiramisuChain(rpcUrl: string): Chain {
 const walletMethods = new Set(['eth_sendTransaction', 'eth_signTransaction', 'eth_accounts', 'eth_requestAccounts', 'eth_chainId', 'wallet_switchEthereumChain', 'wallet_addEthereumChain', 'personal_sign', 'eth_sign', 'eth_signTypedData_v4'])
 export function routeRpc(method: string): 'wallet' | 'rpc' { return walletMethods.has(method) ? 'wallet' : 'rpc' }
 export function splitTransport(wallet: Eip1193, rpc: Eip1193): Transport {
- return custom({ request: args => routeRpc(args.method) === 'wallet' ? wallet.request(args) : rpc.request(args) })
+ return custom({ request: args => routeRpc(args.method) === 'wallet' ? wallet.request(args) : rpc.request(args) }, { retryCount: 0 })
 }
 export type UserWalletClient = Pick<WalletArkivClient, 'account' | 'extendEntity' | 'deleteEntity' | 'changeOwnership' | 'getBlockNumber'>
 export function createUserWalletClient(provider: Eip1193, address: `0x${string}`, rpcUrl: string): UserWalletClient {

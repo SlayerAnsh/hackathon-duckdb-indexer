@@ -329,7 +329,7 @@ See the [design spec](docs/superpowers/specs/2026-10-20-widget-dashboards-design
 
 User widgets are created by the app wallet with fixed `readonly` and `permissionlessExtension` flags and transferred to the session wallet in the same batch. The immutable `user` attribute records the author; the Arkiv owner controls deletion, transfer and saving new versions. Editing creates a new widget and repoints only the author's dashboard links. The old version stays until expiry unless its owner deletes it. Anyone logged in can extend a live user widget by signing in the browser. Extend, transfer and delete need GLM in the signing wallet; saving stays free. Legacy widgets owned by the app wallet have no user signing actions. Official widgets require both `user` and `$owner` to equal the app wallet and use backend keepalive.
 
-Removed widget endpoints: `PATCH /api/dash/widgets/[key]`, `DELETE /api/dash/widgets/[key]` and `POST /api/dash/widgets/[key]/extend`. New versions use `POST /api/dash/widgets` with `replaces`; widget extend, delete and transfer use direct browser signatures.
+Removed widget endpoints: `PUT /api/dash/widgets/[key]`, `DELETE /api/dash/widgets/[key]` and `POST /api/dash/widgets/[key]/extend`. New versions use `POST /api/dash/widgets` with `replaces`; widget extend, delete and transfer use direct browser signatures.
 
 ## 12. Security and abuse
 
