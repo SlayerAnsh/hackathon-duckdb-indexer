@@ -1,4 +1,5 @@
 'use client'
+import { showLoading } from '../../lib/dash/loading'
 import type { CSSProperties } from 'react'
 import Link from 'next/link'
 import type { WidgetEntity } from '../../lib/dash/entities'
@@ -27,7 +28,7 @@ export function WidgetBrowseCard({ item, payload, head, version, variant, select
  return <article ref={ref} className={s.card} style={style} role={toggle ? 'button' : undefined} tabIndex={toggle ? 0 : undefined} aria-pressed={toggle ? selected : undefined}
   onClick={toggle ? onToggle : undefined} onKeyDown={toggle ? event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onToggle?.() } } : undefined}>
   <div className="widget-browse-preview" style={{ height: pick ? 120 : 160, overflow: 'hidden', padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-   {!visible ? <span style={{ opacity: 0.3 }}><ChartIcon type={item.chart} size={32}/></span> : payload === undefined || (!!payload && preview.loading) ? <div aria-label="Loading preview" style={{ width: '100%', height: '100%', background: 'var(--card-2)' }}/> : !payload || preview.error ? <span style={{ color: 'var(--text-3)' }}>Preview unavailable</span> : <div style={{ width: '100%', height: '100%' }}><WidgetPreview id={'browse-' + item.key} payload={payload.widget} query={preview}/></div>}
+   {!visible ? <span style={{ opacity: 0.3 }}><ChartIcon type={item.chart} size={32}/></span> : payload === undefined || (!!payload && showLoading({ loading: preview.loading, data: preview.data })) ? <div aria-label="Loading preview" style={{ width: '100%', height: '100%', background: 'var(--card-2)' }}/> : !payload || preview.error ? <span style={{ color: 'var(--text-3)' }}>Preview unavailable</span> : <div style={{ width: '100%', height: '100%' }}><WidgetPreview id={'browse-' + item.key} payload={payload.widget} query={preview}/></div>}
   </div>
   <style>{'.widget-browse-preview .chart-frame{height:100%;width:100%}.widget-browse-preview .recharts-cartesian-axis,.widget-browse-preview .chart-key{display:none}'}</style>
   <header className={s.head}><h3>{item.name}{pick && selected && <span aria-label="Selected"> ✓</span>}</h3><p><ChartIcon type={item.chart}/> {CHART_LABELS[item.chart]} · by <span onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}><AddressLink address={item.user}/></span> · on {item.uses} {item.uses === 1 ? 'dashboard' : 'dashboards'}</p></header>

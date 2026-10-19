@@ -43,14 +43,14 @@ export function organizeReducer(draft: OrganizeDraft, action: OrganizeAction): O
 }
 
 export function isDirty(draft: OrganizeDraft, original: OrganizeDraft): boolean {
- return draft.title !== original.title || draft.items.length !== original.items.length || draft.items.some((item, index) => {
+ return draft.title.trim() !== original.title || draft.items.length !== original.items.length || draft.items.some((item, index) => {
   const before = original.items[index]!
   return item.link !== before.link || item.widget !== before.widget || item.size !== before.size
  })
 }
 
 export function toOrganizeInput(draft: OrganizeDraft, original: OrganizeDraft): { title?: string; items: { link: string | null; widget: string; size: Size }[] } {
- return { ...(draft.title !== original.title ? { title: draft.title.trim() } : {}),
+ return { ...(draft.title.trim() !== original.title ? { title: draft.title.trim() } : {}),
   items: draft.items.map(({ link, widget, size }) => ({ link, widget, size })) }
 }
 
@@ -64,4 +64,8 @@ export function announcement(kind: 'start' | 'move' | 'drop' | 'cancel', name: s
   case 'drop': return `Dropped at position ${position} of ${count}.`
   case 'cancel': return 'Reorder cancelled.'
  }
+}
+
+export function canExtendRow(row: { link: unknown | null; widgetUser: string; expired: boolean }, caller: string | null): boolean {
+ return !row.expired && (row.widgetUser === caller || row.link !== null)
 }

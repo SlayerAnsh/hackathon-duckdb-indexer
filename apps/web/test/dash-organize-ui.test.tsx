@@ -46,3 +46,22 @@ test('not owner state links back to the dashboard', () => {
  expect(html).toContain('View dashboard')
  expect(html).toContain('href="/d/key"')
 })
+
+import { canExtendRow, isDirty, toOrganizeInput } from '../lib/dash/organize-state'
+import { OrganizeTitle } from '../components/widgets/OrganizeBoard'
+test('extend requires ownership or an existing link and a live widget', () => {
+ expect(canExtendRow({ link: null, widgetUser: user, expired: false }, user)).toBe(true)
+ expect(canExtendRow({ link: 'link', widgetUser: 'other', expired: false }, user)).toBe(true)
+ expect(canExtendRow({ link: null, widgetUser: 'other', expired: false }, user)).toBe(false)
+ expect(canExtendRow({ link: 'link', widgetUser: user, expired: true }, user)).toBe(false)
+ expect(canExtendRow({ link: null, widgetUser: user, expired: false }, null)).toBe(false)
+})
+test('title whitespace is not a change and input requires at most 80 characters', () => {
+ const original = { title: 'Title', items: [] }
+ const draft = { ...original, title: 'Title ' }
+ expect(isDirty(draft, original)).toBe(false)
+ expect(toOrganizeInput(draft, original)).not.toHaveProperty('title')
+ const html = render(<OrganizeTitle value="Title" disabled={false} onChange={() => {}}/>)
+ expect(html).toContain('maxLength="80"')
+ expect(html).toContain('required=""')
+})

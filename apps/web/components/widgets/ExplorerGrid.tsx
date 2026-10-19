@@ -1,4 +1,7 @@
 'use client'
+import { WidgetPayloadError } from './WidgetPayloadError'
+import { useDebounced } from '../../lib/dash/use-debounced'
+import { showLoading } from '../../lib/dash/loading'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useDashAuth } from '../auth/DashAuthProvider'
 import { explorerQuery, explorerReducer, mergeExplorerItems, type ExplorerState } from '../../lib/dash/explorer-state'
@@ -21,11 +24,8 @@ export function ExplorerView({ state, dispatch, liveCount, total, loggedIn, load
 }) {
  const [search, setSearch] = useState(state.search)
  useEffect(() => { setSearch(state.search) }, [state.search])
- useEffect(() => {
-  if (search === state.search) return
-  const timer = setTimeout(() => dispatch({ type: 'search', value: search }), 250)
-  return () => clearTimeout(timer)
- }, [search, state.search, dispatch])
+ const debouncedSearch = useDebounced(search)
+ useEffect(() => { if (debouncedSearch !== state.search) dispatch({ type: 'search', value: debouncedSearch }) }, [debouncedSearch, state.search, dispatch])
  return <section className="explorer">
   <style>{`.explorer{padding:32px 0;display:grid;gap:24px}.explorer-header,.explorer-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.explorer-header h1{margin:0}.explorer-header a{margin-left:auto}.explorer-controls input:not([type=checkbox]),.explorer-controls select{padding:8px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--inset);color:var(--text);font:inherit;max-width:100%}.explorer-controls input:not([type=checkbox]){flex:1;min-width:240px}.explorer-types{display:flex;gap:4px;overflow-x:auto;max-width:100%}.explorer-types button{flex-shrink:0}.explorer-types button[aria-pressed=true]{background:var(--accent-soft);color:var(--accent)}`}</style>
   <header className="explorer-header"><h1>Widgets</h1><span className="quiet-chip">{liveCount ?? '…'} live</span><a className="btn btn-primary" href="/widgets/new">+ New widget</a></header>
@@ -46,8 +46,8 @@ function ResultsPage({ q, version, head, onAdd, remember }: { q: WidgetListQuery
  const list = useWidgetList(q, version)
  const keys = list.items.map(item => item.key).join(',')
  useEffect(() => { remember(q.offset, keys ? keys.split(',') : []) }, [q.offset, keys, remember])
- return <>{list.items.map(item => <WidgetBrowseCard key={item.key} item={item} payload={list.payloads?.get(item.key) ?? (list.payloads ? null : undefined)} head={head} version={version} variant="explorer" onAdd={() => onAdd(item)}/>)}
-  {list.loading && <p role="status">Loading the index into your browser…</p>}{list.error && <p className="error" role="alert">{list.error}</p>}
+ return <><WidgetPayloadError error={list.payloadError}/>{list.items.map(item => <WidgetBrowseCard key={item.key} item={item} payload={list.payloads?.get(item.key) ?? (list.payloads ? null : undefined)} head={head} version={version} variant="explorer" onAdd={() => onAdd(item)}/>)}
+  {showLoading({ loading: list.loading, data: list.total }) && <p role="status">Loading the index into your browser…</p>}{list.error && <p className="error" role="alert">{list.error}</p>}
  </>
 }
 function PendingCard({ item, write, version, onAdd }: { item: WidgetListItem; write: PendingWrite; version: number; onAdd(): void }) {
@@ -81,7 +81,7 @@ export function ExplorerGrid({ state, dispatch }: Props) {
  if (!config.enabled) return <p>Dashboards are not enabled on this deployment.</p>
  return <><ExplorerView state={state} dispatch={dispatch} liveCount={live.data ? Number(live.data.rows[0]?.[0] ?? 0) : null}
   total={optimistic.length ? Math.max(optimistic.length, Number(filtered.data?.rows[0]?.[0] ?? 0)) : filtered.data ? Number(filtered.data.rows[0]?.[0] ?? 0) : null}
-  loggedIn={auth.status === 'authenticated'} loading={live.loading || filtered.loading} error={live.error ?? filtered.error ?? loginError ?? auth.error ?? undefined}>
+  loggedIn={auth.status === 'authenticated'} loading={showLoading({ loading: live.loading, data: live.data }) || showLoading({ loading: filtered.loading, data: filtered.data })} error={live.error ?? filtered.error ?? loginError ?? auth.error ?? undefined}>
   {optimistic.map(item => <PendingCard key={item.key} item={item} write={pending.find(p => p.key === item.key)!} version={version} onAdd={() => void add(item)}/>)}
   {Array.from({ length: state.pages }, (_, page) => <ResultsPage key={`${scope}:${page}`} q={{ ...q, limit: 12, offset: page * 12 }} version={version} head={index.liveHead} onAdd={item => void add(item)} remember={remember}/>)}
  </ExplorerView>{pending.filter(write => write.kind === 'widget' && !optimistic.some(item => item.key === write.key)).map(write => <PendingSync key={write.key} write={write} version={version}/>)}{picker && <AddToDashboardPicker widgetKey={picker.key} chart={picker.chart} onClose={close}/>}</>

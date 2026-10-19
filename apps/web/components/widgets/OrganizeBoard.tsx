@@ -2,7 +2,7 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { closestCenter, DndContext, KeyboardSensor, PointerSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { closestCenter, DndContext, KeyboardSensor, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useDashAuth, type DashAuth } from '../auth/DashAuthProvider'
 import { useDashboard, type DashboardData } from '../../lib/dash/use-dashboard'
@@ -53,7 +53,7 @@ function Editor({ dashboardKey, data, original }: { dashboardKey: string; data: 
  const dirty = isDirty(draft, original)
  const { state } = useIndex()
  const head = Math.max(data.head ?? 0, state.liveHead ?? 0)
- const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }), useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }))
+ const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 4 } }), useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }))
  useEffect(() => { setImportOpen(new URLSearchParams(window.location.search).get('import') === '1') }, [])
  useEffect(() => {
   if (!draft.items.some(item => item.flash)) return
@@ -93,7 +93,7 @@ function Editor({ dashboardKey, data, original }: { dashboardKey: string; data: 
   return announcement(kind, item?.name ?? '', position, draft.items.length)
  }
  async function done() {
-  if (busy.current) return
+  if (busy.current || !draft.title.trim()) return
   if (!dirty) { leaving.current = true; router.push('/d/' + dashboardKey); return }
   busy.current = true; setSaving(true); setError(null)
   try {
@@ -105,11 +105,11 @@ function Editor({ dashboardKey, data, original }: { dashboardKey: string; data: 
  }
  return <div className={s.board}>
   <header className={s.header}>
-   <input className={s.title} aria-label="Dashboard title" value={draft.title} disabled={saving} onChange={event => dispatch({ type: 'title', value: event.target.value })}/>
+   <OrganizeTitle value={draft.title} disabled={saving} onChange={value => dispatch({ type: 'title', value })}/>
    {dirty && <span className={s.dirty}>Unsaved changes</span>}
    <button type="button" className="btn" disabled={saving || remainingSlots(draft) === 0} onClick={() => setImportOpen(true)}>+ Import widget</button>
    <Link className="btn" href={'/widgets/new?dashboard=' + dashboardKey}>+ New widget</Link>
-   <button type="button" className="btn btn-primary" disabled={saving} onClick={() => void done()}>{saving ? 'Saving…' : 'Done'}</button>
+   <button type="button" className="btn btn-primary" disabled={saving || !draft.title.trim()} onClick={() => void done()}>{saving ? 'Saving…' : 'Done'}</button>
   </header>
   {error && <p className="error" role="alert">{error}</p>}
   <div className={s.tabs} role="tablist" aria-label="Organize view">{(['order', 'preview'] as const).map(value => <button key={value} type="button" className="btn" role="tab" aria-selected={tab === value} onClick={() => setTab(value)}>{value === 'order' ? 'Order' : 'Preview'}</button>)}</div>
@@ -146,4 +146,8 @@ export function OrganizeBoard({ dashboardKey }: { dashboardKey: string }) {
  if (!data.widgets) return <p>Loading the index into your browser…</p>
  if (!original.current) original.current = { key, draft: draftFromDashboard(data.dashboard!, dashboardSlots(data.links, data.widgets)) }
  return <Editor key={key} dashboardKey={key} data={data} original={original.current.draft}/>
+}
+
+export function OrganizeTitle({ value, disabled, onChange }: { value: string; disabled: boolean; onChange(value: string): void }) {
+ return <input className={s.title} aria-label="Dashboard title" maxLength={80} required value={value} disabled={disabled} onChange={event => onChange(event.target.value)}/>
 }

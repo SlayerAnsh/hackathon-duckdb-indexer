@@ -1,4 +1,7 @@
 'use client'
+import { WidgetPayloadError } from './WidgetPayloadError'
+import { useDebounced } from '../../lib/dash/use-debounced'
+import { showLoading } from '../../lib/dash/loading'
 import { useCallback, useEffect, useId, useReducer, useRef, useState } from 'react'
 import { useDashAuth } from '../auth/DashAuthProvider'
 import { addLabel, initImport, importReducer, type ImportState } from '../../lib/dash/import-state'
@@ -17,9 +20,9 @@ type Props = { dashboardTitle: string; placed: Set<string>; remaining: number; o
  listOverride?: List & { mineTotal: number | null; allTotal: number | null }; initialState?: ImportState }
 type CardsProps = { list: List; state: ImportState; placed: Set<string>; head?: number; version: number; toggle(key: string): void }
 function Cards({ list, state, placed, head, version, toggle }: CardsProps) {
- return <>{list.items.map(item => <WidgetBrowseCard key={item.key} item={item} payload={list.payloads?.get(item.key) ?? (list.payloads ? null : undefined)}
+ return <><WidgetPayloadError error={list.payloadError}/>{list.items.map(item => <WidgetBrowseCard key={item.key} item={item} payload={list.payloads?.get(item.key) ?? (list.payloads ? null : undefined)}
   head={head} version={version} variant="pick" selected={state.selected.includes(item.key)} disabled={placed.has(item.key)} onToggle={() => toggle(item.key)}/>)}
-  {list.loading && <p role="status">Loading the index into your browser…</p>}
+  {showLoading({ loading: list.loading, data: list.total }) && <p role="status">Loading the index into your browser…</p>}
   {list.error && <p className="error" role="alert">{list.error}</p>}
  </>
 }
@@ -49,6 +52,9 @@ function Counts({ state, user, onCounts }: { state: ImportState; user?: string; 
 export function ImportModal({ dashboardTitle, placed, remaining, onAdd, onClose, listOverride, initialState }: Props) {
  const auth = useDashAuth()
  const [state, dispatch] = useReducer(importReducer, initialState ?? initImport())
+ const [search, setSearch] = useState(initialState?.search ?? '')
+ const debouncedSearch = useDebounced(search)
+ useEffect(() => { dispatch({ type: 'search', value: debouncedSearch }) }, [debouncedSearch])
  const [counts, setCounts] = useState<{ mine: number | null; all: number | null }>({ mine: null, all: null })
  const candidates = useRef(new Map<string, ImportCandidate>())
  const dialog = useRef<HTMLDivElement>(null)
@@ -87,7 +93,7 @@ export function ImportModal({ dashboardTitle, placed, remaining, onAdd, onClose,
    <header className="import-header"><h2 id={title}>Import widgets into “{dashboardTitle}”</h2><button type="button" className="btn btn-quiet" aria-label="Close import" onClick={onClose}>✕</button></header>
    <div className="import-controls">
     <div className="tabs" role="tablist" aria-label="Widget source">{(['mine', 'all'] as const).map(tab => <button key={tab} type="button" className="tab" role="tab" aria-selected={state.tab === tab} onClick={() => dispatch({ type: 'tab', value: tab })}>{tab === 'mine' ? 'My widgets' : 'All widgets'} <span className="tab-n">{(tab === 'mine' ? mine : all) ?? '…'}</span></button>)}</div>
-    <input aria-label="Search by name or creator address" placeholder="Search by name or creator address" value={state.search} onChange={event => dispatch({ type: 'search', value: event.target.value })}/>
+    <input aria-label="Search by name or creator address" placeholder="Search by name or creator address" value={search} onChange={event => setSearch(event.target.value)}/>
     <div className="import-types" role="group" aria-label="Chart type">{([null, ...CHART_TYPES] as const).map(chart => <button key={chart ?? 'all'} type="button" className="btn btn-quiet" aria-pressed={state.chart === chart} onClick={() => dispatch({ type: 'chart', value: chart })}>{chart && <ChartIcon type={chart}/>} {chart ? CHART_LABELS[chart] : 'All'}</button>)}</div>
    </div>
    {!listOverride && <Counts state={state} user={auth.address} onCounts={onCounts}/>}

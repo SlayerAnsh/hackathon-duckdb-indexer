@@ -51,3 +51,9 @@ test('empty home collections use exact copy', () => {
  expect(html).toContain('+ New dashboard')
  expect(html).toContain('href="/widgets/new"')
 })
+
+test('home shows payload errors and retry inside My widgets while retaining rows and Extend', () => {
+ const html = render(<HomeCollections dashboards={[]} widgets={[['key', 'Saved widget', 'bar', 100]]} onCreate={() => {}} payloadError="RPC budget exhausted, retry later" onRetry={() => {}} renderExtend={() => <button>Extend</button>}/> )
+ expect(html.indexOf('RPC budget exhausted')).toBeGreaterThan(html.indexOf('My widgets'))
+ for (const text of ['RPC budget exhausted, retry later', 'Try again', 'Saved widget', 'Extend']) expect(html).toContain(text)
+})

@@ -62,3 +62,46 @@ test('pick cards expose selection and disable already placed widgets', () => {
  const disabled = render(<WidgetBrowseCard {...props} variant="pick" payload={null} disabled/> )
  expect(disabled).toContain('Already on this dashboard'); expect(disabled).not.toContain('aria-pressed'); expect(disabled).not.toContain('role="button"')
 })
+
+import { showLoading } from '../lib/dash/loading'
+import { scheduleDebounced } from '../lib/dash/use-debounced'
+import { WidgetPayloadError } from '../components/widgets/WidgetPayloadError'
+import { RpcError } from '@asi/core'
+import { rpcMessage } from '../components/RowActions'
+test('refresh keeps existing results visible', () => {
+ expect(showLoading({ loading: true, data: null })).toBe(true)
+ expect(showLoading({ loading: true, data: [] })).toBe(false)
+ expect(showLoading({ loading: false, data: null })).toBe(false)
+ const payload = { widget: { ...emptyWidget(), chart: 'counter', counter: { column: 'n', row: 0, prefix: '', suffix: '', label: 'Total', decimals: 0, compact: false } } } as any
+ const html = render(<WidgetBrowseCard {...props} payload={payload} visibleOverride query={{ loading: true, data: { columns: ['n'], rows: [[42]] } }}/>)
+ expect(html).toContain('42')
+ expect(html).not.toContain('Loading preview')
+})
+test('search debounce waits 250 ms and cancels stale input', () => {
+ let now = 0, value = '', jobs: { at: number; run(): void }[] = []
+ const scheduler = { set(run: () => void, ms: number) { const job = { at: now + ms, run }; jobs.push(job); return job }, clear(job: unknown) { jobs = jobs.filter(j => j !== job) } }
+ const cancel = scheduleDebounced(() => { value = 'a' }, scheduler)
+ now = 100; cancel()
+ scheduleDebounced(() => { value = 'ab' }, scheduler)
+ now = 349; jobs.filter(j => j.at <= now).forEach(j => j.run()); expect(value).toBe('')
+ now = 350; jobs.filter(j => j.at <= now).forEach(j => j.run()); expect(value).toBe('ab')
+})
+test('payload failures show the shared RPC message and optional retry', () => {
+ const error = new RpcError('limited', 429, 'limited', '60')
+ const html = render(<WidgetPayloadError error={rpcMessage(error)} onRetry={() => {}}/>)
+ expect(html).toContain('RPC budget exhausted, retry later')
+ expect(html).toContain('Try again')
+ expect(html).toContain('btn-quiet')
+})
+
+import { readFileSync } from 'node:fs'
+test('explorer and import share the tested debounce and render payload failures', () => {
+ for (const file of ['ExplorerGrid', 'ImportModal']) {
+  const source = readFileSync(new URL(`../components/widgets/${file}.tsx`, import.meta.url), 'utf8')
+  expect(source).toContain('useDebounced(search)')
+  expect(source).toContain('<WidgetPayloadError error={list.payloadError}/>')
+ }
+ const modal = readFileSync(new URL('../components/widgets/ImportModal.tsx', import.meta.url), 'utf8')
+ expect(modal).toContain('value={search} onChange={event => setSearch(event.target.value)}')
+ expect(modal).toContain("search: state.search")
+})

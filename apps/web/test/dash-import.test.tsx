@@ -51,3 +51,9 @@ test('modal renders pick cards, placed state, selection and paged loading', () =
  expect(filtered).toContain('No widgets match these filters.')
  expect(filtered).not.toContain('You have no widgets yet.')
 })
+
+test('import payload rate limits are visible before the cards', () => {
+ const html = render(<ImportModal dashboardTitle="Title" placed={new Set()} remaining={48} onAdd={() => {}} onClose={() => {}} listOverride={{ ...list, total: 1, mineTotal: 1, payloadError: 'RPC budget exhausted, retry later' }}/> )
+ expect(html).toContain('RPC budget exhausted, retry later')
+ expect(html).toContain('role="alert"')
+})
