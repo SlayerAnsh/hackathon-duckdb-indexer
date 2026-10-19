@@ -43,7 +43,7 @@ export function Story() {
    <Src files={['SPECS.md', 'arkiv/schema.md', 'apps/indexer/src/store.ts']}/>
   </Chapter>
 
-  <Chapter id="features" title="Arkiv features you can see" lead="Each one is in the code, and each one shows up somewhere in this app." more={<><Link href="/about#use">Feature details</Link> or <Link href="/showcase">open the showcase</Link></>}>
+  <Chapter id="features" title="Arkiv features you can see" lead="Each one is in the code, and each one shows up somewhere in this app." more={<><Link href="/about#use">Feature details</Link> or <Link href="/explore">explore dashboards</Link></>}>
    <ul className={s.featureList}>{FEATURES.map(f => <li key={f.title}><b>{f.title}</b><span>{f.see}</span><Src files={f.src}/></li>)}</ul>
   </Chapter>
 

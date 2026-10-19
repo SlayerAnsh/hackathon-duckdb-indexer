@@ -11,7 +11,7 @@ test('about page renders every section and both infographics', () => {
  for (const h of ['Who this protects', 'How it works', 'Why Arkiv', 'How we use Arkiv', 'Expiry, end to end', 'Friction we measured', 'Reproduce it']) expect(text).toContain(h)
  expect(html.match(/role="img"/g)).toHaveLength(2)
  expect(html).toContain('<title id="arch-t">'); expect(html).toContain('<title id="exp-t">')
- expect(html).toContain('href="/showcase"'); expect(html).toContain('href="/playground"')
+ expect(html).toContain('href="/explore"'); expect(html).toContain('href="/playground"')
 })
 
 test('about copy uses no dash punctuation and no unverified live tail API', () => {
@@ -34,7 +34,7 @@ test('home story renders its chapters and every /about link lands on a section i
  const anchors = [...story.matchAll(/href="\/about#([\w-]+)"/g)].map(m => m[1])
  expect(anchors.length).toBeGreaterThanOrEqual(5)
  for (const id of anchors) expect(html).toContain(`id="${id}"`)
- expect(story).toContain('href="/showcase"'); expect(story).toContain('href="/playground"')
+ expect(story).toContain('href="/explore"'); expect(story).toContain('href="/playground"')
 })
 
 test('footer links to the about page', () => {

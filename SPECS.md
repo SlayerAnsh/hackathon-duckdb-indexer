@@ -17,7 +17,7 @@ Goals (P0 unless marked):
 1. Index all entities matching a configured Arkiv expression, with backfill and live sync.
 2. Publish versioned Parquet snapshots and a per block delta over HTTP.
 3. Browser SQL over the merged data (snapshot, delta, live tail) through DuckDB WASM.
-4. Showcase of fixed analytics cards, each showing its SQL.
+4. Official dashboards stored on Arkiv, with live charts and inspectable SQL (owner decision, 20 October 2026).
 5. SQL editor with syntax highlighting and schema aware autocomplete.
 6. Expiry enforced in the browser against the live chain head.
 7. Removed on 20 October 2026 because widgets, dashboards and links now provide live application data through the dashboard wallet.
@@ -276,7 +276,7 @@ A demo wide view (for example `widgets`) is a `PIVOT` over `attributes` for one 
 ## 9. Frontend (Next.js)
 
 - Next.js App Router with `output: 'standalone'` (a Node server, needed for the proxy). Pages are client components; DuckDB WASM runs only in the browser.
-- Pages: `/` (story sections and live stats), `/showcase` (chart gallery), `/playground` (SQL editor), `/about` (architecture and expiry), `/widgets` (public explorer), `/widgets/new` (create widget), `/widgets/<key>` (view or edit widget), `/d/<key>` (public dashboard), `/d/<key>/edit` (organize dashboard) and `/me` (login required home and activity).
+- Pages: `/` (story sections and live stats), `/explore` (public dashboards and widgets), `/playground` (SQL editor), `/about` (architecture and expiry), `/widgets/new` (create widget), `/widgets/<key>` (view or edit widget), `/d/<key>` (public dashboard), `/d/<key>/edit` (organize dashboard) and `/me` (login required home and activity).
 - Status bar: indexed expression, chain, stored and serving blocks, oldest block with complete attributes, head lag, and live tail pending count and budget state.
 
 ### 9.0 Data proxy
@@ -292,15 +292,11 @@ The browser loads all index data from the Next.js origin under `/data/*`. A rout
 
 A route handler is used instead of `rewrites()` in `next.config` because rewrites are fixed at build time (the indexer URL could not change per deployment) and their forwarding of `Range` and conditional headers would need separate verification. Test: a `curl -H 'Range: bytes=0-99'` through the proxy returns 206 with the same bytes as the indexer.
 
-### 9.1 Showcase
+### 9.1 Official dashboards
 
-Chart cards defined in `apps/web/lib/views.ts`, each showing its SQL, its timing and, where relevant, the clause `arkiv_query` cannot express. Views:
+Owner decision, 20 October 2026: Official dashboards replace the showcase. The landing page shows up to six in seed order, and `/explore` lists public dashboards and widgets. Each report is a normal dashboard with widget and link entities on Arkiv, marked official by its user attribute matching the dashboard wallet. Anyone may open the reports and import their widgets.
 
-1. Overview: live entities, distinct creators and owners, known entities (attributes fetched), entities expiring within an hour, creations per time bucket, entities by `type`, recently updated entities.
-2. Expiry: median remaining lifetime, expiry horizon histogram, expiry bucket by type, entities expiring next.
-3. Creators: top 10 creators, the SQL equivalent of a `$creator` filter, creator versus current owner, creators by distinct types.
-4. Attributes: attribute names and value types, numeric statistics, top `status` and `priority` values.
-5. Activity: updates per time bucket, created versus updated, running count of creations (window function).
+The reports are Arkiv network overview, Expiry watch, Creators, and Attributes and activity. They cover network counters, creations, entity types, expiry distributions, creator rankings, attribute statistics and activity. Queries remain defined in `apps/web/lib/views.ts` for playground snippets and official definitions. Every chart runs SQL in the viewer's DuckDB and exposes that SQL. The app keeps official entities live automatically.
 
 Block numbers convert to time at 2 seconds per block. Charts use Recharts or plain SVG.
 
@@ -309,7 +305,7 @@ Block numbers convert to time at 2 seconds per block. Charts use Recharts or pla
 - CodeMirror 6 through `@uiw/react-codemirror` with `@codemirror/lang-sql`. Syntax highlighting from the SQL language package.
 - Autocomplete: table and column names read from `information_schema.columns` for the public views, passed as the `schema` option, plus SQL keywords and DuckDB function names from `duckdb_functions()`.
 - Ctrl or Cmd plus Enter runs. Cancel button interrupts the running query. Results capped at 1,000 displayed rows with a note, and CSV download of the full result.
-- Snippet sidebar with every showcase query plus the featured JOIN and GROUP BY query "Most placed widgets", and a local query history.
+- Snippet sidebar with every official report query plus the featured JOIN and GROUP BY query "Most placed widgets", and a local query history.
 - Query text kept in the URL hash so a query can be shared as a link.
 
 ### 9.3 Row actions
@@ -375,7 +371,7 @@ Secrets are never build arguments or passed to the indexer. Production uses a bl
 - `packages/core`: attribute decoding for all nine types, expression chunk builder.
 - Indexer: backfill and per block apply against a fake RPC (recorded fixtures), snapshot and delta file contents, expiry sweep.
 - Merge views: DuckDB (node) tests for the merge cases in section 8.
-- Web: proxy and disk fallback, live tail, verify classification, views, playground and showcase rendering.
+- Web: proxy and disk fallback, live tail, verify classification, views, playground and Official dashboards rendering.
 - Deployment: compose, Dockerfiles, `.env.example` and docs (`test/deployment.test.ts`).
 - Manual smoke test against Tiramisu using widget creation and dashboard placement.
 

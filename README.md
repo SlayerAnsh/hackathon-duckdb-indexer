@@ -21,7 +21,7 @@ flowchart TD
   Snapshot --> HTTP[Internal HTTP on port 8080]
   Delta --> HTTP
   HTTP --> Proxy[Next.js data proxy on port 3000]
-  Proxy --> Browser[Browser DuckDB WASM, showcase and SQL playground]
+  Proxy --> Browser[Browser DuckDB WASM, Official dashboards and SQL playground]
   Browser -->|eth_blockNumber, live logs, payload, verify| RPC
   Writer[Web backend dashboard wallet] -->|SDK writes| RPC
 ```
@@ -30,7 +30,7 @@ flowchart TD
 | :--- | :--- |
 | `packages/core` | Direct JSON RPC client, typed attribute decoding, `$key` chunk builder (SDK `eq`, `or`, `render`), browser merge views |
 | `apps/indexer` | Log replay backfill, attribute filler, keyless live sync, Parquet snapshots, JSON delta, internal HTTP |
-| `apps/web` | Next.js data proxy, DuckDB WASM loader, browser live tail, showcase charts, SQL playground, payload and verify actions |
+| `apps/web` | Next.js data proxy, DuckDB WASM loader, browser live tail, Official dashboards, SQL playground, payload and verify actions |
 
 How data flows:
 
@@ -40,7 +40,7 @@ How data flows:
 4. Live sync applies `EntityCreated`, `EntityPatched`, `ExpiryExtended`, `OwnershipTransferred` and `EntityDeleted` straight from public logs every 5 blocks. Patches mark rows pending again for the filler.
 5. The browser imports the snapshot, polls the delta every 2 seconds, tails logs from the public RPC every 4 seconds, and reads `eth_blockNumber` as `live_head`. Public SQL views filter `expires_at > live_head`.
 
-The web app includes: `/` (story and live stats), `/showcase` (chart cards, each one SQL query with the clause `arkiv_query` cannot express), `/playground` (SQL editor with schema aware autocomplete, history, CSV export, Payload and Verify per row) and `/about`, plus `/widgets` (public explorer), `/widgets/new` (create), `/widgets/<key>` (view or edit), `/d/<key>` (public dashboard), `/d/<key>/edit` (organize) and `/me` (your dashboards, widgets and activity).
+The web app includes: `/` (story, live stats and Official dashboards), `/explore` (public dashboards and widgets), `/playground` (SQL editor with schema aware autocomplete, history, CSV export, Payload and Verify per row), `/about` (architecture and expiry), `/me` (your dashboards, widgets and activity), `/d/<key>` (public dashboard), `/widgets/<key>` (view or edit) and `/widgets/new` (create). Dashboard owners organize at `/d/<key>/edit`.
 
 ## Widgets and dashboards
 
@@ -180,7 +180,7 @@ To serve only a subset, set `INDEX_EXPRESSION` in `.env` before the first start 
 
 1. Start the stack as in "Run locally with Docker Compose" and run `docker compose logs indexer`. The first line reads `API key not used: live sync applies public logs and attributes fill on the anonymous RPC budget.` Then it logs `Replayed logs through block N` per window and `Live keys at block N` when backfill is done.
 2. Open http://localhost:3000/data/health. It returns `headBlock`, `headLag`, `lastSnapshot`, `live` and `pending`. `pending` falls as the filler fetches attributes newest first.
-3. Open http://localhost:3000/showcase. Each card is one DuckDB query in your tab and names the clause `arkiv_query` cannot express (GROUP BY, JOIN, window function, ORDER BY on attributes). Open the browser network tab: Parquet loads from `/data/snap/v<n>/`, while `eth_blockNumber`, `eth_getLogs` and occasional `arkiv_query` calls go straight to the public Tiramisu RPC with no credentials.
+3. Open http://localhost:3000 and open an Official dashboard from the landing page. Every chart is one DuckDB query in your tab, with its SQL available to inspect. Open the browser network tab: Parquet loads from `/data/snap/v<n>/`, while `eth_blockNumber`, `eth_getLogs` and occasional `arkiv_query` calls go straight to the public Tiramisu RPC with no credentials.
 4. Open http://localhost:3000/playground and run "Most placed widgets". It joins widget and link entities for `arkiv-sql-indexer-dash`, counts distinct dashboards, and includes widgets with zero placements. Links must share the widget creator. Use the dashboard wallet index scope above to restrict this plain SQL example to your deployment.
 5. Run `SELECT key, creator, owner, updated_at, expires_at FROM entities LIMIT 20` and click Payload or Verify on a row (or Verify page for all rows). Payload fetches the payload by `$key` from the RPC. Verify compares `updatedAt` and `expiresAt` from the RPC with the indexed row and the live head, and labels it `ok`, `stale`, `extended`, `expired` or `deleted`.
 6. Watch expiry: `SELECT key, expires_at FROM entities ORDER BY expires_at LIMIT 5`, wait until the status bar's chain block passes one `expires_at`, and run it again. The row is gone without any event, because the public `entities` view filters against the live head read from RPC.

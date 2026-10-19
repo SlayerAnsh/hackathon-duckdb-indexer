@@ -8,7 +8,7 @@ Use Bun 1.3.x (tested with 1.3.11). Docker uses `oven/bun:1.3` for workspace ins
 | :--- | :--- |
 | `packages/core` | Direct JSON RPC client, typed attribute decoding, `$key` chunk builder, browser merge views |
 | `apps/indexer` | DuckDB store, log replay backfill, attribute filler, live sync, snapshots, delta, internal HTTP |
-| `apps/web` | Next.js data proxy with disk fallback, DuckDB WASM loader, browser live tail, showcase, playground, about page |
+| `apps/web` | Next.js data proxy with disk fallback, DuckDB WASM loader, browser live tail, Official dashboards, /explore, playground, about page |
 | `apps/web/lib/dash` | Widget schemas, SQL, RPC reads, pending writes, authentication and serialized wallet operations |
 | `apps/web/app/api/dash` | Runtime wallet config, session and authenticated write routes |
 | `arkiv` | Entity schema, exact queries, and the friction report |
@@ -91,7 +91,7 @@ Every `SNAPSHOT_INTERVAL_BLOCKS` (default 30) the indexer publishes new versione
 
 The web proxy (`apps/web/lib/proxy.ts`) forwards only those paths with Range and conditional request headers. When `DATA_DIR` is set and the indexer is unreachable or returns 502, 503 or 504, it serves the same files from disk with `x-served-by: disk`; without `DATA_DIR` it returns 502.
 
-In the browser (`apps/web/lib/indexdb.ts`), internal merge views combine the snapshot, delta updates, tombstones and the live tail. `MATERIALIZE_SQL` refreshes `merged_entities` and `merged_attributes` in the same transaction and serial section as every snapshot load, delta replacement, live tail apply and live table clear. The public `entities` and `attributes` views filter expiry at query time against a head read directly from RPC, so head updates alone need no refresh. Live pending keys keep previous attributes until their fetched attributes arrive. Showcase and playground queries share the write queue. Run `bun apps/web/scripts/bench-views.ts` for the offline native DuckDB comparison of every widget and both refresh strategies.
+In the browser (`apps/web/lib/indexdb.ts`), internal merge views combine the snapshot, delta updates, tombstones and the live tail. `MATERIALIZE_SQL` refreshes `merged_entities` and `merged_attributes` in the same transaction and serial section as every snapshot load, delta replacement, live tail apply and live table clear. The public `entities` and `attributes` views filter expiry at query time against a head read directly from RPC, so head updates alone need no refresh. Live pending keys keep previous attributes until their fetched attributes arrive. Dashboard and playground queries share the write queue. Run `bun apps/web/scripts/bench-views.ts` for the offline native DuckDB comparison of every widget and both refresh strategies.
 
 ## Deployment verification
 

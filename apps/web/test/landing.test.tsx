@@ -62,3 +62,37 @@ test('hero figures show placeholders while loading and the pipeline shows the me
  expect(pipe).toContain('avg 3.2 ms')
  expect(renderToStaticMarkup(<Pipeline/>)).toContain('…')
 })
+
+
+test('official landing band covers disabled, loading, populated and empty states', async () => {
+ const { OfficialDashboardsView } = await import('../components/landing/OfficialDashboards')
+ const render = renderToStaticMarkup
+ expect(render(<OfficialDashboardsView enabled={false} items={null}/>)).toBe('')
+ const loading = render(<OfficialDashboardsView enabled items={null}/>)
+ expect(loading).toContain('aria-busy="true"')
+ expect(loading.match(/data-skeleton="true"/g)).toHaveLength(3)
+ const items = ['First report', 'Second report'].map((title,i) => ({ key: 'key'+i, title, user: 'wallet', official: true, widgets: 2, charts: [] as [], createdAt: 1, updatedAt: 1, expiresAt: 100 }))
+ const html = render(<OfficialDashboardsView enabled items={items} descriptions={new Map([['key0','Network description']])}/>)
+ for (const text of ['Official dashboards','Live network reports kept on Arkiv by this app. Open one to see every chart and its SQL.','All dashboards','href="/explore"','Network description']) expect(html).toContain(text)
+ expect(html.indexOf('First report')).toBeLessThan(html.indexOf('Second report'))
+ expect(html.match(/<article/g)).toHaveLength(2)
+ const empty = render(<OfficialDashboardsView enabled items={[]}/>)
+ expect(empty).toContain('Official dashboards are not set up on this deployment yet.')
+ expect(empty).toContain('Explore community dashboards')
+})
+
+test('landing hero and Home use the official reports band', async () => {
+ const { Home } = await import('../components/landing/Home')
+ const { DashAuthContext } = await import('../components/auth/DashAuthProvider')
+ const { readFileSync } = await import('node:fs')
+ const defaults = { status: 'anonymous', config: { enabled: true, wallet: '0x'+'a'.repeat(40), rpcUrl: '', privyAppId: 'test' }, requestLogin: async () => false }
+ const { AppRouterContext } = await import('next/dist/shared/lib/app-router-context.shared-runtime')
+ const html = renderToStaticMarkup(<AppRouterContext.Provider value={{} as any}><DashAuthContext.Provider value={defaults as any}><Home>Story marker</Home></DashAuthContext.Provider></AppRouterContext.Provider>)
+ for (const text of ['Explore live Arkiv data, in SQL.','Explore dashboards','href="/explore"','Open playground','href="/playground"','Build your dashboard','href="/me"']) expect(html).toContain(text)
+ expect(html).not.toContain('/showcase')
+ expect(html.indexOf('hero-h')).toBeLessThan(html.indexOf('Official dashboards'))
+ expect(html.indexOf('Official dashboards')).toBeLessThan(html.indexOf('The most recent creates'))
+ const source = readFileSync(new URL('../components/landing/Home.tsx', import.meta.url),'utf8')
+ expect(source).not.toContain('PreviewCards')
+ expect(source).toContain('OfficialDashboards')
+})

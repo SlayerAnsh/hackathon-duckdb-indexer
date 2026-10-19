@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Landing shows Official dashboards; the showcase page is removed and redirects to Explore.
+
 * Explore page with Dashboards and Widgets tabs; /widgets redirects to the Widgets tab.
 
 * Seed script and in process keepalive for official dashboards.
