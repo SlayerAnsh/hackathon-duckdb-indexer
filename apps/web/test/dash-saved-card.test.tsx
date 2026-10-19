@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { expect, test } from 'bun:test'
 import { renderToStaticMarkup as render } from 'react-dom/server'
 import { SavedWidgetCard } from '../components/widgets/SavedWidgetCard'
@@ -54,5 +55,15 @@ test('loading slots show a fixed height skeleton instead of SQL or results', () 
 
 test('live cards include timing, expiry, SQL toggle and the widget link', () => {
  const html = render(<SavedWidgetCard {...props} status="live" widgetKey="widget-key" expiresAt={43201} head={1} query={{ loading: false, ms: 2, data: { columns: ['n'], rows: [[1]] } }}/> )
- for (const copy of ['class="run"', '1d', 'aria-label="View SQL"', 'aria-expanded="false"', 'href="/widgets/widget-key"', 'Open']) expect(html).toContain(copy)
+ for (const copy of ['class="run"', '1d', 'aria-label="View SQL for Stored name"', 'aria-expanded="false"', 'href="/widgets/widget-key"', 'Open']) expect(html).toContain(copy)
+})
+
+test('report figures have captions, lifetime and accessible actions', () => {
+ const base = { ...props, status: 'live' as const, figure: 2, widgetKey: 'widget-key', expiresAt: 43201, head: 1, query: { loading: false } }
+ expect(readFileSync(new URL('../components/widgets/SavedWidgetCard.tsx', import.meta.url), 'utf8')).toContain('r.figure')
+ const html = render(<SavedWidgetCard {...base} subtitle="Imported from someone"/>)
+ for (const text of ['Figure 2', 'Stored name', 'Imported from someone', 'View SQL for Stored name', 'Open widget Stored name', 'Actions for Stored name', 'aria-expanded="false"', '1d']) expect(html).toContain(text)
+ expect(render(<SavedWidgetCard {...base} official/>)).toContain('Kept live')
+ expect(render(<SavedWidgetCard {...base} initialActionsOpen/>)).toContain('data-actions-open="true"')
+ expect(render(<SavedWidgetCard {...base} payload={{ ...payload, chart: 'counter' }}/>)).not.toContain('Figure 2')
 })

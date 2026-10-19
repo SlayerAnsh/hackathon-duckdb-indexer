@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Dashboards read like reports: numbered figures, quiet icon actions, share menu with Copy link and Post on X.
+
 * Landing shows Official dashboards; the showcase page is removed and redirects to Explore.
 
 * Explore page with Dashboards and Widgets tabs; /widgets redirects to the Widgets tab.

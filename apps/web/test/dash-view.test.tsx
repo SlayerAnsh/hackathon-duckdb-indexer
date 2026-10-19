@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 import { renderToStaticMarkup as render } from 'react-dom/server'
 import { dashboardSlots } from '../lib/dash/slots'
 import type { LinkEntity, WidgetEntity } from '../lib/dash/entities'
-import { DashboardHeader, EmptyDashboard, MissingDashboard } from '../components/widgets/DashboardView'
+import { ReportHeader, EmptyDashboard, MissingDashboard } from '../components/widgets/DashboardView'
 import { shortHex } from '../lib/format'
 
 const user = '0x' + 'ab'.repeat(20)
@@ -23,17 +23,18 @@ test('slots preserve the supplied order, including equal positions, and stored l
  expect(dashboardSlots([], new Map())).toEqual([])
 })
 
-test('header exposes owner actions and public copy link with count grammar', () => {
- const props = { title: 'My dashboard', user, count: 5, dashboardKey: key }
- const owner = render(<DashboardHeader {...props} owner/>)
- for (const text of ['My dashboard', shortHex(user), '5 widgets', 'Organize', '+ Add widget', 'Copy link', `href="/d/${key}/edit"`, `href="/d/${key}/edit?import=1"`]) expect(owner).toContain(text)
- const viewer = render(<DashboardHeader {...props} count={1} owner={false}/>)
- expect(viewer).toContain('1 widget')
- expect(viewer).toContain('Copy link')
- expect(viewer).not.toContain('Organize')
- expect(viewer).not.toContain('+ Add widget')
- expect(viewer).toContain('by ')
- expect(viewer).toContain(' · ')
+test('report header has public facts and quiet owner actions', () => {
+ const props = { title: 'My dashboard', description: 'A live report', user, count: 8, dashboardKey: key, updatedAt: 1, head: 61, official: false }
+ const owner = render(<ReportHeader {...props} owner/>)
+ for (const text of ['My dashboard', shortHex(user), '8 widgets', 'Organize dashboard', 'Add widgets', 'Share dashboard', 'role="toolbar"', 'aria-label="Dashboard actions"', 'Updated 2 min ago', 'Live, computed in your browser', 'href="/explore"', 'href="/explore?tab=dashboards"', 'A live report']) expect(owner).toContain(text)
+ expect(owner).not.toContain('btn-primary')
+ const official = render(<ReportHeader {...props} official owner/>)
+ for (const text of ['Official', 'Network report', 'By', 'Arkiv SQL Indexer']) expect(official).toContain(text)
+ expect(official).not.toContain('Organize dashboard')
+ const blank = render(<ReportHeader {...props} description="   " owner={false}/>)
+ expect(blank).not.toMatch(/<p[ >]/)
+ expect(owner).toContain(`href="/d/${key}/edit"`)
+ expect(owner).toContain(`href="/d/${key}/edit?import=1"`)
 })
 
 test('empty and missing states use the specified copy and destinations', () => {
