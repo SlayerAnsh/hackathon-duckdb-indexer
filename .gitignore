@@ -29,3 +29,6 @@ CODEX-REPORT.md
 .idea/
 .vscode/
 *.log
+
+# brainstorm mockups
+.superpowers/
