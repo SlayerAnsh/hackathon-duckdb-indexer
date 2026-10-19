@@ -42,6 +42,22 @@ bun test ./test/deployment.test.ts
 (cd apps/web && ./node_modules/.bin/tsc --noEmit -p .)
 ```
 
+## Official dashboards
+
+The coordinator seeds the four Official dashboards from the repository root with the existing dashboard wallet. Export `DASHBOARD_PRIVATE_KEY` and optionally `NEXT_PUBLIC_TIRAMISU_RPC_URL` from the root environment without printing their values. The script defaults to Tiramisu and needs no Privy variables.
+
+```sh
+bun apps/web/scripts/seed-official.ts --dry-run
+bun apps/web/scripts/seed-official.ts
+bun apps/web/scripts/seed-official.ts --keepalive
+```
+
+`--dry-run` validates all definitions, queries existing official slugs and reports what would be created without sending writes. Seeding skips each live official dashboard whose slug already exists. Each new dashboard, its widgets and its links are created in one batch with 90 day lifetimes. `--keepalive` runs one renewal pass on demand.
+
+Run the seed while user traffic is low. The script has its own serial write queue and cannot coordinate the wallet nonce with the running web container. A simultaneous user write can clash with its predictions or transaction nonce. Reconcile an uncertain submission before rerunning; a rerun skips live official slugs that already exist.
+
+When dashboards are enabled, Node.js instrumentation starts an in process keepalive 60 seconds after server start, then every 6 hours after the previous run settles. It uses the same serial write queue as user writes. Live official dashboards, widgets and links with fewer than 30 days remaining are extended to the current head plus 90 days, in batches of 50. Failed runs are logged and the timer continues. Nothing runs during the production build or when dashboards are disabled. No new secret, public endpoint or Dokploy job is needed. Run one web container so there is one timer and one wallet queue.
+
 ## Data layout
 
 ```text
@@ -79,4 +95,4 @@ In the browser (`apps/web/lib/indexdb.ts`), internal merge views combine the sna
 
 ## Deployment verification
 
-Use the README setup and wait for the health check. Check `/data/manifest.json` through port 3000 and request `Range: bytes=0-99` for a Parquet file named in the manifest; expect 206. Restart the stack without deleting the data directory and confirm checkpoint reuse. Stop the indexer and confirm the web app still serves stored data from disk. Verify the API key is absent from the built `.next` files without printing the key. Check that the indexer log says `API key not used` unless a keyed mode was chosen deliberately. The dashboard wallet writes only when users invoke authenticated dashboard operations. TLS belongs in the host proxy, outside Compose.
+Use the README setup and wait for the health check. Check `/data/manifest.json` through port 3000 and request `Range: bytes=0-99` for a Parquet file named in the manifest; expect 206. Restart the stack without deleting the data directory and confirm checkpoint reuse. Stop the indexer and confirm the web app still serves stored data from disk. Verify the API key is absent from the built `.next` files without printing the key. Check that the indexer log says `API key not used` unless a keyed mode was chosen deliberately. The dashboard wallet writes for authenticated dashboard operations, coordinator seeding and automatic official keepalive. TLS belongs in the host proxy, outside Compose.

@@ -23,7 +23,7 @@ export function extendTarget(expiresAt: number, head: number, lifetimeDays: numb
 export function widgetAttributes(w: WidgetPayload, s: Session): AttributeInputs {
   return { type: 'widget', project: DASH_PROJECT, user: addr(hex(s.address)), login: s.login, name: w.name, chart: w.chart }
 }
-async function read<T>(work: () => Promise<T>): Promise<T> {
+export async function read<T>(work: () => Promise<T>): Promise<T> {
   try { return await work() } catch (error) {
     if (error instanceof RpcError && error.status === 429) {
       const retry = error.retryAfter === null ? NaN : Number(error.retryAfter)
@@ -32,7 +32,7 @@ async function read<T>(work: () => Promise<T>): Promise<T> {
     throw error
   }
 }
-async function write<T>(work: () => Promise<T>): Promise<T> {
+export async function write<T>(work: () => Promise<T>): Promise<T> {
   try { return await work() } catch (error) {
     let current: unknown = error
     for (let depth = 0; depth <= 5 && current && typeof current === 'object'; depth++) {

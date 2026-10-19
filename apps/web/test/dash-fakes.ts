@@ -35,8 +35,17 @@ export function fakeChain(entities: RpcRow[], head = 1000) {
     calls.push({ method, data })
     return { txHash: '0xtx', entityKey: PREDICTED_1, createdEntities: [PREDICTED_1, PREDICTED_2], expiresAt: BigInt(0) }
   }
-  const client = { account: { address: W }, createEntity: record('create'), patchEntity: record('patch'), extendEntity: record('extend'), deleteEntity: record('delete'), executeBatch: record('batch'),
-    predictEntityKeys: async () => [{ key: PREDICTED_1, salt: BigInt(1) }, { key: PREDICTED_2, salt: BigInt(2) }] } as unknown as DashWriterClient
+  const client = { account: { address: W }, createEntity: record('create'), patchEntity: record('patch'), extendEntity: record('extend'), deleteEntity: record('delete'), executeBatch: async (data: any) => {
+      const result = await record('batch')(data)
+      for (const extension of data.extensions ?? []) {
+        const entity = entities.find(e => e.key === extension.entityKey)
+        if (entity) entity.expiresAt = `0x${extension.expires.expiresAt.toString(16)}`
+      }
+      return result
+    },
+    predictEntityKeys: async ({ count = 2 }: { count?: number }) => Array.from({ length: count }, (_, i) => ({
+      key: `0x${(0xa1 + i).toString(16).padStart(64, '0')}` as `0x${string}`, salt: BigInt(i + 1),
+    })) } as unknown as DashWriterClient
   const deps: OpsDeps = { client, wallet: W, queue: new WriteQueue(), reader: {
     query: async expression => { queries.push(expression); return { data: entities, blockNumber: head } }, blockNumber: async () => head,
   } }

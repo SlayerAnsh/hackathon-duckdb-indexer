@@ -17,18 +17,21 @@ type DashDepsState = DashDeps | { disabled: string }
 declare global {
   var __dashDeps: DashDepsState | undefined
 }
+export function buildOps(privateKey: `0x${string}`, rpcUrl: string): OpsDeps {
+  const account = privateKeyToAccount(privateKey)
+  const wallet = createWalletClient({ chain: tiramisu, account, transport: http(rpcUrl) })
+  const publicClient = createPublicClient({ chain: tiramisu, cacheTime: 0,
+    transport: http(rpcUrl, { fetchOptions: { cache: 'no-store' } }) })
+  const client = { ...wallet, predictEntityKeys: publicClient.predictEntityKeys }
+  return { client, reader: createRpc(rpcUrl), wallet: account.address.toLowerCase(), queue: new WriteQueue(25) }
+}
 export function buildDashDeps(config: ServerDashConfig): DashDeps {
   const now = Date.now
-  const account = privateKeyToAccount(config.privateKey)
-  const wallet = createWalletClient({ chain: tiramisu, account, transport: http(config.rpcUrl) })
-  const publicClient = createPublicClient({ chain: tiramisu, cacheTime: 0,
-    transport: http(config.rpcUrl, { fetchOptions: { cache: 'no-store' } }) })
-  const client = { ...wallet, predictEntityKeys: publicClient.predictEntityKeys }
   return { config, now,
     privy: createPrivyVerifier(new PrivyClient({ appId: config.privyAppId, appSecret: config.privyAppSecret })),
     nonces: new NonceStore({ now }), nonceLimiter: new RateLimiter(NONCE_RULES, now),
     writeLimiter: new RateLimiter(WRITE_RULES, now), globalLimiter: new RateLimiter(GLOBAL_WRITE_RULES, now),
-    ops: { client, reader: createRpc(config.rpcUrl), wallet: config.wallet, queue: new WriteQueue(25) } }
+    ops: buildOps(config.privateKey, config.rpcUrl) }
 }
 export function getDashDeps(): DashDepsState {
   if (!globalThis.__dashDeps) {

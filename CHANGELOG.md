@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Seed script and in process keepalive for official dashboards.
+
 * Official dashboards: entities whose user is the app wallet, defined from the former showcase queries.
 
 * Stacked bar and histogram widgets; time range pickers removed.
