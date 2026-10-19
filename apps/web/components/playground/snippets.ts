@@ -3,7 +3,7 @@ import type { View, Widget } from '../../lib/views'
 export type Snippet = { id: string; title: string; subtitle: string; sql: string; preview: string; notInArkivQuery?: string }
 export type SnippetGroup = { id: string; title: string; snippets: Snippet[] }
 
-const KIND_LABEL: Record<Widget['kind'], string> = { stat: 'Single figure', area: 'Area chart', bar: 'Bar chart', 'stacked-bar': 'Stacked bar chart', donut: 'Donut chart', table: 'Table', histogram: 'Histogram' }
+const KIND_LABEL: Record<Widget['kind'], string> = { line: 'Line chart', stat: 'Single figure', area: 'Area chart', bar: 'Bar chart', 'stacked-bar': 'Stacked bar chart', donut: 'Donut chart', table: 'Table', histogram: 'Histogram' }
 const PREVIEW_MAX = 120
 
 /** One line SQL preview: whitespace collapsed, truncated with an ellipsis. */

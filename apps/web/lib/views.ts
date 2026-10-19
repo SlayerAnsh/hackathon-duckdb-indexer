@@ -1,4 +1,5 @@
-export type Widget = { id: string; title: string; subtitle?: string; sql: string; kind: 'stat' | 'area' | 'bar' | 'stacked-bar' | 'donut' | 'table' | 'histogram'; x?: string; y?: string | string[]; series?: string; span?: 1 | 2 | 3; notInArkivQuery?: string; note?: StatNote; timeRange?: Ranged; activeRange?: TimeRange }
+import type { NumberFormat } from './dash/schema'
+export type Widget = { id: string; title: string; subtitle?: string; sql: string; stacking?: 'off' | 'stack' | 'percent'; numberFormat?: NumberFormat; colors?: Record<string, string>; legend?: boolean; labels?: boolean; xTitle?: string; yTitle?: string; kind: 'line' | 'stat' | 'area' | 'bar' | 'stacked-bar' | 'donut' | 'table' | 'histogram'; x?: string; y?: string | string[]; series?: string; span?: 1 | 2 | 3; notInArkivQuery?: string; note?: StatNote; timeRange?: Ranged; activeRange?: TimeRange }
 /** Context line under a stat value, computed from the `value` and `total` columns. `{n}` is replaced by value/total (share), total/value (ratio) or total. */
 export type StatNote = { kind: 'share' | 'ratio' | 'total'; text: string }
 /** A time window over the chain and the bucket width, both in blocks of two seconds. */
