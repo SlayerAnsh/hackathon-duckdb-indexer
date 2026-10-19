@@ -47,7 +47,7 @@ test('run excludes queued wait and measures send through last batch', async () =
  let release!: () => void
  const queue = new Promise<void>(resolve => { release = resolve })
  const reader = {
-  schema: { fields: [{ name: 'value' }] },
+  schema: { fields: [{ name: 'value', type: { typeId: 2 } }] },
   async open() { now += 2 },
   async *[Symbol.asyncIterator]() {
    now += 3
@@ -63,7 +63,7 @@ test('run excludes queued wait and measures send through last batch', async () =
   const pending = db.run('SELECT 42')
   now += 500
   release()
-  expect(await pending).toEqual({ columns: ['value'], rows: [[42]], truncated: false, elapsedMs: 10 })
+  expect(await pending).toEqual({ columns: ['value'], types: ['integer'], rows: [[42]], truncated: false, elapsedMs: 10 })
  } finally { clock.mockRestore() }
 })
 

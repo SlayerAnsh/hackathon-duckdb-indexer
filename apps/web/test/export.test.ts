@@ -3,11 +3,14 @@ import { IndexDb } from '../lib/indexdb'
 test('display caps rows while full export reads all rows', async () => {
  const run = async (cap?: number) => {
  const batch = { numRows: 1002, getChildAt: () => ({ get: (i: number) => BigInt(i) }) }
- const reader = { schema: { fields: [{ name: 'n' }] }, async *[Symbol.asyncIterator]() { yield batch }, cancel: async () => {}, open: async function () { return this } }
+ const reader = { schema: { fields: [{ name: 'n', type: { typeId: 2 } }] }, async *[Symbol.asyncIterator]() { yield batch }, cancel: async () => {}, open: async function () { return this } }
  const fake = { serial: (fn: () => unknown) => fn(), queries: { send: async () => reader }, cancel: async () => {} }
  return IndexDb.prototype.run.call(fake as never, 'SELECT 1', cap)
  }
  expect((await run()).rows.length).toBe(1000)
+ expect((await run()).types).toEqual(['integer'])
+ expect((await run(5)).rows.length).toBe(5)
+ expect((await run(5)).truncated).toBe(true)
  expect((await run(Infinity)).rows.length).toBe(1002)
  expect((await run(Infinity)).truncated).toBe(false)
 })
