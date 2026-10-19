@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { IndexState } from '../../lib/indexdb'
 import { StatusBar, TopStateChip } from './StatusBar'
+import { AccountButton } from '../widgets/AccountButton'
 import { ThemeToggle } from './ThemeToggle'
 
 export const NAV_ITEMS = [
@@ -33,6 +34,7 @@ export function TopBar({ state }: { state?: IndexState }) {
   <PageNav pathname={pathname}/>
   <span className="top-sp"/>
   {state && <TopStateChip state={state}/>}
+  <AccountButton/>
   <ThemeToggle/>
  </div></header>{state && <StatusBar state={state}/>}</>
 }
