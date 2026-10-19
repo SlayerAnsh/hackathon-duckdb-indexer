@@ -20,13 +20,13 @@ function Box({ x, y, w, h, title, sub, tone }: { x: number; y: number; w: number
 export function ArchitectureFigure() {
  return <svg className={s.svg} viewBox="0 0 440 636" role="img" aria-labelledby="arch-t arch-d">
   <title id="arch-t">Architecture of Arkiv SQL Indexer</title>
-  <desc id="arch-d">The Arkiv RPC on Tiramisu feeds a Bun indexer, which writes a DuckDB checkpoint, Parquet snapshots and a JSON delta. A Next.js proxy serves those files to the browser, which runs DuckDB WASM. The browser also talks to the Arkiv RPC directly, without an API key, for the live head, log tail, payloads and verify. An optional Bun demo writer sends SDK writes to the RPC.</desc>
+  <desc id="arch-d">The Arkiv RPC on Tiramisu feeds a Bun indexer, which writes a DuckDB checkpoint, Parquet snapshots and a JSON delta. A Next.js proxy serves those files to the browser, which runs DuckDB WASM. The browser also talks to the Arkiv RPC directly, without an API key, for the live head, log tail, payloads and verify. The web backend dashboard wallet sends SDK writes to the RPC.</desc>
   <defs>
    <marker id="arch-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path className={s.arrowHead} d="M0 0 10 5 0 10z"/></marker>
    <marker id="arch-arrow-lane" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path className={s.arrowHeadLane} d="M0 0 10 5 0 10z"/></marker>
   </defs>
 
-  <Box x={236} y={8} w={188} h={50} title="Demo writer" sub="Bun and SDK, optional" tone="optional"/>
+  <Box x={236} y={8} w={188} h={50} title="Dashboard wallet" sub="Web backend and SDK" tone="optional"/>
   <line className={s.flow} x1={330} y1={58} x2={330} y2={86} markerEnd="url(#arch-arrow)"/>
 
   <Box x={16} y={90} w={408} h={58} title="Arkiv RPC on Tiramisu" sub="public endpoint, chain 7738577" tone="chain"/>

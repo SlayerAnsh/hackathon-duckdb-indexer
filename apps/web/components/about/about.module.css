@@ -65,9 +65,9 @@
 .pillText{fill:var(--text);font:11.5px var(--font-mono)}
 .axis{stroke:var(--border-strong);stroke-width:1}
 .renew{stroke:var(--c1);stroke-width:1.5;stroke-dasharray:3 3}
-.barHeartbeat{fill:color-mix(in srgb,var(--c2) 22%,transparent);stroke:var(--c2)}
-.barComment{fill:color-mix(in srgb,var(--c7) 22%,transparent);stroke:var(--c7)}
-.barTicket{fill:color-mix(in srgb,var(--c1) 22%,transparent);stroke:var(--c1)}
+.barWidget{fill:color-mix(in srgb,var(--c2) 22%,transparent);stroke:var(--c2)}
+.barDashboard{fill:color-mix(in srgb,var(--c7) 22%,transparent);stroke:var(--c7)}
+.barLink{fill:color-mix(in srgb,var(--c1) 22%,transparent);stroke:var(--c1)}
 .tag{fill:var(--card);stroke:var(--border-strong)}
 .tagBrowser{fill:var(--accent-soft);stroke:var(--accent)}
 .tagText{fill:var(--text-2);font:11px var(--font-ui)}

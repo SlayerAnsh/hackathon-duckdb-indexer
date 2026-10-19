@@ -19,11 +19,9 @@ test('about copy uses no dash punctuation and no unverified live tail API', () =
  expect(html).not.toContain('watchEntityEvents')
 })
 
-// Loaded at runtime: the web Docker image type checks tests but does not ship apps/demo-writer
-test('expiry infographic matches the demo writer lifetimes', async () => {
- const { EXPIRY_SECONDS } = await import(new URL('../../demo-writer/src/plan.ts', import.meta.url).href)
- expect(EXPIRY_SECONDS).toEqual({ ticket: 604800, comment: 86400, heartbeat: 600 })
- for (const label of ['10 min', '1 day', '7 days']) expect(text).toContain(label)
+test('expiry infographic describes widget and dashboard lifetimes', () => {
+ for (const label of ['1, 7, 30 or 90 days', 'dashboard', 'link', 'Extend']) expect(text).toContain(label)
+ expect(text.toLowerCase()).not.toMatch(/heartbeat|ticket|demo writer/)
 })
 
 test('home story renders its chapters and every /about link lands on a section id', () => {

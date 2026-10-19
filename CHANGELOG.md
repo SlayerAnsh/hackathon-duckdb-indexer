@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Removed the demo writer; the dashboard wallet is the only writer and widgets, dashboards and links are the live application data.
+
 * Public SQL widgets and shareable dashboards stored on Arkiv, with Privy social login, chart configuration, expiry and extension, dashboard organization and imports, a widget explorer and personal activity home; backend paid writes, scoped reads and documented self hosting setup.
 
 * `docker-compose.dokploy.yml` stores the index in the named volume `index-data`, so Dokploy redeploys keep it. The indexer serves `/health` (with `bootstrapping: true`) while the first backfill runs, so the container stays healthy. A failed rollback no longer hides the original transaction error.

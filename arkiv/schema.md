@@ -1,42 +1,8 @@
 # Arkiv schema and queries
 
-This file lists the entity types the demo writer creates, their attributes and expiry, and every Arkiv RPC request the indexer and the browser send. Network: Tiramisu, chain ID 7738577, RPC `https://rpc.tiramisu.db-chain.testnet.arkiv.network`. SDK: `@arkiv-network/sdk` 0.8.1 with viem 2.57.3.
+This file lists the widget, dashboard and link entity types the dashboard wallet creates, their attributes and expiry, and every Arkiv RPC request the indexer and the browser send. Network: Tiramisu, chain ID 7738577, RPC `https://rpc.tiramisu.db-chain.testnet.arkiv.network`. SDK: `@arkiv-network/sdk` 0.8.1 with viem 2.57.3.
 
-The indexer itself is schema agnostic. It mirrors every live entity that matches `INDEX_EXPRESSION` (blank means every entity on the chain), whatever its attributes. The support desk below is the demo data set, written by `apps/demo-writer`.
-
-## Entity types and attributes
-
-Every demo entity has `contentType: text/plain` and the attributes `type` and `project`. Payload text stays on chain and is fetched on demand by the browser; it is never stored in Parquet.
-
-| Entity type | Attribute | Arkiv type | Value or purpose |
-| :--- | :--- | :--- | :--- |
-| ticket | type | str | `ticket` |
-| ticket | project | str | `arkiv-sql-indexer-demo` |
-| ticket | title | str | Synthetic title such as `Coral portal` |
-| ticket | status | str | `open` at creation, later patched to `open`, `pending`, or `closed` |
-| ticket | priority | u64 | 1, 2, or 3 |
-| ticket | assignee | addr | Agent address, absent until assignment |
-| comment | type | str | `comment` |
-| comment | project | str | `arkiv-sql-indexer-demo` |
-| comment | ticket | key | Entity key of the parent ticket |
-| heartbeat | type | str | `heartbeat` |
-| heartbeat | project | str | `arkiv-sql-indexer-demo` |
-
-Payloads: a ticket has an empty payload. A comment carries its text (`Synthetic support request for the demo console.` for the first comment, `Synthetic diagnostic check completed.` for later ones). A heartbeat has an empty payload.
-
-Creation flags: tickets are created with `permissionlessExtension: true`, so any account can extend them. Comments and heartbeats use default flags.
-
-## Expiration per type and operations
-
-| Type | Requested expiry | Operations |
-| :--- | :--- | :--- |
-| ticket | 7 days, 604800 seconds | Created together with its first comment in one `executeBatch`. Keys come from `predictEntityKeys`, so the comment's `ticket` attribute can reference the parent inside the same batch. `patchEntity` sets `status`, or sets `assignee` just before `changeOwnership` transfers the ticket to that agent. Each later comment calls `extendEntity` on the ticket with 7 days, a lease renewed by activity. |
-| comment | 1 day, 86400 seconds | The first comment is created in the ticket batch. Later comments use `createEntity`, then extend the parent ticket in a separate transaction. |
-| heartbeat | 10 minutes, 600 seconds | `createEntity`. It disappears through expiry without any event, which makes expiry visible within a demo. |
-
-Expiry is requested with `ExpirationTime.fromSeconds`; the chain stores `expiresAt` as a block number (one block is 2 seconds). The demo never deletes entities explicitly.
-
-After a transfer the writer no longer owns the ticket, so it stops patching it (status changes and assignment pick only unassigned tickets). Comments on a transferred ticket still extend it, which works because of the `permissionlessExtension` flag. Each action picks one of: open ticket (25 percent), comment (35), set status (15), assign (10), heartbeat (15). One action runs every `DEMO_INTERVAL_MS` (default 8000 ms).
+The indexer itself is schema agnostic. It mirrors every live entity that matches `INDEX_EXPRESSION` (blank means every entity on the chain), whatever its attributes. The application entity types, lifetimes and operations are documented in [Widget dashboards](#widget-dashboards). Payloads stay on chain and are fetched on demand, never stored in Parquet.
 
 ## SQL columns
 
@@ -51,12 +17,6 @@ Block numbers are numeric. Addresses and keys are lowercase hex. `value` is cano
 
 All requests are direct JSON RPC POSTs built by `packages/core/src/rpc.ts`. `atBlock` and `limit` are sent as hex quantities. `$key` predicates are rendered with SDK `key`, `eq`, `or` and `render`, in chunks of at most 50 keys (`packages/core/src/query.ts`).
 
-The demo expression is:
-
-```text
-$creator = addr(0x1f61c3cac1612c020f64739b128c5f198939c8cd)
-```
-
 The row selection `ROW_SELECT` is:
 
 ```json
@@ -68,7 +28,7 @@ The row selection `ROW_SELECT` is:
 With a configured expression, a chunk of two keys renders as:
 
 ```text
-($creator = addr(0x1f61c3cac1612c020f64739b128c5f198939c8cd)) AND ($key = key(0x0000000000000000000000000000000000000000000000000000000000000001) OR $key = key(0x0000000000000000000000000000000000000000000000000000000000000002))
+($creator = addr(0xb0b87eddb0bc777eb663c7a11703ba5ed4849a28)) AND ($key = key(0x0000000000000000000000000000000000000000000000000000000000000001) OR $key = key(0x0000000000000000000000000000000000000000000000000000000000000002))
 ```
 
 A single key keeps the outer parentheses but has no `OR`. With a blank expression the indexer sends the bare `OR` of key terms.
@@ -202,7 +162,7 @@ keysExprs(W, [K1, K2]):
 (S) AND ($key = key(K1) OR $key = key(K2))
 ```
 
-Without extras, the dashboard bundle includes only the dashboard key alternative and its links. Key chunks contain at most 50 keys; a single key has no OR group and an empty key list sends no query. The actual two key chunk for agent one's dashboard wallet is:
+Without extras, the dashboard bundle includes only the dashboard key alternative and its links. Key chunks contain at most 50 keys; a single key has no OR group and an empty key list sends no query. The actual two key chunk for the example dashboard wallet is:
 
 ```text
 ($creator = addr(0xb0B87EdDB0bc777Eb663c7a11703ba5ED4849A28) AND project = str('arkiv-sql-indexer-dash')) AND ($key = key(0x0000000000000000000000000000000000000000000000000000000000000001) OR $key = key(0x0000000000000000000000000000000000000000000000000000000000000002))

@@ -45,14 +45,14 @@ export default function AboutPage() {
 
    <Section id="who" title="Who this protects" lead="A dApp or analyst that filters Arkiv data by a user written attribute, such as project or type.">
     <div className={s.prose}>
-     <p>Attributes are written by whoever creates the entity. Anyone can create an entity with <code>project = arkiv-sql-indexer-demo</code>, so a dashboard that trusts that attribute counts forged rows as its own. <strong>User attributes alone are not an identity boundary.</strong></p>
+     <p>Attributes are written by whoever creates the entity. Anyone can create an entity with <code>project = arkiv-sql-indexer-dash</code>, so a dashboard that trusts that attribute counts forged rows as its own. <strong>User attributes alone are not an identity boundary.</strong></p>
      <p>The usual answer is a hosted indexer or a subgraph, which asks every user to trust whoever runs it, and which typically keeps rows after the data was meant to expire.</p>
      <Src files={['README.md', 'SPECS.md']}/>
     </div>
     <div>
      <h3 className={s.subhead}>What changes from day one</h3>
      <ul className={s.changes}>
-      <li><b>Rows are scoped by $creator.</b> Set <code>INDEX_EXPRESSION</code> to <code>$creator = addr(…)</code> and only that wallet&apos;s entities are indexed, including tickets later handed to another owner. Startup refuses to reuse a store built for a different expression.<Src files={['README.md', 'packages/core/src/query.ts', 'apps/indexer/src/store.ts']}/></li>
+      <li><b>Rows are scoped by $creator.</b> Set <code>INDEX_EXPRESSION</code> to <code>$creator = addr(…)</code> and only that wallet&apos;s entities are indexed, including widgets, dashboards and links. Startup refuses to reuse a store built for a different expression.<Src files={['README.md', 'packages/core/src/query.ts', 'apps/indexer/src/store.ts']}/></li>
       <li><b>Any row can be checked against the chain.</b> Verify re-reads key, updated_at, expires_at and owner from the public RPC and labels the row ok, stale, extended, expired or deleted. It is a consistency check against an independent RPC, not a cryptographic proof.<Src files={['apps/web/lib/verify.ts', 'apps/web/components/dash/ResultsGrid.tsx']}/></li>
       <li><b>SQL runs in your tab.</b> There is no server SQL endpoint. No API key reaches the browser, and by default the indexer never sends one either.<Src files={['apps/indexer/src/main.ts', 'apps/indexer/test/keyless.test.ts']}/></li>
       <li><b>Expired rows leave every layer.</b> Snapshots, the indexer store and the browser views all drop entities past their expiry block.<Src files={['apps/indexer/src/snapshot.ts', 'apps/indexer/src/store.ts', 'packages/core/src/views.ts']}/></li>
@@ -100,14 +100,14 @@ export default function AboutPage() {
     </article>)}</div>
    </Section>
 
-   <Section id="expiry" title="Expiry, end to end" lead="Three demo entity types with different lifetimes, and three places where expired rows are removed.">
+   <Section id="expiry" title="Expiry, end to end" lead="Widgets, dashboards and links with their own lifetimes, and three places where expired rows are removed.">
     <div className={s.figure}>
      <figure className={s.svgWrap}><ExpiryFigure/></figure>
      <div className={s.prose}>
-      <p>Heartbeats disappear through expiry without any event. Comments live a day. Tickets live a week, and every new comment renews the lease.</p>
+      <p>Widgets live for 1, 7, 30 or 90 days. Extend adds their chosen lifetime up to 90 days remaining. Dashboards live 90 days, renewed on organize saves, and link lifetime follows the dashboard.</p>
       <p>The snapshot build skips rows with <code>expires_at &lt;= head</code>. The indexer sweeps expired rows and keeps two snapshot versions. The browser filters every query against <code>live_head</code>, read directly from the RPC.</p>
       <p>An older snapshot file can still hold a row until it is pruned, but SQL hides it at expiry. Someone who copied data while it was live keeps their copy; this is not a promise to erase third party copies.</p>
-      <Src files={['apps/demo-writer/src/plan.ts', 'apps/indexer/src/snapshot.ts', 'apps/indexer/src/store.ts', 'packages/core/src/views.ts', 'README.md']}/>
+      <Src files={['apps/web/lib/dash/schema.ts', 'apps/indexer/src/snapshot.ts', 'apps/indexer/src/store.ts', 'packages/core/src/views.ts', 'README.md']}/>
      </div>
     </div>
    </Section>
@@ -123,8 +123,8 @@ export default function AboutPage() {
    <Section id="reproduce" title="Reproduce it" lead="Five minutes in a browser. No wallet, no API key.">
     <ol className={s.steps}>
      <li><span><b>Open the <Link href="/showcase">showcase</Link>.</b> Every chart is one SQL query run by DuckDB in your tab. Each card shows its timing, and most name the clause <code>arkiv_query</code> cannot express.</span></li>
-     <li><span><b>Open the <Link href="/showcase?view=creators">Creators view</Link>.</b> The Creator vs current owner table lists entities whose owner differs from their creator, such as tickets the demo wallet handed to an agent.</span></li>
-     <li><span><b>Open the <Link href="/playground">playground</Link> and press Run.</b> The featured query joins open tickets with their comment counts using JOIN and GROUP BY.</span></li>
+     <li><span><b>Open the <Link href="/showcase?view=creators">Creators view</Link>.</b> The Creator vs current owner table lists entities whose owner differs from their creator, where a transfer has occurred.</span></li>
+     <li><span><b>Open the <Link href="/playground">playground</Link> and press Run.</b> The featured query ranks widgets by dashboard placements, including widgets with no links using JOIN and GROUP BY.</span></li>
      <li><span><b>Press Verify page.</b> Each row is re-read from the public RPC and labelled ok, stale, extended, expired or deleted. Payload loads a row&apos;s payload from the chain.</span></li>
      <li><span><b>Hover the status bar.</b> It shows the indexed expression, the chain head, the browser live tail block and pending attribute fetches.</span></li>
      <li><span><b>Check the chain yourself.</b> The addresses below are on the Tiramisu explorer.</span></li>

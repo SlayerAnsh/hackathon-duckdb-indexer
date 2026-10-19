@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('compose keeps data persistent, credentials isolated, and writer opt in', () => {
+test('compose keeps data persistent and credentials isolated', () => {
   const { services: s } = Bun.YAML.parse(read('docker-compose.yml')) as any;
   expect(s.indexer.environment.PUBLIC_RPC_URL).toContain('PUBLIC_RPC_URL')
   expect(s.indexer.environment.BACKFILL_MODE).toBe('${BACKFILL_MODE:-logs}')
@@ -14,7 +14,6 @@ test('compose keeps data persistent, credentials isolated, and writer opt in', (
   expect(s.indexer.env_file).toBeUndefined();
   expect(s.indexer.environment.TIRAMISU_API_KEY).toBe('${TIRAMISU_API_KEY:-}');
   expect(s.indexer.environment.SYNC_USE_API_KEY).toBe('${SYNC_USE_API_KEY:-false}');
-  expect(JSON.stringify(s.indexer)).not.toContain('DEMO_PRIVATE_KEY');
   expect(s.indexer.volumes).toContain('${INDEX_DATA_PATH:-./data}:/data');
   expect(s.indexer.healthcheck.test.join(' ')).toContain("fetch('http://localhost:8080/health')");
   expect(s.web.depends_on.indexer.condition).toBe('service_started');
@@ -29,12 +28,11 @@ test('compose keeps data persistent, credentials isolated, and writer opt in', (
     expect(s.web.environment[name]).toBe('${' + name + ':-}');
   for (const name of ['NEXT_PUBLIC_PRIVY_APP_ID'])
     expect(s.web.build.args[name]).toBe('${' + name + ':-}');
-  for (const name of ['indexer', 'demo-writer']) {
+  for (const name of ['indexer']) {
     expect(JSON.stringify(s[name])).not.toContain('DASHBOARD_PRIVATE_KEY');
     expect(JSON.stringify(s[name])).not.toContain('PRIVY_APP_SECRET');
   }
-  expect(s['demo-writer'].profiles).toEqual(['demo']);
-  for (const name of ['web', 'demo-writer']) {
+  for (const name of ['web']) {
     expect(s[name].env_file).toBeUndefined();
     expect(JSON.stringify(s[name])).not.toContain('TIRAMISU_API_KEY');
   }
@@ -63,12 +61,12 @@ test('dokploy compose matches the base file except for the named index volume an
 });
 
 test('images use locked workspace installs and the standalone runtime layout', () => {
-  for (const app of ['indexer', 'web', 'demo-writer']) {
+  for (const app of ['indexer', 'web']) {
     const file = read(`apps/${app}/Dockerfile`);
     expect(file).toContain('oven/bun:1.3');
     expect(file).toContain('bun.lock');
     expect(file).toContain('bun install --frozen-lockfile');
-    for (const workspace of ['packages/core', 'apps/indexer', 'apps/web', 'apps/demo-writer'])
+    for (const workspace of ['packages/core', 'apps/indexer', 'apps/web'])
       expect(file).toContain(`${workspace}/package.json`);
     expect(file).not.toContain('TIRAMISU_API_KEY');
   }
@@ -94,14 +92,14 @@ test('images use locked workspace installs and the standalone runtime layout', (
   const env = read('.env.example');
   for (const name of ['NEXT_PUBLIC_PRIVY_APP_ID', 'PRIVY_APP_SECRET', 'DASHBOARD_PRIVATE_KEY'])
     expect(env).toContain(`${name}=`);
-  for (const value of ['TIRAMISU_API_KEY=', 'SYNC_USE_API_KEY=false', 'FILL_USE_API_KEY=false', 'INDEX_EXPRESSION=', 'DEMO_PRIVATE_KEY=', 'DEMO_AGENT_ADDRESSES=', 'NEXT_PUBLIC_TIRAMISU_RPC_URL=', 'NEXT_PUBLIC_EXPLORER_URL=']) expect(env).toContain(value);
+  for (const value of ['TIRAMISU_API_KEY=', 'SYNC_USE_API_KEY=false', 'FILL_USE_API_KEY=false', 'INDEX_EXPRESSION=', 'NEXT_PUBLIC_TIRAMISU_RPC_URL=', 'NEXT_PUBLIC_EXPLORER_URL=']) expect(env).toContain(value);
 });
 
-test('submission docs cover demo identity, schema, expiry, and observed friction', () => {
+test('submission docs cover dashboard identity, schema, expiry, and observed friction', () => {
   const readme = read('README.md');
-  for (const value of ['0x1f61c3cac1612C020f64739B128C5f198939C8Cd', '0xb0B87EdDB0bc777Eb663c7a11703ba5ED4849A28', '0xF1BC753cF42d0157Ac34E28DBf06108F66aDB3B3', 'up -d --build', 'COMPOSE_PROFILES=demo', '$creator', 'Open Source', 'Security', 'DataFusion', 'DuckLake', '9 to 18 October 2026']) expect(readme).toContain(value);
+  for (const value of ['up -d --build', '$creator', 'Open Source', 'Security', 'DataFusion', 'DuckLake', '9 to 18 October 2026']) expect(readme).toContain(value);
   const schema = read('arkiv/schema.md');
-  for (const value of ['ticket', 'comment', 'heartbeat', 'title', 'status', 'priority', 'assignee', 'project', 'u64', 'addr', 'atBlock', '50', 'payload', 'verify', '600']) expect(schema).toContain(value);
+  for (const value of ['widget', 'dashboard', 'link', 'project', 'addr', 'atBlock', '50', 'payload', 'verify']) expect(schema).toContain(value);
   const friction = read('arkiv/friction.md');
   for (const value of ['ANON_COST_LIMITED', '429', '-32004', '100', 'Arkiv-Quota-Used-Percent', '2,800', '4,011']) expect(friction).toContain(value);
   for (const value of ['SYNC_USE_API_KEY', 'API key not used']) expect(readme).toContain(value);
@@ -133,7 +131,19 @@ test('widget dashboard docs cover schema, runtime setup and self hosting', () =>
   const readme = read('README.md');
   for (const value of ['DASHBOARD_PRIVATE_KEY', 'PRIVY_APP_SECRET', 'NEXT_PUBLIC_PRIVY_APP_ID', 'GET /api/dash/config'])
     expect(readme).toContain(value);
-  expect(readme).toMatch(/INDEX_EXPRESSION='\$creator = addr\(0x[0-9a-f]{40}\) OR \$creator = addr\(0x[0-9a-f]{40}\)'/);
+  expect(readme).toContain("INDEX_EXPRESSION='$creator = addr(<dashboard wallet address>)'");
   expect(read('SPECS.md')).not.toContain('Saved queries stored as Arkiv entities (P2). Not implemented.');
   expect(read('DEVELOPER.md')).toContain('apps/web/.env.local');
 });
+
+ test('synthetic writer is removed from deployment', () => {
+  for (const path of ['docker-compose.yml', 'docker-compose.dokploy.yml', '.env.example']) {
+   expect(read(path)).not.toContain('DEMO_PRIVATE_KEY');
+   expect(read(path)).not.toContain('DEMO_AGENT_ADDRESSES');
+  }
+  expect(existsSync(new URL('../apps/demo-writer', import.meta.url))).toBe(false);
+  for (const path of ['docker-compose.yml', 'docker-compose.dokploy.yml']) {
+   const { services } = Bun.YAML.parse(read(path)) as any;
+   expect(Object.keys(services).sort()).toEqual(['indexer', 'web']);
+  }
+ })

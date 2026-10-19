@@ -50,15 +50,6 @@ services:
         condition: service_started
     restart: unless-stopped
 
-  demo-writer:
-    build:
-      context: .
-      dockerfile: apps/demo-writer/Dockerfile
-    profiles: ["demo"]
-    environment:
-      DEMO_PRIVATE_KEY: ${DEMO_PRIVATE_KEY:-}
-      DEMO_AGENT_ADDRESSES: ${DEMO_AGENT_ADDRESSES:-}
-    restart: unless-stopped
 
 volumes:
   index-data:

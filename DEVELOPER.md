@@ -1,6 +1,6 @@
 # Developer guide
 
-Use Bun 1.3.x (tested with 1.3.11). Docker uses `oven/bun:1.3` for workspace installation and the indexer and writer, and `node:22-slim` for the Next.js standalone runtime. Key versions from `bun.lock`: `@arkiv-network/sdk` 0.8.1, viem 2.57.3, `@duckdb/node-api` 1.5.6-r.1 (indexer), `@duckdb/duckdb-wasm` 1.33.1-dev57.0 (browser), Next.js 16.4.2, React 19.3.0, `@codemirror/lang-sql` 6.10.0 with `@uiw/react-codemirror`, Recharts 3.
+Use Bun 1.3.x (tested with 1.3.11). Docker uses `oven/bun:1.3` for workspace installation and the indexer, and `node:22-slim` for the Next.js standalone runtime. Key versions from `bun.lock`: `@arkiv-network/sdk` 0.8.1, viem 2.57.3, `@duckdb/node-api` 1.5.6-r.1 (indexer), `@duckdb/duckdb-wasm` 1.33.1-dev57.0 (browser), Next.js 16.4.2, React 19.3.0, `@codemirror/lang-sql` 6.10.0 with `@uiw/react-codemirror`, Recharts 3.
 
 ## Workspace layout
 
@@ -11,7 +11,6 @@ Use Bun 1.3.x (tested with 1.3.11). Docker uses `oven/bun:1.3` for workspace ins
 | `apps/web` | Next.js data proxy with disk fallback, DuckDB WASM loader, browser live tail, showcase, playground, about page |
 | `apps/web/lib/dash` | Widget schemas, SQL, RPC reads, pending writes, authentication and serialized wallet operations |
 | `apps/web/app/api/dash` | Runtime wallet config, session and authenticated write routes |
-| `apps/demo-writer` | Synthetic support desk mutations through the Arkiv SDK wallet client |
 | `arkiv` | Entity schema, exact queries, and the friction report |
 | `test/deployment.test.ts` | Offline deployment and documentation checks |
 
@@ -23,7 +22,6 @@ bun test ./test/deployment.test.ts
 bun test ./packages/core/test
 bun test ./apps/indexer/test
 bun test ./apps/web/test
-bun test ./apps/demo-writer/test
 ```
 
 All automated tests use fixtures or fakes and need no RPC. The deployment tests inspect configuration and docs, not running containers. They also reject dash punctuation in the docs. Docker image builds, Range responses, credential absence in built bundles, restart persistence and public deployment need separate integration checks.
@@ -81,4 +79,4 @@ In the browser (`apps/web/lib/indexdb.ts`), internal merge views combine the sna
 
 ## Deployment verification
 
-Use the README setup and wait for the health check. Check `/data/manifest.json` through port 3000 and request `Range: bytes=0-99` for a Parquet file named in the manifest; expect 206. Restart the stack without deleting the data directory and confirm checkpoint reuse. Stop the indexer and confirm the web app still serves stored data from disk. Verify the API key is absent from the built `.next` files without printing the key. Check that the indexer log says `API key not used` unless a keyed mode was chosen deliberately. Default startup must leave the writer stopped. TLS belongs in the host proxy, outside Compose.
+Use the README setup and wait for the health check. Check `/data/manifest.json` through port 3000 and request `Range: bytes=0-99` for a Parquet file named in the manifest; expect 206. Restart the stack without deleting the data directory and confirm checkpoint reuse. Stop the indexer and confirm the web app still serves stored data from disk. Verify the API key is absent from the built `.next` files without printing the key. Check that the indexer log says `API key not used` unless a keyed mode was chosen deliberately. The dashboard wallet writes only when users invoke authenticated dashboard operations. TLS belongs in the host proxy, outside Compose.

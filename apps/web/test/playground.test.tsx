@@ -21,7 +21,7 @@ import { VIEWS, DEFAULT_SQL } from '../lib/views'
 test('buildSnippets puts the default query first, then one group per view with every widget', () => {
  const groups = buildSnippets(VIEWS, DEFAULT_SQL)
  expect(groups[0].snippets).toHaveLength(1)
- expect(groups[0].snippets[0].title).toBe('Open tickets with most discussion')
+ expect(groups[0].snippets[0].title).toBe('Most placed widgets')
  expect(groups[0].snippets[0].sql).toBe(DEFAULT_SQL)
  expect(groups.slice(1).map(g => g.title)).toEqual(VIEWS.map(v => v.title))
  expect(snippetCount(groups)).toBe(1 + VIEWS.reduce((n, v) => n + v.widgets.length, 0))
@@ -75,5 +75,5 @@ test('playground renders before the index loads', async () => {
  const { Playground } = await import('../components/playground/Playground')
  const html = renderToStaticMarkup(<Playground db={null} rpcUrl="http://rpc"/>)
  expect(html).toContain('SQL playground'); expect(html).toContain('Loading the index into your browser')
- expect(html).toContain('Open tickets with most discussion')
+ expect(html).toContain('Most placed widgets')
 })

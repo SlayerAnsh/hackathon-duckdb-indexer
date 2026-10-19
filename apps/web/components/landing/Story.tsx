@@ -20,7 +20,7 @@ export function Story() {
  return <>
   <Chapter id="problem" title="Filters you can forge, queries you cannot write" lead="Arkiv attributes are written by whoever creates the entity, and arkiv_query only filters and pages." more={<Link href="/about#who">Who this protects</Link>}>
    <div className={s.prose}>
-    <p>Anyone can create an entity with <code>project = arkiv-sql-indexer-demo</code>, so a dashboard that trusts that attribute counts forged rows as its own. <code>$creator</code> is set by the chain. Scope the index with <code>$creator = addr(…)</code> and look alikes never get in.</p>
+    <p>Anyone can create an entity with <code>project = arkiv-sql-indexer-dash</code>, so a dashboard that trusts that attribute counts forged rows as its own. <code>$creator</code> is set by the chain. Scope the index with <code>$creator = addr(…)</code> and look alikes never get in.</p>
     <p><code>arkiv_query</code> returns at most 200 results per page, with no JOIN, GROUP BY or ORDER BY on attributes. Here the same data sits in DuckDB in your tab, so those queries just work.</p>
     <Src files={['README.md', 'SPECS.md', 'packages/core/src/query.ts']}/>
    </div>
@@ -51,7 +51,7 @@ export function Story() {
    <ul className={s.relies}>
     <li><b>Verify any row.</b> In the playground, Verify page re-reads each row from the public RPC and labels it ok, stale, extended, expired or deleted. It is a consistency check, not a cryptographic proof.<Src files={['apps/web/lib/verify.ts', 'apps/web/components/dash/ResultsGrid.tsx']}/></li>
     <li><b>Expiry at the live head.</b> SQL views hide every entity whose expiry block is at or below the head your tab read from the RPC.<Src files={['packages/core/src/views.ts']}/></li>
-    <li><b>The demo wallets are public.</b> Look them up on the Tiramisu explorer.<Src files={['README.md', 'apps/web/lib/explorer.ts']}/></li>
+    <li><b>The dashboard wallet is public.</b> Read its address from GET /api/dash/config and look it up on the Tiramisu explorer.<Src files={['README.md', 'apps/web/lib/explorer.ts']}/></li>
    </ul>
    <dl className={s.ids}>{IDS.map(i => { const url = addressUrl(i.addr); return <div key={i.addr}><dt>{i.role}</dt><dd>{url ? <a href={url} target="_blank" rel="noreferrer">{i.addr}</a> : i.addr}</dd></div> })}</dl>
   </Chapter>

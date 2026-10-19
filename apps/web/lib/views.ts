@@ -71,23 +71,26 @@ export const VIEWS: View[] = [
   {id:'running',title:'Running count of creations',kind:'area',span:3,x:'created_at',y:'running_count',notInArkivQuery:'window function',sql:'SELECT created_at,sum(count(*)) OVER (ORDER BY created_at ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_count FROM entities GROUP BY created_at ORDER BY created_at'},
  ]},
 ]
-export const DEFAULT_SQL = `WITH tickets AS (
- SELECT e.key, e.updated_at, e.expires_at,
-  max(CASE WHEN a.name='title' THEN a.value END) AS title,
-  max(CASE WHEN a.name='priority' THEN a.num END) AS priority
- FROM entities e JOIN attributes t ON t.key=e.key AND t.name='type' AND t.value='ticket'
- JOIN attributes s ON s.key=e.key AND s.name='status' AND s.value='open'
- LEFT JOIN attributes a ON a.key=e.key
- GROUP BY e.key,e.updated_at,e.expires_at
-), comments AS (
- SELECT parent.value AS ticket, count(*) AS comments, max(e.updated_at) AS last_comment_block
- FROM entities e JOIN attributes t ON t.key=e.key AND t.name='type' AND t.value='comment'
- JOIN attributes parent ON parent.key=e.key AND parent.name='ticket'
- GROUP BY parent.value
+export const DEFAULT_SQL = `WITH dash AS (
+ SELECT e.key, e.creator, e.expires_at,
+  max(a.value) FILTER (WHERE a.name = 'type') AS type,
+  max(a.value) FILTER (WHERE a.name = 'name') AS name,
+  max(a.value) FILTER (WHERE a.name = 'chart') AS chart,
+  max(a.value) FILTER (WHERE a.name = 'widget') AS widget,
+  max(a.value) FILTER (WHERE a.name = 'dashboard') AS dashboard
+ FROM entities e JOIN attributes a ON a.key = e.key
+ GROUP BY e.key, e.creator, e.expires_at
+ HAVING max(a.value) FILTER (WHERE a.name = 'project') = 'arkiv-sql-indexer-dash'
+), placements AS (
+ SELECT creator, widget, count(DISTINCT dashboard) AS dashboards
+ FROM dash WHERE type = 'link'
+ GROUP BY creator, widget
 )
-SELECT tickets.*,coalesce(comments.comments,0) AS comments,last_comment_block
-FROM tickets LEFT JOIN comments ON comments.ticket=tickets.key
-ORDER BY comments DESC,priority,key`
+SELECT w.key, w.name, w.chart, coalesce(p.dashboards, 0) AS dashboards, w.expires_at
+FROM dash w LEFT JOIN placements p ON p.widget = w.key AND p.creator = w.creator
+WHERE w.type = 'widget'
+ORDER BY dashboards DESC, w.key
+LIMIT 20`
 
 /** The selected range of a ranged widget, falling back to its default; undefined for other widgets. */
 export function rangeOf(widget: Widget, id?: string | null): TimeRange | undefined {

@@ -1,6 +1,6 @@
 # Arkiv SQL Indexer
 
-Open source analytics for Arkiv, aimed at developers. A Bun indexer mirrors Arkiv into versioned Parquet snapshots plus a JSON delta, so any app, script or AI agent can query every live entity in milliseconds with plain SQL, without paging `arkiv_query` (200 results per page, no JOIN, GROUP BY or ORDER BY on attributes) and without hitting RPC rate limits. One `docker compose up` gives you your own read only Arkiv data API over HTTP, and a Next.js app runs full SQL over the same files in DuckDB WASM in the visitor's tab. Expiry is honored everywhere: a row disappears the moment its expiry block passes. No API key is needed by default, and a `$creator` filter turns "who wrote this" into the trust boundary. A synthetic support desk writer shows batch creates, patches, lease style extensions, ownership transfers and expiring data.
+Open source analytics for Arkiv, aimed at developers. A Bun indexer mirrors Arkiv into versioned Parquet snapshots plus a JSON delta, so any app, script or AI agent can query every live entity in milliseconds with plain SQL, without paging `arkiv_query` (200 results per page, no JOIN, GROUP BY or ORDER BY on attributes) and without hitting RPC rate limits. One `docker compose up` gives you your own read only Arkiv data API over HTTP, and a Next.js app runs full SQL over the same files in DuckDB WASM in the visitor's tab. Expiry is honored everywhere: a row disappears the moment its expiry block passes. No API key is needed by default, and a `$creator` filter turns "who wrote this" into the trust boundary. The dashboard wallet writes widgets, dashboards and links that showcase batch creates, edits, extensions and expiring data.
 
 * Live app: https://arkiv-sql.dokploy.anshudhar.dev
 * Demo video: `<VIDEO_URL>`
@@ -23,7 +23,7 @@ flowchart TD
   HTTP --> Proxy[Next.js data proxy on port 3000]
   Proxy --> Browser[Browser DuckDB WASM, showcase and SQL playground]
   Browser -->|eth_blockNumber, live logs, payload, verify| RPC
-  Writer[Optional Bun demo writer] -->|SDK writes| RPC
+  Writer[Web backend dashboard wallet] -->|SDK writes| RPC
 ```
 
 | Path | Role |
@@ -31,7 +31,6 @@ flowchart TD
 | `packages/core` | Direct JSON RPC client, typed attribute decoding, `$key` chunk builder (SDK `eq`, `or`, `render`), browser merge views |
 | `apps/indexer` | Log replay backfill, attribute filler, keyless live sync, Parquet snapshots, JSON delta, internal HTTP |
 | `apps/web` | Next.js data proxy, DuckDB WASM loader, browser live tail, showcase charts, SQL playground, payload and verify actions |
-| `apps/demo-writer` | Synthetic support desk that writes through the SDK wallet client |
 
 How data flows:
 
@@ -55,18 +54,18 @@ The deployment owner must enable Google, Discord, X and Telegram in the Privy da
 | :--- | :--- | :--- |
 | `NEXT_PUBLIC_PRIVY_APP_ID` | Web build and runtime | Public Privy app ID; blank disables dashboards |
 | `PRIVY_APP_SECRET` | Web runtime only | Privy verification and session signing |
-| `DASHBOARD_PRIVATE_KEY` | Web runtime only | Funded Tiramisu backend wallet; this deployment reuses agent one |
+| `DASHBOARD_PRIVATE_KEY` | Web runtime only | Funded Tiramisu backend wallet |
 | `NEXT_PUBLIC_TIRAMISU_RPC_URL` | Web build and runtime | Public RPC for browser reads and backend writes; never include credentials |
 
-Secrets belong only in the web runtime environment, never build arguments, the indexer or the demo writer. `GET /api/dash/config` returns `{ wallet: string | null }`, deriving the public wallet address from the configured key at runtime. Run one web instance because nonces, rate limits and the serial wallet queue are in memory. Local environment file setup is in [DEVELOPER.md](DEVELOPER.md).
+Secrets belong only in the web runtime environment, never build arguments or the indexer. `GET /api/dash/config` returns `{ wallet: string | null }`, deriving the public wallet address from the configured key at runtime. Run one web instance because nonces, rate limits and the serial wallet queue are in memory. Local environment file setup is in [DEVELOPER.md](DEVELOPER.md).
 
-Production leaves `INDEX_EXPRESSION` blank and indexes all entities. A self hosted filtered index must include the dashboard wallet with `OR`, as specified in [SPECS.md section 4](SPECS.md#4-verified-facts-sdk-arkiv-networksdk-081-source-read-18-october-2026). This Compose example includes the demo writer and agent one, the dashboard wallet, with lowercase addresses:
+Production leaves `INDEX_EXPRESSION` blank and indexes all entities. A self hosted filtered index can scope to the dashboard wallet:
 
 ```dotenv
-INDEX_EXPRESSION='$creator = addr(0x1f61c3cac1612c020f64739b128c5f198939c8cd) OR $creator = addr(0xb0b87eddb0bc777eb663c7a11703ba5ed4849a28)'
+INDEX_EXPRESSION='$creator = addr(<dashboard wallet address>)'
 ```
 
-Replace the second address if using a different dashboard wallet. Keep the single quotes so Compose preserves `$creator`. Changing the expression requires a fresh data directory and full backfill; startup refuses a store built for a different expression. Dashboard reads always filter on the backend wallet's creator address and project, even when the index expression is blank.
+Replace the placeholder with the lowercase address shown by `GET /api/dash/config`. If keeping other creator scopes, include the dashboard wallet with `OR`. Keep the single quotes so Compose preserves `$creator`. Changing the expression requires a fresh data directory and full backfill; startup refuses a store built for a different expression. Dashboard reads always filter on the backend wallet's creator address and project, even when the index expression is blank.
 
 ## Run locally with Docker Compose
 
@@ -81,11 +80,7 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 
 Open http://localhost:3000. The base `docker-compose.yml` publishes no host ports, so the local override is what publishes port 3000. The indexer stays internal on port 8080 and is reachable through the web proxy at http://localhost:3000/data/health.
 
-Leave `INDEX_EXPRESSION` blank to index every live Tiramisu entity, or scope the index to the demo wallet. Keep the single quotes so Compose preserves the dollar sign:
-
-```dotenv
-INDEX_EXPRESSION='$creator = addr(0x1f61c3cac1612c020f64739b128c5f198939c8cd)'
-```
+Leave `INDEX_EXPRESSION` blank to index every live Tiramisu entity, or use the dashboard wallet scope above.
 
 A changed expression needs a fresh data directory, because startup refuses to reuse a store built for a different expression. The index lives in the host directory `INDEX_DATA_PATH` (default `./data`), so it survives `docker compose down` and restarts resume from the checkpoint.
 
@@ -101,20 +96,10 @@ INDEXER_URL=http://localhost:8080 bun run --cwd apps/web dev
 
 The indexer reads the same variables as `.env.example`; Bun loads `.env` from the working directory automatically. Run the tests with `bun test` (see [DEVELOPER.md](DEVELOPER.md)).
 
-### Optional demo writer
-
-The writer is off unless the `demo` profile is enabled. It needs a funded Tiramisu testnet key of your own in `DEMO_PRIVATE_KEY` and the two agent addresses in `DEMO_AGENT_ADDRESSES` (comma separated):
-
-```sh
-docker compose -f docker-compose.yml -f docker-compose.local.yml --profile demo up -d --build
-```
-
-Setting `COMPOSE_PROFILES=demo` in `.env` has the same effect. No private key is committed. The writer never sees `TIRAMISU_API_KEY`.
-
 ### Deploy with Dokploy
 
 1. Create a Docker Compose application from this repository with compose path `./docker-compose.dokploy.yml` and keep Isolated Deployments enabled. This file stores the index in the named Docker volume `index-data` (indexer read and write, web read only), so redeploys keep it even though Dokploy wipes the cloned code folder.
-2. In the Environment tab set `INDEX_EXPRESSION` (single quoted, as above). For the writer also set `DEMO_PRIVATE_KEY`, `DEMO_AGENT_ADDRESSES` and `COMPOSE_PROFILES=demo`.
+2. In the Environment tab set `INDEX_EXPRESSION` (single quoted, as above). Set the dashboard environment variables listed above to enable writes.
 3. In the Domains tab add the domain for service `web`, container port `3000`, with HTTPS. The indexer stays internal.
 4. Deploy, then open `https://<domain>/data/health`.
 
@@ -196,20 +181,14 @@ To serve only a subset, set `INDEX_EXPRESSION` in `.env` before the first start 
 1. Start the stack as in "Run locally with Docker Compose" and run `docker compose logs indexer`. The first line reads `API key not used: live sync applies public logs and attributes fill on the anonymous RPC budget.` Then it logs `Replayed logs through block N` per window and `Live keys at block N` when backfill is done.
 2. Open http://localhost:3000/data/health. It returns `headBlock`, `headLag`, `lastSnapshot`, `live` and `pending`. `pending` falls as the filler fetches attributes newest first.
 3. Open http://localhost:3000/showcase. Each card is one DuckDB query in your tab and names the clause `arkiv_query` cannot express (GROUP BY, JOIN, window function, ORDER BY on attributes). Open the browser network tab: Parquet loads from `/data/snap/v<n>/`, while `eth_blockNumber`, `eth_getLogs` and occasional `arkiv_query` calls go straight to the public Tiramisu RPC with no credentials.
-4. Open http://localhost:3000/playground and run the featured query "Open tickets with most discussion". It JOINs tickets to their comments and groups by ticket. With a blank expression it covers every live entity whose `type` attribute is `ticket`, from any creator; with the demo `$creator` expression it covers only the demo wallet's data.
+4. Open http://localhost:3000/playground and run "Most placed widgets". It joins widget and link entities for `arkiv-sql-indexer-dash`, counts distinct dashboards, and includes widgets with zero placements. Links must share the widget creator. Use the dashboard wallet index scope above to restrict this plain SQL example to your deployment.
 5. Run `SELECT key, creator, owner, updated_at, expires_at FROM entities LIMIT 20` and click Payload or Verify on a row (or Verify page for all rows). Payload fetches the payload by `$key` from the RPC. Verify compares `updatedAt` and `expiresAt` from the RPC with the indexed row and the live head, and labels it `ok`, `stale`, `extended`, `expired` or `deleted`.
 6. Watch expiry: `SELECT key, expires_at FROM entities ORDER BY expires_at LIMIT 5`, wait until the status bar's chain block passes one `expires_at`, and run it again. The row is gone without any event, because the public `entities` view filters against the live head read from RPC.
 7. Optional: `bun install && bun test` runs every suite offline against fakes. `apps/indexer/test/keyless.test.ts` asserts that no default request carries `Authorization` or `X-API-Key`.
 
-## Demo identities
+## Dashboard identity and security
 
-| Role | Address |
-| :--- | :--- |
-| Demo wallet (creates every demo entity) | `0x1f61c3cac1612C020f64739B128C5f198939C8Cd` |
-| Agent one (receives transferred tickets and serves as dashboard wallet) | `0xb0B87EdDB0bc777Eb663c7a11703ba5ED4849A28` |
-| Agent two (receives transferred tickets) | `0xF1BC753cF42d0157Ac34E28DBf06108F66aDB3B3` |
-
-The `$creator` filter keeps a ticket indexed after its owner changes to an agent, because `$creator` never changes. User attributes alone are not an identity boundary, since anyone can write a `project` or `type` attribute. Startup warns when the expression has no `$creator` term. This creator boundary, plus running all SQL in the visitor's browser with no server SQL endpoint and no credentials in the browser, is the Security track story.
+`GET /api/dash/config` shows the dashboard wallet address derived from `DASHBOARD_PRIVATE_KEY`. This wallet is the only application writer. The `$creator` boundary for application reads refers to this dashboard wallet. User attributes alone are not an identity boundary, since anyone can write a `project` or `type` attribute. Startup warns when the index expression has no `$creator` term. This creator boundary, plus running all SQL in the visitor's browser with no server SQL endpoint and no credentials in the browser, is the Security track story.
 
 ## Expiry
 

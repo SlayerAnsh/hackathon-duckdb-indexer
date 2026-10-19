@@ -20,7 +20,7 @@ Goals (P0 unless marked):
 4. Showcase of fixed analytics cards, each showing its SQL.
 5. SQL editor with syntax highlighting and schema aware autocomplete.
 6. Expiry enforced in the browser against the live chain head.
-7. Demo writer app that writes through the SDK (per type expiry, `extendEntity`, batch writes, ownership transfer).
+7. Removed on 20 October 2026 because widgets, dashboards and links now provide live application data through the dashboard wallet.
 8. Verify button per row (P1).
 9. Browser live tail (P1). Implemented as direct `eth_getLogs` polling decoded with SDK `ENTITY_EVENTS_ABI`, not `watchEntityEvents`.
 10. Saved SQL widgets and shareable dashboards stored as Arkiv entities. Implemented with Privy login, a public explorer and personal home.
@@ -75,7 +75,7 @@ indexer (Bun, single process)                 browser (via Next.js /data proxy)
    delta writer      -> delta.json          ---> delta tables
    Bun.serve: manifest.json, snap, delta         live tables (from the live tail)
                                                  merged tables, public views filtered by live head
-demo writer (Bun, synthetic testnet wallet) -> Arkiv via SDK wallet client
+web backend dashboard wallet -> Arkiv via SDK wallet client
 ```
 
 Monorepo with Bun workspaces:
@@ -84,7 +84,6 @@ Monorepo with Bun workspaces:
 packages/core       shared types, attribute decoding, expression helpers, row shapes
 apps/indexer        sync, snapshot, delta, HTTP
 apps/web            Next.js dashboard and SQL editor
-apps/demo-writer    synthetic data generator using the SDK
 arkiv/schema.md     entity schema and exact queries
 arkiv/friction.md   friction report
 ```
@@ -272,7 +271,7 @@ SELECT a.* FROM merged_attributes a JOIN entities e ON e.key = a.key;
 
 The public columns, including `entities.attrs_pending`, stay unchanged. Even a head change with no data change immediately hides expired entities and their attributes. A patch that removes an attribute removes it from the materialized attribute set too.
 
-A demo wide view (for example `tickets`) is a `PIVOT` over `attributes` for one `type`, defined in the browser, so no extra Parquet file is needed.
+A demo wide view (for example `widgets`) is a `PIVOT` over `attributes` for one `type`, defined in the browser, so no extra Parquet file is needed.
 
 ## 9. Frontend (Next.js)
 
@@ -310,7 +309,7 @@ Block numbers convert to time at 2 seconds per block. Charts use Recharts or pla
 - CodeMirror 6 through `@uiw/react-codemirror` with `@codemirror/lang-sql`. Syntax highlighting from the SQL language package.
 - Autocomplete: table and column names read from `information_schema.columns` for the public views, passed as the `schema` option, plus SQL keywords and DuckDB function names from `duckdb_functions()`.
 - Ctrl or Cmd plus Enter runs. Cancel button interrupts the running query. Results capped at 1,000 displayed rows with a note, and CSV download of the full result.
-- Snippet sidebar with every showcase query plus the featured JOIN and GROUP BY query "Open tickets with most discussion", and a local query history.
+- Snippet sidebar with every showcase query plus the featured JOIN and GROUP BY query "Most placed widgets", and a local query history.
 - Query text kept in the URL hash so a query can be shared as a link.
 
 ### 9.3 Row actions
@@ -318,17 +317,9 @@ Block numbers convert to time at 2 seconds per block. Charts use Recharts or pla
 - Payload: fetched on demand from Arkiv RPC (`$key = k`, select payload), never through the indexer.
 - Verify (P1): when the result has a `key` column, batch query `$key = k` at head (chunks of 50, selection `key`, `updatedAt`, `expiresAt`, `owner`) and label each row `ok`, `stale`, `extended`, `expired` or `deleted`, or `present` when the result lacks `updated_at` and `expires_at`. The tooltip names the RPC URL and block checked and states that this is a consistency check, not a cryptographic proof, because `eth_getProof` is unavailable.
 
-## 10. Demo writer
+## 10. Application writer
 
-Bun script using the `@arkiv-network/sdk` wallet client with a synthetic testnet wallet (address listed in README, key supplied only through `DEMO_PRIVATE_KEY`). Domain: a support desk. Full attribute and expiry details are in `arkiv/schema.md`.
-
-| Type | Expiry | Writes |
-|---|---|---|
-| `ticket` | 7 days | created with its first `comment` in one `executeBatch` (keys from `predictEntityKeys`) and `permissionlessExtension`; status patched; `assignee` patched, then ownership transferred to an agent wallet |
-| `comment` | 1 day | each new comment extends its ticket (`extendEntity` as a lease renewed by activity) |
-| `heartbeat` | 10 minutes | shows expiry visibly removing rows within the demo video |
-
-Runs one action every `DEMO_INTERVAL_MS` (default 8000) with a seeded generator (`DEMO_SEED`, default 1). The indexer does not depend on the domain.
+The dashboard wallet is the only application writer. Widgets, dashboards and links replace the synthetic data generator removed on 20 October 2026. Entity attributes, lifetimes and operations are in `arkiv/schema.md`.
 
 ## 11. Widgets and dashboards
 
@@ -342,7 +333,7 @@ See the [design spec](docs/superpowers/specs/2026-10-20-widget-dashboards-design
 
 - No server side SQL. Arbitrary queries run in the visitor's browser and only cost the visitor.
 - The index expression controls published index data. Widget and dashboard reads also require the configured backend `$creator` and project, since attributes alone cannot establish identity. Startup warns when the expression has no `$creator` term.
-- `TIRAMISU_API_KEY` reaches only the indexer service, is unused by default, and never reaches the web build, the browser or the writer. The deployment test asserts this for the compose file and Dockerfiles.
+- `TIRAMISU_API_KEY` reaches only the indexer service, is unused by default, and never reaches the web build, the browser. The deployment test asserts this for the compose file and Dockerfiles.
 - The indexer serves static files and JSON only. The web app has write endpoints under `/api/dash`, authenticated through a verified Privy access token plus EIP 191 personal_sign of a single use nonce. The recovered signer must be a linked Privy embedded wallet. An HMAC signed HttpOnly session lasts eight hours, with SameSite=Lax and Secure on HTTPS.
 - Writes enforce application ownership, JSON payload and SQL guard validation, same origin checks when Origin is supplied, and a serial backend wallet queue with at most 25 waiting jobs. Per address limits are 5 writes per minute and 40 per hour; the global limit is 80 per hour. Nonce requests allow 20 per minute per client IP bucket. Nonces expire after five minutes. State is in memory, so deploy one web instance.
 - `PRIVY_APP_SECRET` and `DASHBOARD_PRIVATE_KEY` exist only in the web runtime environment. `NEXT_PUBLIC_PRIVY_APP_ID` is public at build and runtime. `GET /api/dash/config` derives the public wallet address at runtime; no public wallet build variable is needed.
@@ -365,7 +356,6 @@ One `docker-compose.yml` at the repository root plus `docker-compose.local.yml`,
 |---|---|---|---|
 | `indexer` | `oven/bun:1.3`, runs `apps/indexer` | 8080, internal only (`expose`, no `ports`) | bind mount `${INDEX_DATA_PATH:-./data}` at `/data`; healthcheck on `/health` |
 | `web` | built with `oven/bun:1.3`, runs on `node:22-slim` as a Next.js standalone server | 3000, `expose` only in the base file | `INDEXER_URL=http://indexer:8080`; same data path mounted read only for the disk fallback; `depends_on: indexer (service_started)` |
-| `demo-writer` | `oven/bun`, `apps/demo-writer` | none | compose profile `demo`, so it runs only with `--profile demo`; private key from `.env`, never committed |
 
 Configuration comes from a `.env` file next to the compose file (`.env.example` committed); services read it only through `${VAR}` references, never through `env_file`. Every service uses `restart: unless-stopped`. TLS and the public domain sit in front of `web` (Dokploy with Traefik, or another host proxy) and are outside the compose file.
 
@@ -375,10 +365,10 @@ Dashboard environment:
 | :--- | :--- | :--- |
 | `NEXT_PUBLIC_PRIVY_APP_ID` | Web build and runtime | Privy app ID; blank disables dashboards |
 | `PRIVY_APP_SECRET` | Web runtime only | Privy verification and session HMAC |
-| `DASHBOARD_PRIVATE_KEY` | Web runtime only | Funded backend wallet, agent one on this deployment |
+| `DASHBOARD_PRIVATE_KEY` | Web runtime only | Funded backend dashboard wallet |
 | `NEXT_PUBLIC_TIRAMISU_RPC_URL` | Web build and runtime | Public browser RPC and backend transport |
 
-Secrets are never build arguments or passed to the indexer or writer. Production uses a blank expression. Filtered self hosted indexes must include the dashboard creator with `OR`; changing the expression requires a fresh data directory and full backfill.
+Secrets are never build arguments or passed to the indexer. Production uses a blank expression. Filtered self hosted indexes must include the dashboard creator with `OR`; changing the expression requires a fresh data directory and full backfill.
 
 ## 15. Testing
 
@@ -386,9 +376,8 @@ Secrets are never build arguments or passed to the indexer or writer. Production
 - Indexer: backfill and per block apply against a fake RPC (recorded fixtures), snapshot and delta file contents, expiry sweep.
 - Merge views: DuckDB (node) tests for the merge cases in section 8.
 - Web: proxy and disk fallback, live tail, verify classification, views, playground and showcase rendering.
-- Demo writer: action plan, writes against a fake client, configuration.
 - Deployment: compose, Dockerfiles, `.env.example` and docs (`test/deployment.test.ts`).
-- Manual smoke test against Tiramisu with the demo writer running.
+- Manual smoke test against Tiramisu using widget creation and dashboard placement.
 
 ## 16. Deliverables for the gates
 
@@ -399,7 +388,7 @@ Public MIT repository with setup in the README (wallet addresses, live URL and v
 1. Spike (section 5).
 2. `packages/core` plus indexer backfill and snapshot.
 3. Next.js with DuckDB WASM, base tables, SQL editor, dashboard.
-4. Demo writer.
+4. Widget dashboard application writes.
 5. Live sync and delta, then browser delta polling.
 6. Docker compose deploy (public URL), README, schema.md, friction.md, video.
 7. P1: verify button, browser live tail (both done). Widgets and dashboards are implemented (section 11).
@@ -407,4 +396,4 @@ Public MIT repository with setup in the README (wallet addresses, live URL and v
 ## 18. Open decisions
 
 - Host machine and public domain for the compose stack.
-- Whether the public deployment indexes every entity (blank expression) or only the demo wallet (`$creator` expression).
+Production indexes every entity with a blank expression. Self hosters may scope to the dashboard wallet.

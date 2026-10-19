@@ -17,7 +17,7 @@ const snippet = (id: string, title: string, subtitle: string, sql: string, notIn
 /** Featured default query first, then one group per view holding every widget query. */
 export function buildSnippets(views: View[], defaultSql: string): SnippetGroup[] {
  return [
-  { id: 'featured', title: 'Featured', snippets: [snippet('featured/default', 'Open tickets with most discussion', 'Open tickets joined with their comment counts', defaultSql, 'GROUP BY + JOIN')] },
+  { id: 'featured', title: 'Featured', snippets: [snippet('featured/default', 'Most placed widgets', 'Widgets ranked by dashboard placements, including unused widgets', defaultSql, 'GROUP BY + JOIN')] },
   ...views.map(view => ({ id: view.id, title: view.title, snippets: view.widgets.map(w => snippet(`${view.id}/${w.id}`, w.title, w.subtitle ?? KIND_LABEL[w.kind], w.sql, w.notInArkivQuery)) })),
  ]
 }
