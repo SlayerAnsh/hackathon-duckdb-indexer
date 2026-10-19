@@ -9,14 +9,6 @@
         "typescript": "^7.0.2",
       },
     },
-    "apps/demo-writer": {
-      "name": "@asi/demo-writer",
-      "version": "0.1.0",
-      "dependencies": {
-        "@arkiv-network/sdk": "0.8.1",
-        "viem": "^2.57.3",
-      },
-    },
     "apps/indexer": {
       "name": "@asi/indexer",
       "version": "0.1.0",
@@ -76,8 +68,6 @@
     "@arkiv-network/sdk": ["@arkiv-network/sdk@0.8.1", "", { "dependencies": { "brotli-wasm": "^3.0.1" }, "peerDependencies": { "typescript": ">=5.0.0", "viem": "^2.0.0" }, "optionalPeers": ["typescript"] }, "sha512-J2Qn7OOPZet5qGtN2XwLkSEnzk70FZCYDNclS/a4vrYBmsW4xgblTXWrczZXAhD2x4unSgGQwqpGZkBta/x7ow=="],
 
     "@asi/core": ["@asi/core@workspace:packages/core"],
-
-    "@asi/demo-writer": ["@asi/demo-writer@workspace:apps/demo-writer"],
 
     "@asi/indexer": ["@asi/indexer@workspace:apps/indexer"],
 
