@@ -26,8 +26,23 @@ import { AddToDashboardPicker } from './AddToDashboardPicker'
 import s from './widgets.module.css'
 
 export type WidgetPageMode = 'loading' | 'missing' | 'owner' | 'viewer'
-export function widgetPageMode({ loaded, widget, address }: { loaded: boolean; widget: WidgetEntity | null; address?: string }): WidgetPageMode {
- return !loaded ? 'loading' : !widget ? 'missing' : address?.toLowerCase() === widget.user.toLowerCase() ? 'owner' : 'viewer'
+export function widgetPageMode({ loaded, widget, address, authStatus }: { loaded: boolean; widget: WidgetEntity | null; address?: string; authStatus?: string }): WidgetPageMode {
+ return authStatus === 'loading' || !loaded ? 'loading' : !widget ? 'missing' : address?.toLowerCase() === widget.user.toLowerCase() ? 'owner' : 'viewer'
+}
+export function widgetLoadState({ authStatus, widget, pending, attempts, loadError }: { authStatus: string; widget: unknown | null; pending: boolean; attempts: number; loadError: boolean }): 'auth' | 'syncing' | 'missing' | 'error' | 'ready' {
+ if (authStatus === 'loading') return 'auth'
+ if (widget) return 'ready'
+ if (pending && attempts < 10) return 'syncing'
+ if (loadError && attempts < 3) return 'syncing'
+ if (loadError) return 'error'
+ return 'missing'
+}
+export function WidgetPageBody({ state, name }: { state: ReturnType<typeof widgetLoadState>; name?: string }) {
+ if (state === 'auth') return <p>Loading the index into your browser…</p>
+ if (state === 'syncing') return <section><h1>{name}</h1><span className="state state-disk">Syncing</span><p role="status" aria-live="polite">Saved to Arkiv. The index catches up in a few seconds.</p></section>
+ if (state === 'error') return <p className="error">Preview unavailable</p>
+ if (state === 'missing') return <MissingWidget/>
+ return null
 }
 export function MissingWidget() { return <section><p>This widget has expired. Its query is no longer on Arkiv.</p><a href="/widgets">Browse widgets</a></section> }
 export function ViewerHeader({ name, sql, onAdd }: { name: string; sql: string; onAdd(): void }) {
@@ -49,6 +64,8 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
  const [record, setRecord] = useState<{ key: string; widget: WidgetEntity | null; head: number } | null>(null)
  const [loadError, setLoadError] = useState<string | null>(null)
  const [refresh, setRefresh] = useState(0), [editorRevision, setEditorRevision] = useState(0)
+ const [attemptState, setAttemptState] = useState({ key, count: 0 })
+ const attempts = attemptState.key === key ? attemptState.count : 0
  const [picker, setPicker] = useState(false)
  const closePicker = useCallback(() => setPicker(false), [])
  const latestLocal = useRef<{ key: string; txHash: string; afterBlock: number; updatedAt?: number } | null>(null)
@@ -56,6 +73,7 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
  const pending = usePending()
  const write = pending.find(p => p.key === key && p.kind === 'widget' && p.op === 'upsert')
  const widget = record?.key === key ? record.widget : null
+ const loadState = widgetLoadState({ authStatus: auth.status, widget, pending: !!write, attempts, loadError: !!loadError })
  const usage = useTimedQuery(config?.enabled && isEntityKey(key) ? widgetUsageSql(config.wallet, key, auth.address ?? null) : 'SELECT 0, false', version)
  useEffect(() => {
   const current = ++sequence.current
@@ -75,6 +93,14 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
   }).catch(() => { if (sequence.current === current) setLoadError('Preview unavailable') })
   return () => { sequence.current++ }
  }, [key, config?.enabled, config?.wallet, config?.rpcUrl, refresh])
+ useEffect(() => {
+  if (loadState !== 'syncing' || !config?.enabled) return
+  const timer = setTimeout(() => {
+   setAttemptState(previous => ({ key, count: (previous.key === key ? previous.count : 0) + 1 }))
+   setRefresh(n => n + 1)
+  }, 2000)
+  return () => clearTimeout(timer)
+ }, [loadState, key, config?.enabled, refresh])
  function localTxSeen(value: WidgetEntity | null) {
   const local = latestLocal.current
   if (local?.key === key && local.updatedAt === undefined && value && value.updatedAt > local.afterBlock) local.updatedAt = value.updatedAt
@@ -90,10 +116,10 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
   if (auth.status !== 'authenticated' && !await auth.requestLogin()) return
   setPicker(true)
  }
- const mode = widgetPageMode({ loaded: record?.key === key, widget, address: auth.address })
+ const mode = widgetPageMode({ loaded: record?.key === key, widget, address: auth.address, authStatus: auth.status })
  if (!config) return <p>Loading the index into your browser…</p>
  if (!config.enabled) return <p>Dashboards are not enabled on this deployment.</p>
- if (loadError) return <p className="error">{loadError}</p>
+ if (loadState !== 'ready') return <WidgetPageBody state={loadState} name={write?.fields?.name === undefined ? undefined : String(write.fields.name)}/>
  if (mode === 'loading') return <p>Loading the index into your browser…</p>
  const head = Math.max(record?.head ?? 0, state.liveHead ?? 0)
  if (!widget) return <MissingWidget/>

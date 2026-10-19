@@ -17,7 +17,12 @@ export async function waitForWallet(read: () => string | undefined, opts: { time
   await sleep(delay); elapsed += delay
  }
 }
-type Props = { appId: string; mode: 'login' | 'logout'; onDone(session: SessionInfo | null): void; onError(reason: 'cancelled' | 'no_wallet' | 'failed'): void }
+export function bridgeErrorReason(error: unknown): 'cancelled' | 'failed' {
+ if (error === 'exited_auth_flow') return 'cancelled'
+ if (error && typeof error === 'object' && ['privyErrorCode', 'code', 'message'].some(key => (error as Record<string, unknown>)[key] === 'exited_auth_flow')) return 'cancelled'
+ return 'failed'
+}
+type Props = { appId: string; mode: 'login' | 'logout'; resume?: boolean; onDone(session: SessionInfo | null): void; onError(reason: 'cancelled' | 'no_wallet' | 'failed'): void }
 function Runner(props: Props) {
  const privy = usePrivy()
  const { signMessage } = useSignMessage()
@@ -31,7 +36,12 @@ function Runner(props: Props) {
   if (finished.current || !mounted.current) return
   finished.current = true; latest.current.props.onError(reason)
  }
- const { login } = useLogin({ onError: () => fail('failed') })
+ const { login } = useLogin({ onError: error => fail(bridgeErrorReason(error)) })
+ useEffect(() => {
+  if (!props.resume || props.mode !== 'login' || (privy.ready && privy.authenticated)) return
+  const timer = setTimeout(() => fail('failed'), 20000)
+  return () => clearTimeout(timer)
+ }, [props.resume, props.mode, privy.ready, privy.authenticated])
  useEffect(() => {
   if (!privy.ready || finished.current) return
   if (props.mode === 'logout') {
@@ -41,7 +51,7 @@ function Runner(props: Props) {
    return
   }
   if (!privy.authenticated) {
-   if (!started.current) { started.current = true; login() }
+   if (!props.resume && !started.current) { started.current = true; login() }
    return
   }
   if (working.current) return
@@ -58,7 +68,7 @@ function Runner(props: Props) {
     if (mounted.current && !finished.current) { finished.current = true; latest.current.props.onDone(session) }
    } catch { fail('failed') }
   })()
- }, [privy.ready, privy.authenticated, props.mode, login, privy.logout])
+ }, [privy.ready, privy.authenticated, props.mode, props.resume, login, privy.logout])
  useEffect(() => {
   if (isOpen) opened.current = true
   else if (opened.current && !privy.authenticated && props.mode === 'login') fail('cancelled')

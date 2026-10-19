@@ -2,11 +2,11 @@ import React from 'react'
 import { expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup as render } from 'react-dom/server'
-import { DashAuthContext, DashAuthProvider, useDashAuth, type DashAuth } from '../components/auth/DashAuthProvider'
+import { oauthReturnPending, DashAuthContext, DashAuthProvider, useDashAuth, type DashAuth } from '../components/auth/DashAuthProvider'
 import { AccountButton } from '../components/widgets/AccountButton'
 import { AvatarMenu, menuIndex } from '../components/widgets/AvatarMenu'
 import { LoginGate } from '../components/widgets/LoginGate'
-import { waitForWallet } from '../components/auth/PrivyBridge'
+import { bridgeErrorReason, waitForWallet } from '../components/auth/PrivyBridge'
 import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime'
 import { shortHex } from '../lib/format'
 
@@ -54,4 +54,14 @@ test('provider exposes a null config and loading status before wallet discovery'
   return <span>{value.status}:{value.config === null ? 'pending' : 'ready'}</span>
  }
  expect(render(<DashAuthProvider><State/></DashAuthProvider>)).toBe('<span>loading:pending</span>')
+})
+
+test('OAuth returns require both code and state', () => {
+ expect(oauthReturnPending('?privy_oauth_code=a&privy_oauth_state=b&privy_oauth_provider=google')).toBe(true)
+ for (const search of ['', '?privy_oauth_code=a', '?x=1']) expect(oauthReturnPending(search)).toBe(false)
+})
+test('closing the Privy flow is a silent cancellation', () => {
+ for (const error of ['exited_auth_flow', { privyErrorCode: 'exited_auth_flow' }, { code: 'exited_auth_flow' }, { message: 'exited_auth_flow' }]) expect(bridgeErrorReason(error)).toBe('cancelled')
+ expect(bridgeErrorReason(new Error('boom'))).toBe('failed')
+ expect(bridgeErrorReason(null)).toBe('failed')
 })

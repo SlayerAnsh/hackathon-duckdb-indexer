@@ -15,11 +15,16 @@ export type DashAuth = {
 export const DashAuthContext = createContext<DashAuth>({ config: null, status: 'loading', confirming: false, error: null,
  requestLogin: async () => false, logout: async () => {}, refresh: async () => {} })
 export const useDashAuth = () => useContext(DashAuthContext)
+export function oauthReturnPending(search: string): boolean {
+ const params = new URLSearchParams(search)
+ return params.has('privy_oauth_code') && params.has('privy_oauth_state')
+}
 export function DashAuthProvider({ children }: { children: ReactNode }) {
  const [config, setConfig] = useState<PublicDashConfig | null>(null)
  const [session, setSession] = useState<SessionInfo | null>(null)
  const [status, setStatus] = useState<DashAuth['status']>('loading')
  const [mode, setMode] = useState<'login' | 'logout' | null>(null)
+ const [resume, setResume] = useState(false)
  const [error, setError] = useState<string | null>(null)
  const pending = useRef<{ promise: Promise<boolean>; resolve(value: boolean): void } | null>(null)
  const revision = useRef(0)
@@ -42,6 +47,9 @@ export function DashAuthProvider({ children }: { children: ReactNode }) {
  useEffect(() => {
   if (!config) return
   if (!config.enabled) { setStatus('disabled'); return }
+  if (oauthReturnPending(window.location.search)) {
+   revision.current++; setResume(true); setMode('login'); return
+  }
   void refresh()
   return () => { revision.current++ }
  }, [config])
@@ -59,14 +67,22 @@ export function DashAuthProvider({ children }: { children: ReactNode }) {
   await dashApi.logout()
   revision.current++; apply(null); setError(null); setMode('logout')
  }
+ function clearOAuthReturn() {
+  if (!resume) return
+  const url = new URL(window.location.href)
+  for (const name of ['privy_oauth_code', 'privy_oauth_state', 'privy_oauth_provider']) url.searchParams.delete(name)
+  window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
+  setResume(false)
+ }
  function done(value: SessionInfo | null) {
-  apply(value); setMode(null); pending.current?.resolve(!!value); pending.current = null
+  revision.current++; clearOAuthReturn(); apply(value); setMode(null); pending.current?.resolve(!!value); pending.current = null
  }
  function failed(reason: 'cancelled' | 'no_wallet' | 'failed') {
+  clearOAuthReturn(); if (resume) apply(null)
   setMode(null); setError(reason === 'cancelled' ? null : "Login didn't finish. Try again.")
   pending.current?.resolve(false); pending.current = null
  }
  return <DashAuthContext.Provider value={{ config, status, ...session, confirming: mode === 'login', error, requestLogin, logout, refresh }}>
-  {children}{mode && config?.enabled && <PrivyBridge key={mode} appId={config.privyAppId} mode={mode} onDone={done} onError={failed}/>}
+  {children}{mode && config?.enabled && <PrivyBridge key={mode} appId={config.privyAppId} mode={mode} resume={resume} onDone={done} onError={failed}/>}
  </DashAuthContext.Provider>
 }

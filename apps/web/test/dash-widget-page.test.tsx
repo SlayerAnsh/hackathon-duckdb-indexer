@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { renderToStaticMarkup as render } from 'react-dom/server'
-import { widgetPageMode, ViewerHeader, MissingWidget, StoredWidgetPreview } from '../components/widgets/WidgetPage'
+import { widgetLoadState, WidgetPageBody, widgetPageMode, ViewerHeader, MissingWidget, StoredWidgetPreview } from '../components/widgets/WidgetPage'
 import { pickerRows, PickerList } from '../components/widgets/AddToDashboardPicker'
 import { emptyWidget } from '../lib/dash/schema'
 import type { WidgetEntity } from '../lib/dash/entities'
@@ -50,4 +50,23 @@ test('unsafe stored SQL never mounts the query runner', () => {
  expect(html).toContain('class="error"')
  expect(html).toContain(checkWidgetSql(payload.sql)!)
  expect(calls).toBe(0)
+})
+
+test('widget loading waits for auth and retries pending writes and transient errors', () => {
+ const input = { authStatus: 'anonymous', widget: null, pending: false, attempts: 0, loadError: false }
+ expect(widgetLoadState({ ...input, authStatus: 'loading', widget })).toBe('auth')
+ expect(widgetLoadState({ ...input, widget, pending: true, loadError: true })).toBe('ready')
+ expect(widgetLoadState({ ...input, pending: true, attempts: 9 })).toBe('syncing')
+ expect(widgetLoadState({ ...input, pending: true, attempts: 10 })).toBe('missing')
+ expect(widgetLoadState({ ...input, loadError: true, attempts: 2 })).toBe('syncing')
+ expect(widgetLoadState({ ...input, loadError: true, attempts: 3 })).toBe('error')
+ expect(widgetLoadState(input)).toBe('missing')
+ expect(widgetPageMode({ loaded: true, widget, authStatus: 'loading' })).toBe('loading')
+})
+test('syncing widget page body shows the pending name without expired copy', () => {
+ const html = render(<WidgetPageBody state="syncing" name="Count"/>)
+ expect(html).toContain('Count')
+ expect(html).toContain('Syncing')
+ expect(html).toContain('state-disk')
+ expect(html).not.toContain('expired')
 })
