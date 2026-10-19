@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useIndex } from './use-index'
 export type TimedResult = { data?: { columns: string[]; types?: string[]; rows: unknown[][] }; ms?: number; error?: string; loading: boolean }
-export type QueryControl = { paused?: boolean; nonce?: number; maxRows?: number }
+export type QueryControl = { paused?: boolean; nonce?: number; maxRows?: number; skip?: boolean }
 
 /** What a query reruns on: the current data key while live, the key of its last run while paused (or the current one before any run). */
 export const runKey = (current: string, lastRun: string | undefined, paused: boolean) => (paused && lastRun !== undefined ? lastRun : current)
@@ -16,13 +16,15 @@ export function useTimedQuery(sql: string, version: number, control: QueryContro
  const key = runKey(`${version}|${manifestVersion}`, lastRun.current, !!control.paused)
  const nonce = control.nonce ?? 0
  const maxRows = control.maxRows ?? Infinity
+ const skip = !!control.skip
  useEffect(() => {
+  if(skip) return
   if(!db || manifestVersion === undefined) return
   lastRun.current = key
   let active = true
   setResult(previous=>({...previous,loading:true,error:undefined}))
   void db.run(sql, maxRows).then(data=>{ if(active) setResult({data,ms:data.elapsedMs,loading:false}) }).catch(error=>{ if(active) setResult(previous=>({...previous,error:error instanceof Error?error.message:String(error),loading:false})) })
   return ()=>{active=false}
- },[db,sql,key,nonce,maxRows,manifestVersion === undefined])
- return result
+ },[db,sql,key,nonce,maxRows,manifestVersion === undefined,skip])
+ return skip ? {loading:false} : result
 }
