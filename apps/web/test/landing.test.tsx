@@ -77,8 +77,9 @@ test('official landing band covers disabled, loading, populated and empty states
  expect(html.indexOf('First report')).toBeLessThan(html.indexOf('Second report'))
  expect(html.match(/<article/g)).toHaveLength(2)
  const empty = render(<OfficialDashboardsView enabled items={[]}/>)
- expect(empty).toContain('Official dashboards are not set up on this deployment yet.')
- expect(empty).toContain('Explore community dashboards')
+ expect(empty).toContain('Official reports are on their way')
+ expect(empty).not.toContain('not set up on this deployment')
+ for (const text of ['Explore dashboards', 'Open playground', 'href="/playground"', 'role="status"']) expect(empty).toContain(text)
 })
 
 test('landing hero and Home use the official reports band', async () => {

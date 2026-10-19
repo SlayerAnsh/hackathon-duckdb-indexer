@@ -28,7 +28,7 @@ test('edited age and dashboard card copy', () => {
 })
 test('activity tiles, tooltip, footnote and empty lists use exact copy', () => {
  const html = render(<ActivityPanel counts={{ live_widgets: 2, live_dashboards: 1, placements: 4, active_days: 3 }} expiring={[]} recent={[]}/> )
- for (const text of ['Live widgets', 'Live dashboards', 'Placements', 'Active days', 'Times your widgets appear on any dashboard', 'Counts cover live entities only.', 'Nothing expiring soon.', 'No activity yet.']) expect(html).toContain(text)
+ for (const text of ['Live widgets', 'Live dashboards', 'Placements', 'Active days', 'Times your widgets appear on any dashboard', 'Counts cover live entities only.', 'Nothing expiring soon', 'No activity yet']) expect(html).toContain(text)
 })
 test('activity links entities and displays kind and relative time without transaction hashes', () => {
  const html = render(<ActivityPanel counts={null} expiring={[]} recent={[
@@ -46,9 +46,13 @@ test('anonymous home shows login gate', () => {
 })
 test('empty home collections use exact copy', () => {
  const html = render(<HomeCollections dashboards={[]} widgets={[]} onCreate={() => {}}/> )
- expect(html).toContain('No dashboards yet. Create one, then add widgets to it.')
- expect(html).toContain('No widgets yet. Write a query and save it as your first widget.')
- expect(html).toContain('+ New dashboard')
+ expect(html).toContain('Create your first dashboard')
+ expect(html).toContain('No widgets yet')
+ expect(html).toContain('New dashboard')
+ expect(html).toContain('class="empty-state"')
+ const loading = render(<HomeCollections dashboards={[]} widgets={[]} onCreate={() => {}} loading/> )
+ expect(loading).toContain('data-skeleton="true"')
+ expect(loading).not.toContain('Create your first dashboard')
  expect(html).toContain('href="/widgets/new"')
 })
 

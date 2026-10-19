@@ -8,6 +8,7 @@ import { dashboardListSql, toDashboardItems, type DashboardListItem } from '../.
 import { fetchDashboards } from '../../lib/dash/read'
 import { createBrowserRpc } from '../../lib/rpc-browser'
 import { DashboardBrowseCard } from '../explore/DashboardBrowseCard'
+import { EmptyState, SkeletonCards } from '../widgets/EmptyState'
 import s from './landing.module.css'
 
 export function OfficialDashboardsView({ enabled, items, descriptions, head, error }: { enabled: boolean; items: DashboardListItem[] | null; descriptions?: Map<string, string>; head?: number; error?: string }) {
@@ -16,9 +17,8 @@ export function OfficialDashboardsView({ enabled, items, descriptions, head, err
   <div className={s.sectionHead}><div><h2 id="official-h">Official dashboards</h2><p>Live network reports kept on Arkiv by this app. Open one to see every chart and its SQL.</p></div><Link className="btn btn-quiet" href="/explore">All dashboards <span aria-hidden="true">→</span></Link></div>
   {error ? <p role="alert" className="error">{error}</p> : null}
   <div className={s.officialGrid} aria-busy={items === null && !error}>
-   {items === null ? !error && Array.from({ length: 3 }, (_, i) => <div key={i} className={s.skeleton} data-skeleton="true" aria-hidden="true"/>) : items.map(item => <DashboardBrowseCard key={item.key} item={item} head={head} description={descriptions?.get(item.key)}/>)}
+   {items === null ? !error && <SkeletonCards count={3} label="Loading official dashboards…"/> : items.length === 0 ? !error && <EmptyState icon="official" title="Official reports are on their way" body="Network reports kept live by this app will appear here. Meanwhile, explore what the community built." actions={<><Link className="btn btn-primary" href="/explore">Explore dashboards</Link><Link className="btn" href="/playground">Open playground</Link></>}/> : items.map(item => <DashboardBrowseCard key={item.key} item={item} head={head} description={descriptions ? descriptions.get(item.key) ?? null : undefined}/>)}
   </div>
-  {items?.length === 0 && !error && <p>Official dashboards are not set up on this deployment yet. <Link href="/explore">Explore community dashboards</Link></p>}
  </section>
 }
 
@@ -36,7 +36,7 @@ export function OfficialDashboards() {
   let active = true
   void fetchDashboards(createBrowserRpc(config.rpcUrl), config.wallet, keys.split(',')).then(({ dashboards }) => {
    if (active) setRecord({ scope, descriptions: new Map([...dashboards].map(([key, value]) => [key, value.dashboard.description])) })
-  }).catch(() => {})
+  }).catch(() => { if (active) setRecord({ scope, descriptions: new Map() }) })
   return () => { active = false }
  }, [config?.enabled, config?.wallet, config?.rpcUrl, keys, scope])
  return <OfficialDashboardsView enabled={enabled} items={items} head={state.liveHead} error={query.error} descriptions={record?.scope === scope ? record.descriptions : undefined}/>

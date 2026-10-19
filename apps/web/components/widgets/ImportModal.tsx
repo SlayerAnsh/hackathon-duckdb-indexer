@@ -14,6 +14,7 @@ import { useTimedQuery } from '../../lib/use-query'
 import { ChartIcon } from './ChartIcon'
 import { CHART_LABELS } from './ChartPicker'
 import { WidgetBrowseCard } from './WidgetBrowseCard'
+import { EmptyState, PlusIcon, SkeletonCards } from './EmptyState'
 
 type List = ReturnType<typeof useWidgetList>
 type Props = { dashboardTitle: string; placed: Set<string>; remaining: number; onAdd(widgets: ImportCandidate[]): void; onClose(): void;
@@ -22,7 +23,7 @@ type CardsProps = { list: List; state: ImportState; placed: Set<string>; head?: 
 function Cards({ list, state, placed, head, version, toggle }: CardsProps) {
  return <><WidgetPayloadError error={list.payloadError}/>{list.items.map(item => <WidgetBrowseCard key={item.key} item={item} payload={list.payloads?.get(item.key) ?? (list.payloads ? null : undefined)}
   head={head} version={version} variant="pick" selected={state.selected.includes(item.key)} disabled={placed.has(item.key)} onToggle={() => toggle(item.key)}/>)}
-  {showLoading({ loading: list.loading, data: list.total }) && <p role="status">Loading the index into your browser…</p>}
+  {showLoading({ loading: list.loading, data: list.total }) && <SkeletonCards count={2} label="Loading widgets…"/>}
   {list.error && <p className="error" role="alert">{list.error}</p>}
  </>
 }
@@ -98,7 +99,9 @@ export function ImportModal({ dashboardTitle, placed, remaining, onAdd, onClose,
    </div>
    {!listOverride && <Counts state={state} user={auth.address} onCounts={onCounts}/>}
    <div className="import-results">
-    {total === 0 ? <p>{state.tab === 'mine' && !state.search && !state.chart ? <>You have no widgets yet. <a className="btn" href="/widgets/new">+ New widget</a></> : 'No widgets match these filters.'}</p> : <div className="import-grid">
+    {total === 0 ? (state.tab === 'mine' && !state.search && !state.chart
+     ? <EmptyState compact icon="widget" title="You have no widgets yet" body="Save a query as a widget, then import it here. You can also pick from all public widgets." actions={<><a className="btn btn-primary" href="/widgets/new"><PlusIcon/>New widget</a><button type="button" className="btn btn-quiet" onClick={() => dispatch({ type: 'tab', value: 'all' })}>All widgets</button></>}/>
+     : <EmptyState compact icon="search" title="No matches" body="No widgets match these filters."/>) : <div className="import-grid">
      {listOverride ? <Cards list={listOverride} state={state} placed={placed} toggle={toggle} version={0}/> : <LiveResults state={state} user={auth.address} placed={placed} toggle={toggle} remember={remember}/>}
     </div>}
     {total !== null && state.pages * 12 < total && <button type="button" className="btn" onClick={() => dispatch({ type: 'more' })}>Load more</button>}

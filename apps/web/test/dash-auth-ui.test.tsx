@@ -4,7 +4,9 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { renderToStaticMarkup as render } from 'react-dom/server'
 import { oauthReturnPending, DashAuthContext, DashAuthProvider, useDashAuth, type DashAuth } from '../components/auth/DashAuthProvider'
 import { AccountButton } from '../components/widgets/AccountButton'
-import { AvatarMenu, menuIndex } from '../components/widgets/AvatarMenu'
+import { AccountPopoverView, menuIndex } from '../components/widgets/AvatarMenu'
+import { ThemeToggle } from '../components/dash/ThemeToggle'
+import { addressUrl } from '../lib/explorer'
 import { LoginGate } from '../components/widgets/LoginGate'
 import { bridgeErrorReason, waitForWallet, pickEmbeddedWallet, needsChainSwitch } from '../components/auth/PrivyBridge'
 import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime'
@@ -17,15 +19,35 @@ function account(value: Partial<DashAuth>) {
  return render(<AppRouterContext.Provider value={router}><DashAuthContext.Provider value={{ ...auth, ...value }}><AccountButton/></DashAuthContext.Provider></AppRouterContext.Provider>)
 }
 test('account button states and responsive labels', () => {
- expect(account({})).toContain('Build your dashboard')
- expect(account({})).toContain('>Build<')
+ expect(account({})).toContain('Log in')
+ expect(account({})).not.toContain('Build your dashboard')
+ expect(account({})).not.toContain('build-long')
  for (const status of ['disabled', 'loading'] as const) expect(account({ status })).toBe('')
- expect(account({ status: 'authenticated', address, login: 'google' })).toContain('aria-haspopup="menu"')
+ expect(account({ status: 'authenticated', address, login: 'google' })).toContain('aria-haspopup="dialog"')
  expect(account({ confirming: true })).toContain('Confirming…')
 })
-test('open avatar menu and login gate use specified copy', () => {
- const menu = render(<AvatarMenu address={address} login="google" open onClose={() => {}} onLogout={async () => {}}/>)
- for (const text of [shortHex(address), 'via Google', 'My home', 'href="/me"', 'Log out']) expect(menu).toContain(text)
+const popAddress = '0x1111111111111111111111111111111111111111'
+function popover(balance: { wei: bigint | null; level: 'unknown' | 'empty' | 'low' | 'ok' }, copied = false) {
+ return render(<AccountPopoverView address={popAddress} login="google" balance={balance} copied={copied} onCopy={() => {}} onClose={() => {}} onLogout={() => {}}/>)
+}
+test('account popover shows identity, balance warnings, links and log out', () => {
+ const low = popover({ wei: BigInt("50000000000000000"), level: 'low' })
+ for (const text of ['Signed in with Google', '0.05 GLM', 'Below 0.1 GLM', 'href="/me"', 'href="/widgets/new"', 'href="/explore"', 'Log out', 'role="dialog"', 'aria-label="Account"', `href="${addressUrl(popAddress)}"`, 'target="_blank"', 'Copy address']) expect(low).toContain(text)
+ expect(popover({ wei: BigInt(0), level: 'empty' })).toContain('No GLM')
+ const unknown = popover({ wei: null, level: 'unknown' })
+ expect(unknown).toContain('Balance unavailable')
+ for (const text of ['Below 0.1 GLM', 'No GLM']) expect(unknown).not.toContain(text)
+ expect(popover({ wei: BigInt("1000000000000000000"), level: 'ok' }, true)).toContain('Copied')
+})
+test('icon buttons never use the chart tooltip class', () => {
+ const bareTip = /class="([^"]* )?tip( [^"]*)?"/
+ for (const html of [popover({ wei: null, level: 'unknown' }), render(<ThemeToggle/>)]) {
+  expect(html).not.toMatch(bareTip)
+  expect(html).toContain('has-tip')
+ }
+})
+test('login gate uses specified copy', () => {
+ expect(shortHex(address)).toContain('…')
  const gate = render(<LoginGate/>)
  for (const text of ['Log in to build dashboards', 'Use Google, Discord, X or Telegram. Saving widgets and dashboards is free and nothing personal goes on chain. Your widgets belong to your wallet; extending, transferring or deleting them is signed by it and needs a little GLM.', '>Log in<']) expect(gate).toContain(text)
 })

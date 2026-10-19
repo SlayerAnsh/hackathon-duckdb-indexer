@@ -125,7 +125,6 @@
 
 /* Official reports and bordered live figures. */
 .officialGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.skeleton{height:260px;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--card)}
 .figures{gap:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--card)}
 .figure,.figure:nth-child(even){padding:14px 16px;border:0}
 .figure:nth-child(odd){border-right:1px solid var(--border-strong)}

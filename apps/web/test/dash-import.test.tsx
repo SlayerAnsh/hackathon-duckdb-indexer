@@ -31,7 +31,7 @@ const list = { items: [], total: 0, loading: false, payloads: undefined, mineTot
 const props = { dashboardTitle: 'Top creators', placed: new Set<string>(), remaining: 4, onAdd() {}, onClose() {} }
 test('import dialog shows named tabs with counts and empty My widgets copy', () => {
  const html = render(<ImportModal {...props} listOverride={list}/> )
- for (const text of ['role="dialog"', 'aria-modal="true"', 'Import widgets into “Top creators”', 'My widgets', 'All widgets', 'class="tab-n">0', 'class="tab-n">12', 'You have no widgets yet.', '+ New widget', 'href="/widgets/new"', '0 selected', 'Add widgets', 'Cancel']) expect(html).toContain(text)
+ for (const text of ['role="dialog"', 'aria-modal="true"', 'Import widgets into “Top creators”', 'My widgets', 'All widgets', 'class="tab-n">0', 'class="tab-n">12', 'You have no widgets yet', 'New widget', 'href="/widgets/new"', '0 selected', 'Add widgets', 'Cancel']) expect(html).toContain(text)
  expect(html).toContain('disabled=""')
 })
 test('import dialog shows selected count and singular or plural add labels', () => {
@@ -46,10 +46,10 @@ test('modal renders pick cards, placed state, selection and paged loading', () =
  const html = render(<ImportModal {...props} placed={new Set(['b'])} initialState={{ ...initImport(), tab: 'all', selected: ['a'] }}
   listOverride={{ ...list, items, total: 20, allTotal: 20, payloads: new Map() }}/> )
  for (const text of ['Widget a', 'Widget b', 'aria-pressed="true"', 'Already on this dashboard', 'height:120px', 'Load more']) expect(html).toContain(text)
- expect(html).not.toContain('You have no widgets yet.')
+ expect(html).not.toContain('You have no widgets yet')
  const filtered = render(<ImportModal {...props} listOverride={list} initialState={{ ...initImport(), search: 'missing' }}/> )
  expect(filtered).toContain('No widgets match these filters.')
- expect(filtered).not.toContain('You have no widgets yet.')
+ expect(filtered).not.toContain('You have no widgets yet')
 })
 
 test('import payload rate limits are visible before the cards', () => {

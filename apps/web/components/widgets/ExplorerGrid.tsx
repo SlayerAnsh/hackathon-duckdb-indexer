@@ -17,7 +17,10 @@ import { AddToDashboardPicker } from './AddToDashboardPicker'
 import { ChartIcon } from './ChartIcon'
 import { CHART_LABELS } from './ChartPicker'
 import { SyncChip } from './SyncChip'
+import { EmptyState, PlusIcon, SkeletonCards } from './EmptyState'
+import { SearchField, ToggleChip, Toolbar } from '../explore/Toolbar'
 import s from '../showcase/showcase.module.css'
+import e from '../explore/explore.module.css'
 
 type Props = { state: ExplorerState; dispatch(a: Parameters<typeof explorerReducer>[1]): void }
 export function ExplorerView({ state, dispatch, liveCount, total, loggedIn, loading, children, error }: Props & {
@@ -27,21 +30,25 @@ export function ExplorerView({ state, dispatch, liveCount, total, loggedIn, load
  useEffect(() => { setSearch(state.search) }, [state.search])
  const debouncedSearch = useDebounced(search)
  useEffect(() => { if (debouncedSearch !== state.search) dispatch({ type: 'search', value: debouncedSearch }) }, [debouncedSearch, state.search, dispatch])
- return <section className="explorer">
-  <style>{`.explorer{padding:32px 0;display:grid;gap:24px}.explorer-header,.explorer-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.explorer-header h1{margin:0}.explorer-header a{margin-left:auto}.explorer-controls input:not([type=checkbox]),.explorer-controls select{padding:8px;border:1px solid var(--ui-edge);border-radius:var(--r-md);background:var(--inset);color:var(--text);font:inherit;max-width:100%}.explorer-controls input:not([type=checkbox]){flex:1;min-width:240px}.explorer-types{display:flex;gap:4px;overflow-x:auto;max-width:100%}.explorer-types button{flex-shrink:0;min-height:32px;padding:0 12px;border-radius:var(--r-md);border:1px solid var(--border-strong);background:var(--card-2);color:var(--text-2);font:inherit;cursor:pointer}.explorer-types button[aria-pressed=true]{border-color:var(--accent)}@media(hover:none){.explorer-types button{min-height:44px}}.explorer-types button[aria-pressed=true]{background:var(--accent-soft);color:var(--accent)}`}</style>
-  <header className="explorer-header"><span className="quiet-chip">{liveCount ?? '…'} live</span></header>
-  <div className="explorer-controls">
-   <input aria-label="Search by name or creator address" placeholder="Search by name or creator address" value={search} onChange={e => setSearch(e.target.value)}/>
-   <div className="explorer-types" role="group" aria-label="Chart type">{([null, ...CHART_TYPES] as const).map(chart => <button type="button" className="fchip" key={chart ?? 'all'} aria-pressed={state.chart === chart} onClick={() => dispatch({ type: 'chart', value: chart })}>{state.chart === chart && <span aria-hidden="true">✓</span>}{chart && <ChartIcon type={chart}/>} {chart ? CHART_LABELS[chart] : 'All'}</button>)}</div>
-   <select aria-label="Sort widgets" value={state.sort} onChange={e => dispatch({ type: 'sort', value: e.target.value as ExplorerState['sort'] })}><option value="newest">Newest</option><option value="used">Most used</option><option value="expiring">Expiring soon</option></select>
-   {loggedIn && <label><input type="checkbox" checked={state.mine} onChange={e => dispatch({ type: 'mine', value: e.target.checked })}/> Mine only</label>}
-   <a className="btn btn-primary" href="/widgets/new">+ New widget</a>
-  </div>
+ const filtered = !!state.search || state.chart !== null || state.mine
+ const empty = !loading && !error && total === 0
+ const clear = () => { setSearch(''); dispatch({ type: 'clear' }) }
+ return <section className={e.browse}>
+  <Toolbar count={total ? `${total.toLocaleString('en-US')} ${total === 1 ? 'widget' : 'widgets'}` : null} filters={<>
+   <div className={e.seg} role="group" aria-label="Chart type">{([null, ...CHART_TYPES] as const).map(chart => <button type="button" key={chart ?? 'all'} aria-pressed={state.chart === chart} onClick={() => dispatch({ type: 'chart', value: chart })}>{chart && <ChartIcon type={chart}/>}{chart ? CHART_LABELS[chart] : 'All charts'}</button>)}</div>
+   <select className={`${e.select} ${e.typeSelect}`} aria-label="Chart type" value={state.chart ?? ''} onChange={ev => dispatch({ type: 'chart', value: (ev.target.value || null) as ChartType | null })}><option value="">All charts</option>{CHART_TYPES.map(chart => <option key={chart} value={chart}>{CHART_LABELS[chart]}</option>)}</select>
+  </>}>
+   <SearchField label="Search by name or creator address" value={search} onChange={setSearch}/>
+   <select className={e.select} aria-label="Sort widgets" value={state.sort} onChange={ev => dispatch({ type: 'sort', value: ev.target.value as ExplorerState['sort'] })}><option value="newest">Newest</option><option value="used">Most used</option><option value="expiring">Expiring soon</option></select>
+   {loggedIn && <ToggleChip label="Mine only" checked={state.mine} onChange={value => dispatch({ type: 'mine', value })}/>}
+   <a className={`btn btn-primary ${e.primary}`} href="/widgets/new"><PlusIcon/>New widget</a>
+  </Toolbar>
   {error && <p className="error" role="alert">{error}</p>}
-  {loading && <p role="status">Loading the index into your browser…</p>}
-  <div className={s.grid}>{children}</div>
-  {!loading && !error && total === 0 && (liveCount === 0 ? <p>No widgets yet. Be the first to build one. <a className="btn btn-primary" href="/widgets/new">+ New widget</a></p> : <p>No widgets match these filters. <button className="btn btn-quiet" onClick={() => { setSearch(''); dispatch({ type: 'clear' }) }}>Clear filters</button></p>)}
-  {total !== null && state.pages * 12 < total && <button className="btn" onClick={() => dispatch({ type: 'more' })}>Load more</button>}
+  {empty ? (liveCount === 0 && !filtered
+   ? <EmptyState icon="widget" title="No widgets yet" body="A widget is one SQL query with a chart. Write one in a minute; it runs on the live index in your browser." actions={<><a className="btn btn-primary" href="/widgets/new"><PlusIcon/>New widget</a><a className="btn btn-quiet" href="/playground">Open playground</a></>}/>
+   : <EmptyState icon="search" title="No matches" body={state.search ? `Nothing matches “${state.search}”.` : 'Nothing matches these filters.'} actions={<button type="button" className="btn" onClick={clear}>Clear filters</button>}/>)
+  : <div className={e.widgetGrid} aria-busy={loading}>{loading && !children ? <SkeletonCards count={4} tall label="Loading widgets…"/> : children}</div>}
+  {total !== null && state.pages * 12 < total && <button type="button" className={`btn ${e.more}`} onClick={() => dispatch({ type: 'more' })}>Load 12 more</button>}
  </section>
 }
 function ResultsPage({ q, version, head, onAdd, remember }: { q: WidgetListQuery; version: number; head?: number; onAdd(item: WidgetListItem): void; remember(page: number, keys: string[]): void }) {
@@ -50,7 +57,7 @@ function ResultsPage({ q, version, head, onAdd, remember }: { q: WidgetListQuery
  const keys = list.items.map(item => item.key).join(',')
  useEffect(() => { remember(q.offset, keys ? keys.split(',') : []) }, [q.offset, keys, remember])
  return <><WidgetPayloadError error={list.payloadError}/>{list.items.map(item => <WidgetBrowseCard key={item.key} item={item} payload={list.payloads?.get(item.key) ?? (list.payloads ? null : undefined)} head={head} version={version} variant="explorer" official={isOfficialOwned(item.user, item.owner, config?.wallet ?? '')} onAdd={() => onAdd(item)}/>)}
-  {showLoading({ loading: list.loading, data: list.total }) && <p role="status">Loading the index into your browser…</p>}{list.error && <p className="error" role="alert">{list.error}</p>}
+  {showLoading({ loading: list.loading, data: list.total }) && <SkeletonCards count={2} tall label="Loading widgets…"/>}{list.error && <p className="error" role="alert">{list.error}</p>}
  </>
 }
 function PendingCard({ item, write, version, onAdd }: { item: WidgetListItem; write: PendingWrite; version: number; onAdd(): void }) {
@@ -80,7 +87,7 @@ export function ExplorerGrid({ state, dispatch }: Props) {
   try { if (auth.status === 'authenticated' || await auth.requestLogin()) setPicker(item) }
   catch { setLoginError("Login didn't finish. Try again.") }
  }
- if (!config) return <p>Loading the index into your browser…</p>
+ if (!config) return <section className={e.browse}><div className={e.widgetGrid}><SkeletonCards count={2} tall label="Loading widgets…"/></div></section>
  if (!config.enabled) return <p>Dashboards are not enabled on this deployment.</p>
  return <><ExplorerView state={state} dispatch={dispatch} liveCount={live.data ? Number(live.data.rows[0]?.[0] ?? 0) : null}
   total={optimistic.length ? Math.max(optimistic.length, Number(filtered.data?.rows[0]?.[0] ?? 0)) : filtered.data ? Number(filtered.data.rows[0]?.[0] ?? 0) : null}

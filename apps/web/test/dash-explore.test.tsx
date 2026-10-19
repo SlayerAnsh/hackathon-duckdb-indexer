@@ -69,9 +69,30 @@ test('Explore exposes accessible tabs and dashboard empty states',()=>{
  const html=render(<ExplorePageView tab="widgets" onTab={()=>{}}/>)
  for(const text of ['<h1>Explore</h1>','role="tablist"','aria-label="Explore"','aria-selected="true" tabindex="0"','aria-selected="false" tabindex="-1"']) expect(html).toContain(text)
  const props={state:initDashboardBrowse(),dispatch:()=>{},items:[],loading:false,total:0}
- expect(render(<DashboardBrowseView {...props}/>)).toContain('No dashboards yet. Build the first one.')
- expect(render(<DashboardBrowseView {...props} state={{...props.state,search:'x'}}/>)).toContain('No dashboards match these filters.')
+ const empty=render(<DashboardBrowseView {...props}/>)
+ for(const text of ['No dashboards yet','Log in to create','Browse widgets','role="status"','New dashboard','Official only','role="switch"']) expect(empty).toContain(text)
+ expect(empty).not.toContain('0 dashboards')
+ const search=render(<DashboardBrowseView {...props} state={{...props.state,search:'abc'}}/>)
+ for(const text of ['No matches','Nothing matches “abc”.','Clear filters']) expect(search).toContain(text)
+ expect(render(<DashboardBrowseView {...props} state={{...props.state,official:true}}/>)).toContain('Nothing matches these filters.')
+ const loading=render(<DashboardBrowseView {...props} total={null} loading/>)
+ expect(loading).toContain('data-skeleton="true"')
+ expect(loading).not.toContain('No dashboards yet')
+ expect(render(<DashboardBrowseView {...props} total={38}/>)).toContain('38 dashboards, newest first')
  expect(readFileSync(new URL('../app/widgets/page.tsx',import.meta.url),'utf8')).toContain("redirect('/explore?tab=widgets')")
+})
+
+test('dashboard card renders from the SQL row before its payload arrives', () => {
+ const pending=render(<DashboardBrowseCard item={{...item,official:false,user:U}} head={10}/>)
+ expect(pending).toContain('Overview')
+ expect(pending).toContain('skel-text')
+ expect(pending).not.toContain('error')
+ const failed=render(<DashboardBrowseCard item={{...item,official:false,user:U}} head={10} description={null}/>)
+ expect(failed).toContain('Overview')
+ expect(failed).not.toContain('skel-text')
+})
+test('Explore header has no floating live note', () => {
+ expect(render(<ExplorePageView tab="dashboards" onTab={()=>{}}/>)).not.toContain('Index live at block')
 })
 
 test('component and page links use the Explore widgets tab', () => {

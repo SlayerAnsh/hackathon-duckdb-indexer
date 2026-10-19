@@ -28,17 +28,18 @@ import { canExtendWidget } from '../../lib/dash/widget-actions'
 import { ExtendButton } from './ExtendButton'
 import { TimeLeft } from './TimeLeft'
 import { ChartIcon } from './ChartIcon'
+import { EmptyState, PlusIcon, SkeletonCards } from './EmptyState'
 import s from '../showcase/showcase.module.css'
 
-export function HomeCollections({ dashboards, widgets, head, onCreate, loading = false, payloadError, onRetry, renderExtend, renderDelete }: { dashboards: HomeDashboard[]; widgets: unknown[][]; head?: number; onCreate(): void; loading?: boolean; payloadError?: string; onRetry?(): void; renderExtend?(key: string): ReactNode; renderDelete?(key: string): ReactNode }) {
- return <><section><header className="home-heading"><h2>My dashboards</h2><button className="btn btn-primary" onClick={onCreate}>+ New dashboard</button></header>
-  <div className="home-dashboards">{dashboards.map(item => <DashboardCard key={item.key} item={item} head={head}/>)}</div>
-  {!loading && !dashboards.length && <p>No dashboards yet. Create one, then add widgets to it.</p>}
- </section><section><header className="home-heading"><h2>My widgets</h2><a className="btn" href="/widgets/new">+ New widget</a></header>
+export function HomeCollections({ dashboards, widgets, head, onCreate, loading = false, failed = false, payloadError, onRetry, renderExtend, renderDelete }: { dashboards: HomeDashboard[]; widgets: unknown[][]; head?: number; onCreate(): void; loading?: boolean; failed?: boolean; payloadError?: string; onRetry?(): void; renderExtend?(key: string): ReactNode; renderDelete?(key: string): ReactNode }) {
+ return <><section><header className="home-heading"><h2>My dashboards</h2><button type="button" className="btn btn-primary" onClick={onCreate}><PlusIcon/>New dashboard</button></header>
+  {!loading && !failed && !dashboards.length ? <EmptyState icon="dashboard" title="Create your first dashboard" body="A dashboard is a public page of live charts. Create one, then add your widgets or any public widget to it." actions={<button type="button" className="btn btn-primary" onClick={onCreate}><PlusIcon/>New dashboard</button>}/>
+   : <div className="home-dashboards">{dashboards.map(item => <DashboardCard key={item.key} item={item} head={head}/>)}{loading && !failed && !dashboards.length && <SkeletonCards count={3} label="Loading your dashboards…"/>}</div>}
+ </section><section><header className="home-heading"><h2>My widgets</h2><a className="btn" href="/widgets/new"><PlusIcon/>New widget</a></header>
   <WidgetPayloadError error={payloadError} onRetry={onRetry}/><div className="home-two">{widgets.map(([key, name, chart, expiry]) => <article className={s.card} key={String(key)}><div className="home-widget">
    {CHART_TYPES.includes(chart as ChartType) && <ChartIcon type={chart as ChartType}/>}<strong>{String(name)}</strong><TimeLeft expiresAt={Number(expiry)} head={head}/>{renderExtend?.(String(key))}{renderDelete?.(String(key))}<a className="btn btn-quiet" href={`/widgets/${String(key)}`}>Open</a>
-  </div></article>)}</div>
-  {!loading && !widgets.length && <p>No widgets yet. Write a query and save it as your first widget.</p>}
+  </div></article>)}{loading && !failed && !widgets.length && <SkeletonCards count={2} label="Loading your widgets…"/>}</div>
+  {!loading && !failed && !widgets.length && <EmptyState icon="widget" title="No widgets yet" body="A widget is one SQL query with a chart. Write one in a minute and save it; it runs on the live index in your browser." actions={<a className="btn btn-primary" href="/widgets/new"><PlusIcon/>New widget</a>}/>}
  </section></>
 }
 export function HomeHeader({ address, balance }: { address: string; balance: { wei: bigint | null; level: BalanceLevel } }) {
@@ -84,6 +85,14 @@ function AuthenticatedHome() {
  const expiring = useTimedQuery(expiringSoonSql(config.wallet, address), version)
  const recent = useTimedQuery(recentSql(config.wallet, address), version)
  const [creating, setCreating] = useState(false)
+ useEffect(() => {
+  const params = new URLSearchParams(window.location.search)
+  if (params.get('new') !== 'dashboard') return
+  setCreating(true)
+  params.delete('new')
+  const query = params.toString()
+  window.history.replaceState(null, '', window.location.pathname + (query ? '?' + query : '') + window.location.hash)
+ }, [])
  const [payloadError, setPayloadError] = useState<string>()
  const [retry, setRetry] = useState(0)
  const [payloads, setPayloads] = useState<{ scope: string; widgets: Map<string, WidgetEntity> } | null>(null)
@@ -114,11 +123,11 @@ function AuthenticatedHome() {
  const error = [dashboards, widgets, counts, expiring, recent].find(q => q.error)?.error ?? state.error
  const loading = [dashboards, widgets, counts, expiring, recent].some(q => showLoading({ loading: q.loading, data: q.data }))
  return <section className="home-page">
-  <style>{`.home-page{display:grid;gap:32px;padding:32px 0}.home-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}.home-heading h1,.home-heading h2{margin:0}.home-dashboards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.home-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.home-two>article{grid-column:auto}.home-widget{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px}.home-widget strong{flex:1;overflow-wrap:anywhere}.home-page li{margin:12px 0}.home-dialog{max-width:420px;width:calc(100% - 32px);padding:24px;background:var(--card);color:var(--text);border:1px solid var(--border-strong);border-radius:var(--r-lg);box-shadow:var(--shadow-pop)}.home-dialog form,.home-dialog label{display:grid;gap:16px}.home-dialog input{min-height:34px;padding:8px;background:var(--inset);color:var(--text);border:1px solid var(--ui-edge);border-radius:var(--r-md)}@media(max-width:1100px){.home-dashboards{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:760px){.home-dashboards,.home-two{grid-template-columns:minmax(0,1fr)}}`}</style>
+  <style>{`.home-page{display:grid;gap:32px;padding:32px 0}.home-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}.home-heading h1,.home-heading h2{margin:0}.home-heading h1{font-size:24px;font-weight:600;letter-spacing:-.02em;line-height:1.25}.home-heading h2{font-size:20px;font-weight:600;letter-spacing:-.015em}.home-heading .btn{min-height:36px}.home-page section>h2{font-size:20px;font-weight:600;letter-spacing:-.015em;margin:0 0 16px}.home-page h3{font-size:15px;font-weight:600}.home-dashboards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.home-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.home-two>article{grid-column:auto}.home-widget{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px}.home-widget strong{flex:1;overflow-wrap:anywhere}.home-page li{margin:12px 0}.home-dialog{max-width:420px;width:calc(100% - 32px);padding:24px;background:var(--card);color:var(--text);border:1px solid var(--border-strong);border-radius:var(--r-lg);box-shadow:var(--shadow-pop)}.home-dialog form,.home-dialog label{display:grid;gap:16px}.home-dialog input{min-height:34px;padding:8px;background:var(--inset);color:var(--text);border:1px solid var(--ui-edge);border-radius:var(--r-md)}.home-two .skel-card{min-height:64px;justify-content:center;padding:16px 0}.home-two .skel-block{display:none}@media(max-width:1100px){.home-dashboards{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:760px){.home-dashboards,.home-two{grid-template-columns:minmax(0,1fr)}}`}</style>
   <HomeHeader address={address} balance={balance}/>
   {pending.filter(w => w.kind === 'dashboard' || w.kind === 'widget').map(write => <PendingSync key={write.key} write={write} version={version}/>)}
-  {loading && <p role="status">Loading the index into your browser…</p>}{error && <p className="error" role="alert">{error}</p>}
-  <HomeCollections dashboards={mergeDashboards(dashboards.data?.rows ?? [], pending)} widgets={widgetRows} head={state.liveHead} onCreate={() => setCreating(true)} payloadError={payloadError} onRetry={() => setRetry(value => value + 1)} loading={loading || !!error} renderExtend={extend} renderDelete={renderDelete}/>
+  {error && <p className="error" role="alert">{error}</p>}
+  <HomeCollections dashboards={mergeDashboards(dashboards.data?.rows ?? [], pending)} widgets={widgetRows} head={state.liveHead} onCreate={() => setCreating(true)} payloadError={payloadError} onRetry={() => setRetry(value => value + 1)} loading={loading} failed={!!error} renderExtend={extend} renderDelete={renderDelete}/>
   <ActivityPanel counts={activityCounts} expiring={expiring.data?.rows ?? []} recent={recent.data?.rows ?? []} head={state.liveHead} renderExtend={extend}/>
   {creating && <CreateDashboardDialog onClose={() => setCreating(false)}/>}
  </section>
