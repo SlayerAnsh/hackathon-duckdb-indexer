@@ -78,3 +78,12 @@ test('component and page links use the Explore widgets tab', () => {
  const walk = (dir: string): string[] => readdirSync(dir, {withFileTypes:true}).flatMap(entry => entry.isDirectory() ? walk(dir+'/'+entry.name) : [dir+'/'+entry.name])
  for(const root of ['../components','../app'].map(p=>new URL(p,import.meta.url).pathname)) for(const file of walk(root).filter(file=>file.endsWith('.tsx'))) expect(readFileSync(file,'utf8')).not.toMatch(/href=["']\/widgets["']/)
 })
+
+test('explorer widget card does not mark transferred official authorship as Official', async () => {
+ const { isOfficialOwned } = await import('../lib/dash/official')
+ const { WidgetBrowseCard } = await import('../components/widgets/WidgetBrowseCard')
+ const item = { key:key(70), name:'Transferred', chart:'bar' as const, user:W, owner:U, expiresAt:100, createdAt:1, uses:0 }
+ const html = render(<WidgetBrowseCard item={item} payload={null} version={0} variant="explorer" visibleOverride official={isOfficialOwned(item.user,item.owner,W)}/> )
+ expect(html).not.toContain('Official')
+ expect(readFileSync(new URL('../components/widgets/ExplorerGrid.tsx',import.meta.url),'utf8')).toContain('isOfficialOwned(item.user, item.owner,')
+})

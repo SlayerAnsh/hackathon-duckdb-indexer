@@ -42,7 +42,7 @@ test('import dialog shows selected count and singular or plural add labels', () 
  }
 })
 test('modal renders pick cards, placed state, selection and paged loading', () => {
- const items = ['a', 'b'].map(key => ({ key, name: `Widget ${key}`, chart: 'bar' as const, user: '0x' + 'ab'.repeat(20), expiresAt: 100, createdAt: 1, uses: 0 }))
+ const items = ['a', 'b'].map(key => ({ key, name: `Widget ${key}`, chart: 'bar' as const, user: '0x' + 'ab'.repeat(20), owner: '0x' + 'ab'.repeat(20), expiresAt: 100, createdAt: 1, uses: 0 }))
  const html = render(<ImportModal {...props} placed={new Set(['b'])} initialState={{ ...initImport(), tab: 'all', selected: ['a'] }}
   listOverride={{ ...list, items, total: 20, allTotal: 20, payloads: new Map() }}/> )
  for (const text of ['Widget a', 'Widget b', 'aria-pressed="true"', 'Already on this dashboard', 'height:120px', 'Load more']) expect(html).toContain(text)

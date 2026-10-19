@@ -1,4 +1,5 @@
 'use client'
+import { isOfficialOwned } from '../../lib/dash/official'
 import { WidgetPayloadError } from './WidgetPayloadError'
 import { useDebounced } from '../../lib/dash/use-debounced'
 import { showLoading } from '../../lib/dash/loading'
@@ -48,7 +49,7 @@ function ResultsPage({ q, version, head, onAdd, remember }: { q: WidgetListQuery
  const { config } = useDashAuth()
  const keys = list.items.map(item => item.key).join(',')
  useEffect(() => { remember(q.offset, keys ? keys.split(',') : []) }, [q.offset, keys, remember])
- return <><WidgetPayloadError error={list.payloadError}/>{list.items.map(item => <WidgetBrowseCard key={item.key} item={item} payload={list.payloads?.get(item.key) ?? (list.payloads ? null : undefined)} head={head} version={version} variant="explorer" official={item.user === config?.wallet} onAdd={() => onAdd(item)}/>)}
+ return <><WidgetPayloadError error={list.payloadError}/>{list.items.map(item => <WidgetBrowseCard key={item.key} item={item} payload={list.payloads?.get(item.key) ?? (list.payloads ? null : undefined)} head={head} version={version} variant="explorer" official={isOfficialOwned(item.user, item.owner, config?.wallet ?? '')} onAdd={() => onAdd(item)}/>)}
   {showLoading({ loading: list.loading, data: list.total }) && <p role="status">Loading the index into your browser…</p>}{list.error && <p className="error" role="alert">{list.error}</p>}
  </>
 }

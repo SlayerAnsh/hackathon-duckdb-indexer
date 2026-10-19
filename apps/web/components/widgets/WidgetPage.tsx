@@ -27,7 +27,7 @@ import s from './widgets.module.css'
 
 export type WidgetPageMode = 'loading' | 'missing' | 'owner' | 'viewer'
 export function widgetPageMode({ loaded, widget, address, authStatus }: { loaded: boolean; widget: WidgetEntity | null; address?: string; authStatus?: string }): WidgetPageMode {
- return authStatus === 'loading' || !loaded ? 'loading' : !widget ? 'missing' : address?.toLowerCase() === widget.user.toLowerCase() ? 'owner' : 'viewer'
+ return authStatus === 'loading' || !loaded ? 'loading' : !widget ? 'missing' : address?.toLowerCase() === widget.owner.toLowerCase() ? 'owner' : 'viewer'
 }
 export function widgetLoadState({ authStatus, widget, pending, attempts, loadError }: { authStatus: string; widget: unknown | null; pending: boolean; attempts: number; loadError: boolean }): 'auth' | 'syncing' | 'missing' | 'error' | 'ready' {
  if (authStatus === 'loading') return 'auth'

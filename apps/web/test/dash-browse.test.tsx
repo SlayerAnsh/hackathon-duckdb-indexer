@@ -11,7 +11,7 @@ const key = (n: number) => '0x' + n.toString(16).padStart(64, '0')
 const q: WidgetListQuery = { search: '', chart: null, sort: 'newest', user: null, limit: 12, offset: 0 }
 test('browse SQL scopes, searches literal text, filters, sorts and pages in DuckDB', async () => {
  const base = { project: DASH_PROJECT, user: U }
- const widgets = ['Top creators', 'Top_owners', 'Expiry', '50% done'].map((name, i) => ({ key: key(i + 1), creator: W, created_at: i < 2 ? 4 : i, expires_at: 100 - i, attrs: { ...base, type: 'widget', name, chart: i % 2 ? 'donut' : 'bar', user: i === 3 ? V : U } }))
+ const widgets = ['Top creators', 'Top_owners', 'Expiry', '50% done'].map((name, i) => ({ key: key(i + 1), creator: W, owner: i === 3 ? V : U, created_at: i < 2 ? 4 : i, expires_at: 100 - i, attrs: { ...base, type: 'widget', name, chart: i % 2 ? 'donut' : 'bar', user: i === 3 ? V : U } }))
  const { db, close } = await nativeDb([...widgets,
   { ...widgets[0]!, key: key(9), creator: V },
   ...[1, 2, 2, 3, 3, 3].map((n, i) => ({ key: key(20 + i), creator: W, attrs: { ...base, type: 'link', widget: key(n), dashboard: key(40 + i) } })),
@@ -36,10 +36,10 @@ test('browse SQL scopes, searches literal text, filters, sorts and pages in Duck
  } finally { close() }
 })
 test('list rows convert numeric fields and lowercase keys and owners', () => {
- expect(toListItems([[key(10).toUpperCase(), 'Name', 'bar', U.toUpperCase(), BigInt(100), '20', BigInt(12)]])).toEqual([{ key: key(10), name: 'Name', chart: 'bar', user: U, expiresAt: 100, createdAt: 20, uses: 12 }])
+ expect(toListItems([[key(10).toUpperCase(), 'Name', 'bar', U.toUpperCase(), BigInt(100), '20', V.toUpperCase(), BigInt(12)]])).toEqual([{ key: key(10), name: 'Name', chart: 'bar', user: U, owner: V, expiresAt: 100, createdAt: 20, uses: 12 }])
  for (const build of [() => widgetListSql('bad', q), () => widgetCountSql(W, { search: '', chart: null, user: 'bad' }), () => widgetListSql(W, { ...q, limit: -1 })]) expect(build).toThrow()
 })
-const item = { key: key(1), name: 'Top creators', chart: 'bar' as const, user: U, expiresAt: 43201, createdAt: 1, uses: 12 }
+const item = { key: key(1), name: 'Top creators', chart: 'bar' as const, user: U, owner: U, expiresAt: 43201, createdAt: 1, uses: 12 }
 const props = { item, head: 1, version: 0, variant: 'explorer' as const }
 test('explorer cards show metadata, expiry and actions', () => {
  const html = render(<WidgetBrowseCard {...props} payload={null} visibleOverride/> )
@@ -107,7 +107,7 @@ test('explorer and import share the tested debounce and render payload failures'
 })
 
 test('official widget cards use official author and kept live', () => {
- const html = render(<WidgetBrowseCard item={{ key: key(1), name: 'Official widget', chart: 'bar', user: W, expiresAt: 100, createdAt: 1, uses: 2 }} payload={undefined} version={0} variant="explorer" official/>)
+ const html = render(<WidgetBrowseCard item={{ key: key(1), name: 'Official widget', chart: 'bar', user: W, owner: W, expiresAt: 100, createdAt: 1, uses: 2 }} payload={undefined} version={0} variant="explorer" official/>)
  expect(html).toContain('Official')
  expect(html).toContain('Arkiv SQL Indexer')
  expect(html).toContain('Kept live')

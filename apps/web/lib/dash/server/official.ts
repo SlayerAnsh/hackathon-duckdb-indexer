@@ -3,7 +3,7 @@ import { addr, key } from '@arkiv-network/sdk/attr'
 import { privateKeyToAccount } from 'viem/accounts'
 import { asDashboard, jsonPayload, queryAll } from '../entities'
 import { OFFICIAL_DASHBOARDS, type OfficialDashboardDef } from '../official-defs'
-import { isOfficialUser, officialExpr, OFFICIAL_KEEP_DAYS, OFFICIAL_LOGIN } from '../official'
+import { isOfficialOwned, officialExpr, OFFICIAL_KEEP_DAYS, OFFICIAL_LOGIN } from '../official'
 import { BLOCKS_PER_DAY, CONTENT_TYPE, DASH_PROJECT, MAX_LINKS_PER_DASHBOARD, MAX_REMAINING_DAYS, SIZES, parseDashboardPayload, parseWidgetPayload, utf8Bytes } from '../schema'
 import { read, write, type OpsDeps } from './operations'
 
@@ -59,7 +59,7 @@ export async function seedOfficial(deps: OpsDeps, defs = OFFICIAL_DASHBOARDS): P
 export function keepOfficialAlive(deps: OpsDeps, { keepDays = OFFICIAL_KEEP_DAYS }: { keepDays?: number } = {}): Promise<KeepaliveResult> {
   return deps.queue.run(async () => {
     const { head, entities } = await read(() => queryAll(deps.reader, officialExpr(deps.wallet)))
-    const live = entities.filter(e => e.expiresAt > head && e.creator === deps.wallet.toLowerCase() && e.attrs.project === DASH_PROJECT && isOfficialUser(e.attrs.user, deps.wallet))
+    const live = entities.filter(e => e.expiresAt > head && e.creator === deps.wallet.toLowerCase() && e.attrs.project === DASH_PROJECT && isOfficialOwned(e.attrs.user, e.owner, deps.wallet))
     const target = head + MAX_REMAINING_DAYS * BLOCKS_PER_DAY
     const due = live.filter(e => e.expiresAt < head + keepDays * BLOCKS_PER_DAY && e.expiresAt < target)
     const result: KeepaliveResult = { checked: live.length, extended: 0, txHashes: [] }

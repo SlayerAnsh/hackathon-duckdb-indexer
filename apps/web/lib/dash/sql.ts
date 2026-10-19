@@ -1,3 +1,4 @@
+import { isOfficialOwned } from './official'
 import { DASH_PROJECT, isEntityKey, isHexAddress } from './schema'
 
 const quote = (value: string) => `'${value.replaceAll("'", "''")}'`
@@ -10,9 +11,18 @@ function entityKey(value: string): string {
   return quote(value.toLowerCase())
 }
 
+export function officialSql(alias: string, wallet: string): string {
+  const w = address(wallet)
+  return `(${alias}.usr = ${w} AND ${alias}.owner = ${w})`
+}
+export function mineSql(alias: string, user: string): string {
+  const a = address(user)
+  return `((${alias}.type = 'widget' AND ${alias}.owner = ${a}) OR (${alias}.type <> 'widget' AND ${alias}.usr = ${a}))`
+}
+
 export function dashCte(wallet: string): string {
   return `WITH dash AS (
- SELECT e.key, e.created_at, e.updated_at, e.expires_at,
+ SELECT e.key, e.owner, e.created_at, e.updated_at, e.expires_at,
   max(a.value) FILTER (WHERE a.name = 'type') AS type,
   max(a.value) FILTER (WHERE a.name = 'user') AS usr,
   max(a.value) FILTER (WHERE a.name = 'login') AS login,
@@ -57,12 +67,12 @@ export function syncedSql(key: string, afterBlock: number, op: 'upsert' | 'delet
 }
 
 export type WidgetListQuery = { search: string; chart: import('./schema').ChartType | null; sort: 'newest' | 'used' | 'expiring'; user: string | null; limit: number; offset: number }
-export type WidgetListItem = { key: string; name: string; chart: import('./schema').ChartType; user: string; expiresAt: number; createdAt: number; uses: number }
+export type WidgetListItem = { key: string; name: string; chart: import('./schema').ChartType; user: string; owner: string; expiresAt: number; createdAt: number; uses: number }
 
 function widgetFilters(q: Pick<WidgetListQuery, 'search' | 'chart' | 'user'>): string {
  const filters = ["w.type = 'widget'"]
  if (q.chart !== null) filters.push(`w.chart = ${quote(q.chart)}`)
- if (q.user !== null) filters.push(`w.usr = ${address(q.user)}`)
+ if (q.user !== null) filters.push(`w.owner = ${address(q.user)}`)
  if (q.search) {
   const term = q.search.toLowerCase()
   const literal = term.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')
@@ -77,10 +87,10 @@ export function widgetListSql(wallet: string, q: WidgetListQuery): string {
  const order = { newest: 'w.created_at DESC', used: 'uses DESC', expiring: 'w.expires_at ASC' }[q.sort]
  if (!order) throw new Error('Invalid sort')
  return `${dashCte(wallet)}
- SELECT w.key, w.name, w.chart, w.usr, w.expires_at, w.created_at, count(DISTINCT l.dashboard) AS uses
+ SELECT w.key, w.name, w.chart, w.usr, w.expires_at, w.created_at, w.owner, count(DISTINCT l.dashboard) AS uses
  FROM dash w LEFT JOIN dash l ON l.type = 'link' AND l.widget = w.key
  WHERE ${widgetFilters(q)}
- GROUP BY w.key, w.name, w.chart, w.usr, w.expires_at, w.created_at
+ GROUP BY w.key, w.name, w.chart, w.usr, w.expires_at, w.created_at, w.owner
  ORDER BY ${order}, w.key
  LIMIT ${q.limit} OFFSET ${q.offset}`
 }
@@ -101,13 +111,13 @@ export function myDashboardsSql(wallet: string, user: string): string {
 export function myWidgetsSql(wallet: string, user: string): string {
   return `${dashCte(wallet)}
  SELECT key, name, chart, expires_at, updated_at FROM dash
- WHERE type = 'widget' AND usr = ${address(user)}
+ WHERE type = 'widget' AND ${mineSql('dash', user)}
  ORDER BY expires_at, key`
 }
 
 export function activityCountsSql(wallet: string, user: string): string {
   return `${dashCte(wallet)}, mine AS (
- SELECT * FROM dash WHERE usr = ${address(user)} AND type IN ('widget', 'dashboard')
+ SELECT * FROM dash WHERE ${mineSql('dash', user)} AND type IN ('widget', 'dashboard')
  ), days AS (
  SELECT floor(created_at / 43200) AS day FROM mine
  UNION
@@ -124,7 +134,7 @@ export function activityCountsSql(wallet: string, user: string): string {
 export function expiringSoonSql(wallet: string, user: string): string {
   return `${dashCte(wallet)}
  SELECT key, type, CASE WHEN type = 'widget' THEN name ELSE title END AS label, expires_at
- FROM dash WHERE usr = ${address(user)} AND type IN ('widget', 'dashboard')
+ FROM dash WHERE ${mineSql('dash', user)} AND type IN ('widget', 'dashboard')
  AND expires_at <= (SELECT block FROM live_head) + 43200
  ORDER BY expires_at, key LIMIT 10`
 }
@@ -133,7 +143,7 @@ export function recentSql(wallet: string, user: string): string {
   return `${dashCte(wallet)}
  SELECT key, type, CASE WHEN type = 'widget' THEN name ELSE title END AS label,
  CASE WHEN created_at = updated_at THEN 'Created' ELSE 'Patched' END AS kind, updated_at
- FROM dash WHERE usr = ${address(user)} AND type IN ('widget', 'dashboard')
+ FROM dash WHERE ${mineSql('dash', user)} AND type IN ('widget', 'dashboard')
  ORDER BY updated_at DESC, key LIMIT 10`
 }
 
@@ -141,7 +151,7 @@ export type DashboardListQuery = { search: string; sort: 'newest' | 'oldest' | '
 export type DashboardListItem = { key: string; title: string; user: string; official: boolean; widgets: number; charts: import('./schema').ChartType[]; createdAt: number; updatedAt: number; expiresAt: number }
 function dashboardFilters(wallet: string, q: Pick<DashboardListQuery, 'search' | 'official'>): string {
  const filters = ["d.type = 'dashboard'"]
- if (q.official) filters.push(`d.usr = ${address(wallet)}`)
+ if (q.official) filters.push(officialSql('d', wallet))
  if (q.search) {
   const term = q.search.toLowerCase()
   const literal = term.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')
@@ -155,13 +165,13 @@ export function dashboardListSql(wallet: string, q: DashboardListQuery): string 
  const order = { newest: 'd.created_at DESC', oldest: 'd.created_at ASC', widgets: 'widgets DESC', expiring: 'd.expires_at ASC' }[q.sort]
  if (!order) throw new Error('Invalid sort')
  return `${dashCte(wallet)}
- SELECT d.key, d.title, d.usr, d.usr = ${address(wallet)} AS official,
+ SELECT d.key, d.title, d.usr, ${officialSql('d', wallet)} AS official,
  count(DISTINCT l.key) AS widgets, list(DISTINCT w.chart ORDER BY w.chart) FILTER (WHERE w.chart IS NOT NULL) AS charts,
  d.created_at, d.updated_at, d.expires_at
  FROM dash d LEFT JOIN dash l ON l.type = 'link' AND l.dashboard = d.key
  LEFT JOIN dash w ON w.type = 'widget' AND w.key = l.widget
  WHERE ${dashboardFilters(wallet, q)}
- GROUP BY d.key, d.title, d.usr, d.created_at, d.updated_at, d.expires_at
+ GROUP BY d.key, d.title, d.usr, d.owner, d.created_at, d.updated_at, d.expires_at
  ORDER BY ${order}, d.key LIMIT ${q.limit} OFFSET ${q.offset}`
 }
 export function dashboardCountSql(wallet: string, q: Pick<DashboardListQuery, 'search' | 'official'>): string {
@@ -174,15 +184,15 @@ export function toDashboardItems(rows: unknown[][]): DashboardListItem[] {
 export function widgetDashboardsSql(wallet: string, widgetKey: string, limit: number): string {
  if (!Number.isSafeInteger(limit) || limit < 0) throw new Error('Invalid pagination')
  return `${dashCte(wallet)}
- SELECT d.key, d.title, d.usr, count(DISTINCT all_links.key) AS widgets
+ SELECT d.key, d.title, d.usr, count(DISTINCT all_links.key) AS widgets, d.owner
  FROM dash d LEFT JOIN dash all_links ON all_links.type = 'link' AND all_links.dashboard = d.key
  AND all_links.expires_at > (SELECT block FROM live_head)
  WHERE d.type = 'dashboard' AND d.expires_at > (SELECT block FROM live_head)
  AND EXISTS (SELECT 1 FROM dash l WHERE l.type = 'link' AND l.dashboard = d.key
  AND l.widget = ${entityKey(widgetKey)} AND l.expires_at > (SELECT block FROM live_head))
- GROUP BY d.key, d.title, d.usr
- ORDER BY (d.usr = ${address(wallet)}) DESC, d.title, d.key LIMIT ${limit}`
+ GROUP BY d.key, d.title, d.usr, d.owner
+ ORDER BY ${officialSql('d', wallet)} DESC, d.title, d.key LIMIT ${limit}`
 }
 export function toUsedOn(rows: unknown[][], wallet: string): { key: string; title: string; user: string; official: boolean; widgets: number }[] {
- return rows.map(([key, title, user, widgets]) => ({ key: String(key).toLowerCase(), title: String(title), user: String(user).toLowerCase(), official: String(user).toLowerCase() === wallet.toLowerCase(), widgets: Number(widgets) }))
+ return rows.map(([key, title, user, widgets, owner]) => ({ key: String(key).toLowerCase(), title: String(title), user: String(user).toLowerCase(), official: isOfficialOwned(String(user).toLowerCase(), String(owner).toLowerCase(), wallet), widgets: Number(widgets) }))
 }

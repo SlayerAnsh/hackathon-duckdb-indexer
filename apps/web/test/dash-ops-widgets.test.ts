@@ -3,7 +3,7 @@ import { ExpirationTime } from '@arkiv-network/sdk'
 import { addr, key } from '@arkiv-network/sdk/attr'
 import { RpcError } from '@asi/core'
 import { createWidget, updateWidget, extendWidget, deleteWidget, extendTarget } from '../lib/dash/server/operations'
-import { dashboardBundleExpr, keysExprs, widgetExtendExpr } from '../lib/dash/entities'
+import { dashboardBundleExpr, keysExprs, widgetVersionExpr } from '../lib/dash/entities'
 import { fakeChain, widgetRow, dashboardRow, linkRow, validWidget, U, OTHER, K, D, W, PREDICTED_1, PREDICTED_2 } from './dash-fakes'
 const S = { address: U, login: 'google' as const, exp: 9e9 }
 const payload = (data: any) => JSON.parse(new TextDecoder().decode(data.payload))
@@ -63,7 +63,7 @@ test('extend: creator or owner of a live link may extend, capped, never past 90 
     const { deps, calls, queries } = fakeChain(rows)
     const target = extendTarget(5000, 1000, 7)
     expect(await extendWidget(deps, S, K)).toEqual({ txHash: '0xtx', afterBlock: 1000, expiresAt: target })
-    expect(queries).toEqual([widgetExtendExpr(W, K, U)])
+    expect(queries).toEqual([widgetVersionExpr(W, K, U)])
     expect(calls).toEqual([{ method: 'extend', data: { entityKey: K, expires: ExpirationTime.atBlock(BigInt(target)) } }])
   }
   for (const [rows, code, status] of [ [[widgetRow({ user: OTHER })], 'forbidden', 403], [[widgetRow({ expiresAt: 1000 + 90 * 43200 })], 'at_cap', 409], [[], 'not_found', 404] ] as const) {

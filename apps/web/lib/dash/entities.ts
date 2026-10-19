@@ -1,4 +1,4 @@
-import { OFFICIAL_LOGIN, isOfficialUser } from './official'
+import { OFFICIAL_LOGIN, isOfficialUser, isOfficialOwned } from './official'
 import { clampBlock, decodeAttribute, keyChunkQueries, type ArkivRpc, type RpcEntity, type RpcSelect } from '@asi/core'
 import { addr, key } from '@arkiv-network/sdk/attr'
 import { and, eq, or, render } from '@arkiv-network/sdk/query'
@@ -44,7 +44,7 @@ export function asWidget(e: DashEntity, wallet: string): WidgetEntity | null {
   if (!trusted(e, wallet, 'widget') || !provider || !validName(e.attrs.name) || !CHART_TYPES.includes(e.attrs.chart as ChartType)) return null
   const parsed = parseWidgetPayload(e.payload)
   if (!parsed.ok) return null
-  return { ...e, kind: 'widget', official: isOfficialUser(e.attrs.user!, wallet), user: e.attrs.user!.toLowerCase(), login: provider, name: e.attrs.name, chart: parsed.value.chart, widget: parsed.value }
+  return { ...e, kind: 'widget', official: isOfficialOwned(e.attrs.user!, e.owner, wallet), user: e.attrs.user!.toLowerCase(), login: provider, name: e.attrs.name, chart: parsed.value.chart, widget: parsed.value }
 }
 function dashboardSlug(value: string | undefined): string | null {
   return value && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) && utf8Bytes(value) <= 64 ? value : null
@@ -54,13 +54,13 @@ export function asDashboard(e: DashEntity, wallet: string): DashboardEntity | nu
   if (!trusted(e, wallet, 'dashboard') || !provider || !validName(e.attrs.title)) return null
   const parsed = parseDashboardPayload(e.payload)
   if (!parsed.ok) return null
-  return { ...e, kind: 'dashboard', official: isOfficialUser(e.attrs.user!, wallet), slug: dashboardSlug(e.attrs.slug), user: e.attrs.user!.toLowerCase(), login: provider, title: e.attrs.title, dashboard: parsed.value }
+  return { ...e, kind: 'dashboard', official: isOfficialOwned(e.attrs.user!, e.owner, wallet), slug: dashboardSlug(e.attrs.slug), user: e.attrs.user!.toLowerCase(), login: provider, title: e.attrs.title, dashboard: parsed.value }
 }
 export function asLink(e: DashEntity, wallet: string): LinkEntity | null {
   if (!trusted(e, wallet, 'link') || !isEntityKey(e.attrs.dashboard ?? '') || !isEntityKey(e.attrs.widget ?? '')) return null
   const parsed = parseLinkPayload(e.payload)
   if (!parsed.ok) return null
-  return { ...e, kind: 'link', official: isOfficialUser(e.attrs.user!, wallet), user: e.attrs.user!.toLowerCase(), dashboardKey: e.attrs.dashboard!.toLowerCase(), widgetKey: e.attrs.widget!.toLowerCase(), link: parsed.value }
+  return { ...e, kind: 'link', official: isOfficialOwned(e.attrs.user!, e.owner, wallet), user: e.attrs.user!.toLowerCase(), dashboardKey: e.attrs.dashboard!.toLowerCase(), widgetKey: e.attrs.widget!.toLowerCase(), link: parsed.value }
 }
 
 const scope = (wallet: string) => and(eq('$creator', addr(wallet.toLowerCase() as `0x${string}`)), eq('project', DASH_PROJECT))
@@ -69,7 +69,7 @@ export function dashboardBundleExpr(wallet: string, dashboardKey: string, extraK
   return render(and(scope(wallet), or(eq('$key', key(dashboardKey as `0x${string}`)),
     ...extraKeys.map(k => eq('$key', key(k as `0x${string}`))), and(eq('type', 'link'), eq('dashboard', key(dashboardKey as `0x${string}`))))))
 }
-export function widgetExtendExpr(wallet: string, widgetKey: string, caller: string): string {
+export function widgetVersionExpr(wallet: string, widgetKey: string, caller: string): string {
   return render(and(scope(wallet), or(eq('$key', key(widgetKey as `0x${string}`)),
     and(eq('type', 'link'), eq('widget', key(widgetKey as `0x${string}`)), eq('user', addr(caller as `0x${string}`))))))
 }

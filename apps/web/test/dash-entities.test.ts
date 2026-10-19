@@ -3,7 +3,7 @@ import { addr, key } from '@arkiv-network/sdk/attr'
 import { and, eq, or, render } from '@arkiv-network/sdk/query'
 import type { ArkivRpc, RpcEntity } from '@asi/core'
 import { emptyWidget } from '../lib/dash/schema'
-import { DASH_SELECT, asDashboard, asLink, asWidget, dashboardBundleExpr, decodeDashEntity, jsonPayload, keysExprs, queryAll, scopeExpr, widgetExtendExpr } from '../lib/dash/entities'
+import { DASH_SELECT, asDashboard, asLink, asWidget, dashboardBundleExpr, decodeDashEntity, jsonPayload, keysExprs, queryAll, scopeExpr, widgetVersionExpr } from '../lib/dash/entities'
 import { readPublicDashConfig } from '../lib/dash/config'
 
 const W = `0x${'1a'.repeat(20)}` as const, U = `0x${'2b'.repeat(20)}` as const
@@ -58,7 +58,7 @@ test('expressions scope every read to the dashboard wallet and project', () => {
   expect(scopeExpr(W).toLowerCase()).toContain(`$creator = addr(${W})`)
   expect(dashboardBundleExpr(W, D, [K])).toBe(render(and(scope, or(eq('$key', key(D)), eq('$key', key(K)), and(eq('type', 'link'), eq('dashboard', key(D)))))))
   expect(dashboardBundleExpr(W, D)).toBe(render(and(scope, or(eq('$key', key(D)), and(eq('type', 'link'), eq('dashboard', key(D)))))))
-  expect(widgetExtendExpr(W, K, U)).toBe(render(and(scope, or(eq('$key', key(K)), and(eq('type', 'link'), eq('widget', key(K)), eq('user', addr(U)))))))
+  expect(widgetVersionExpr(W, K, U)).toBe(render(and(scope, or(eq('$key', key(K)), and(eq('type', 'link'), eq('widget', key(K)), eq('user', addr(U)))))))
   const chunks = keysExprs(W, Array.from({ length: 51 }, (_, i) => '0x' + i.toString(16).padStart(64, '0')))
   expect(chunks).toHaveLength(2)
   for (const chunk of chunks) expect(chunk).toContain(scopeExpr(W))
@@ -99,4 +99,13 @@ test('official entities reserve arkiv login and validate optional dashboard slug
   for (const slug of ['Bad Slug', 'a'.repeat(65), '']) expect(asDashboard({ ...d, attrs: { ...d.attrs, slug } }, W)?.slug).toBeNull()
   expect(asDashboard({ ...d, attrs: { ...d.attrs, user: U, login: 'google', slug: '' } }, W)).toMatchObject({ official: false, slug: null })
   expect(asLink({ ...official, attrs: { ...official.attrs, type: 'link', dashboard: D, widget: K }, payload: { v: 1, size: 'md', position: 0, name: 'Top' } }, W)?.official).toBe(true)
+})
+
+test('all official entity decoders require app ownership', async () => {
+ const { officialWidgetRow, officialDashboardRow, widgetRow, linkRow } = await import('./dash-fakes')
+ expect(asWidget(decodeDashEntity(officialWidgetRow()), W)?.official).toBe(true)
+ expect(asWidget(decodeDashEntity(officialWidgetRow({ owner: U })), W)?.official).toBe(false)
+ expect(asWidget(decodeDashEntity(widgetRow({ owner: U })), W)).toMatchObject({ official: false, owner: U, user: U })
+ expect(asDashboard(decodeDashEntity(officialDashboardRow('creators', { owner: U })), W)?.official).toBe(false)
+ expect(asLink(decodeDashEntity(linkRow({ user: W, owner: U })), W)?.official).toBe(false)
 })

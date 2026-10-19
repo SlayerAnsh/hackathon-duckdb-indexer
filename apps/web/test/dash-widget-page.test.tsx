@@ -8,7 +8,7 @@ import type { PendingWrite } from '../lib/dash/pending'
 import { playgroundHref } from '../components/dash/WidgetCard'
 import { checkWidgetSql } from '../lib/dash/sql-guard'
 const K = '0x' + 'ab'.repeat(32), D = '0x' + 'cd'.repeat(32), U = '0x' + 'ef'.repeat(20)
-const widget = { user: U, widget: { ...emptyWidget(), name: 'Count', sql: 'SELECT count(*) FROM entities' } } as WidgetEntity
+const widget = { user: U, owner: U, widget: { ...emptyWidget(), name: 'Count', sql: 'SELECT count(*) FROM entities' } } as WidgetEntity
 
 test('widget page mode handles loading, missing, owner and public viewers', () => {
  expect(widgetPageMode({ loaded: false, widget: null })).toBe('loading')
@@ -107,7 +107,7 @@ test('used on SQL scopes live links and dashboards and orders official first', a
   expect(result.map(r=>r[0])).toEqual([key(1),key(2),key(6)])
   expect((await db.runAndReadAll(widgetDashboardsSql(wallet,K,2))).getRowsJson()).toHaveLength(2)
  } finally {close()}
- expect(toUsedOn([['0xAB','Title',wallet.toUpperCase(),BigInt(4)]],wallet)[0]).toEqual({key:'0xab',title:'Title',user:wallet,official:true,widgets:4})
+ expect(toUsedOn([['0xAB','Title',wallet.toUpperCase(),BigInt(4),wallet]],wallet)[0]).toEqual({key:'0xab',title:'Title',user:wallet,official:true,widgets:4})
  expect(()=>widgetDashboardsSql(wallet,K,-1)).toThrow()
 })
 
@@ -127,4 +127,10 @@ test('organize rows show Kept live and hide Extend for official widgets', async 
  expect(html).toContain('Kept live')
  expect(html).toContain('Arkiv SQL Indexer')
  expect(html).not.toContain('Extend')
+})
+
+test('widget owner view follows current owner rather than author', () => {
+ const moved = { ...widget, owner: '0x' + '12'.repeat(20) }
+ expect(widgetPageMode({ loaded: true, widget: moved, address: U, authStatus: 'authenticated' })).toBe('viewer')
+ expect(widgetPageMode({ loaded: true, widget: moved, address: moved.owner, authStatus: 'authenticated' })).toBe('owner')
 })

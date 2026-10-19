@@ -38,10 +38,10 @@ test('seed predicts and creates each dashboard, widgets and links in one queued 
 
 test('seed skips only a live official dashboard with the same slug', async () => {
   const def = OFFICIAL_DASHBOARDS.find(d => d.slug === 'creators')!
-  for (const row of [officialDashboardRow('creators', { expiresAt: head + 1 }), officialDashboardRow('creators', { user: U, expiresAt: head + 1 }), officialDashboardRow('creators', { expiresAt: head })]) {
+  for (const row of [officialDashboardRow('creators', { owner: U, expiresAt: head + 1 }), officialDashboardRow('creators', { expiresAt: head + 1 }), officialDashboardRow('creators', { user: U, expiresAt: head + 1 }), officialDashboardRow('creators', { expiresAt: head })]) {
     const f = fakeChain([row], head)
     const predict = spyOn(f.deps.client, 'predictEntityKeys')
-    const skipped = row.attributes!.find(a => a.name === 'user')!.value === W && Number(BigInt(row.expiresAt!)) > head
+    const skipped = row.owner === W && row.attributes!.find(a => a.name === 'user')!.value === W && Number(BigInt(row.expiresAt!)) > head
     const result = await seedOfficial(f.deps, [def])
     expect(result.skipped).toEqual(skipped ? ['creators'] : [])
     expect(f.calls).toHaveLength(skipped ? 0 : 1)
@@ -178,4 +178,12 @@ test('CLI dry run reports existing slugs and failures never log secret values', 
   expect(f.calls).toHaveLength(0)
   expect(await runSeedCli([], env, { makeOps: () => { throw new Error(env.DASHBOARD_PRIVATE_KEY) }, log: s => logs.push(s) })).toBe(1)
   expect(logs.some(s => s.includes(env.DASHBOARD_PRIVATE_KEY))).toBe(false)
+})
+
+test('keepalive ignores official looking entities owned by users', async () => {
+ const f = fakeChain([officialWidgetRow({ key: entityKey(501), expiresAt: head + 10 * days }), officialWidgetRow({ key: entityKey(502), owner: U, expiresAt: head + 10 * days })], head)
+ const result = await keepOfficialAlive(f.deps)
+ expect(result.checked).toBe(1)
+ expect(f.calls).toHaveLength(1)
+ expect(f.calls[0].data.extensions.map((e: any) => e.entityKey)).toEqual([entityKey(501)])
 })

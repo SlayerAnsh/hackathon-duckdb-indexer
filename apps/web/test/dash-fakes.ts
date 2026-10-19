@@ -12,9 +12,9 @@ export const D = `0x${'22'.repeat(32)}` as const
 export const PREDICTED_1 = `0x${'a1'.padStart(64, '0')}` as const
 export const PREDICTED_2 = `0x${'a2'.padStart(64, '0')}` as const
 export const validWidget: WidgetPayload = { ...emptyWidget(), name: 'Top 10 creators', sql: 'SELECT creator, count(*) AS n FROM entities GROUP BY 1 ORDER BY n DESC LIMIT 10', chart: 'hbar', mapping: { x: 'creator', y: ['n'], groupBy: null, stacking: 'off', sort: 'query' } }
-type RowOptions = { key?: string; user?: string; expiresAt?: number; creator?: string }
+type RowOptions = { owner?: string; key?: string; user?: string; expiresAt?: number; creator?: string }
 function row(type: string, attrs: Record<string, string>, payload: object, options: RowOptions): RpcRow {
-  return { key: (options.key ?? K) as `0x${string}`, owner: W, creator: (options.creator ?? W) as `0x${string}`, createdAt: '0x1', updatedAt: '0x2', expiresAt: `0x${(options.expiresAt ?? 5000).toString(16)}`,
+  return { key: (options.key ?? K) as `0x${string}`, owner: (options.owner ?? W) as `0x${string}`, creator: (options.creator ?? W) as `0x${string}`, createdAt: '0x1', updatedAt: '0x2', expiresAt: `0x${(options.expiresAt ?? 5000).toString(16)}`,
     attributes: Object.entries({ type, project: DASH_PROJECT, user: options.user ?? U, ...attrs }).map(([name, value]) => ({ name, value, type: name === 'user' ? 'addr' : ['dashboard', 'widget'].includes(name) ? 'key' : 'str' })),
     payload: `0x${Buffer.from(JSON.stringify(payload)).toString('hex')}` }
 }

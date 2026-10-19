@@ -22,10 +22,11 @@ export function mergeExplorerItems(items: WidgetListItem[], pending: PendingWrit
   const f = write.fields
   if (write.kind !== 'widget' || write.op !== 'upsert' || known.has(write.key) || !f || typeof f.name !== 'string' || !CHART_TYPES.includes(f.chart as ChartType) || typeof f.user !== 'string') continue
   const user = f.user.toLowerCase()
-  if (state.chart && state.chart !== f.chart || state.mine && address && user !== address.toLowerCase()) continue
+  const owner = typeof f.owner === 'string' ? f.owner.toLowerCase() : ''
+  if (state.chart && state.chart !== f.chart || state.mine && address && owner !== address.toLowerCase()) continue
   if (search && !f.name.toLowerCase().includes(search) && !(/^0x[0-9a-f]{0,40}$/i.test(search) && user.startsWith(search))) continue
   known.add(write.key)
-  added.push({ key: write.key, name: f.name, chart: f.chart as ChartType, user, expiresAt: Number(f.expiresAt ?? 0), createdAt: write.afterBlock, uses: 0 })
+  added.push({ key: write.key, name: f.name, chart: f.chart as ChartType, user, owner, expiresAt: Number(f.expiresAt ?? 0), createdAt: write.afterBlock, uses: 0 })
  }
  return [...added, ...items]
 }

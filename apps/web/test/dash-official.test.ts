@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { DuckDBInstance } from '../../../packages/core/node_modules/@duckdb/node-api'
 import { RAW_TABLES_SQL, MERGE_VIEWS_SQL, MATERIALIZE_SQL, setHeadSql } from '@asi/core'
-import { isOfficialUser, officialExpr } from '../lib/dash/official'
+import { isOfficialUser, isOfficialOwned, officialExpr } from '../lib/dash/official'
 import { OFFICIAL_DASHBOARDS } from '../lib/dash/official-defs'
 import { parseDashboardPayload, parseWidgetPayload } from '../lib/dash/schema'
 import { dashCte } from '../lib/dash/sql'
@@ -56,4 +56,12 @@ test('every official query executes on populated and empty public views with map
       }
     }
   } finally { db.closeSync(); instance.closeSync() }
+})
+
+test('official ownership requires both author and owner', () => {
+ expect(isOfficialOwned(W, W, W)).toBe(true)
+ expect(isOfficialOwned(W, U, W)).toBe(false)
+ expect(isOfficialOwned(U, W, W)).toBe(false)
+ expect(isOfficialOwned('nope', W, W)).toBe(false)
+ expect(officialExpr(W).toLowerCase()).toContain(`$owner = addr(${W})`)
 })

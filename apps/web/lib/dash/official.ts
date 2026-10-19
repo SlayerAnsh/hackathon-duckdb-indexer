@@ -8,8 +8,11 @@ export const OFFICIAL_KEEP_DAYS = 30
 export function isOfficialUser(user: string, wallet: string): boolean {
   return isHexAddress(user) && isHexAddress(wallet) && user.toLowerCase() === wallet.toLowerCase()
 }
+export function isOfficialOwned(user: string, owner: string, wallet: string): boolean {
+  return isOfficialUser(user, wallet) && isOfficialUser(owner, wallet)
+}
 export function officialExpr(wallet: string): string {
   if (!isHexAddress(wallet)) throw new Error('Invalid address')
   const publisher = addr(wallet.toLowerCase() as `0x${string}`)
-  return render(and(eq('$creator', publisher), eq('project', DASH_PROJECT), eq('user', publisher)))
+  return render(and(eq('$creator', publisher), eq('project', DASH_PROJECT), eq('user', publisher), eq('$owner', publisher)))
 }

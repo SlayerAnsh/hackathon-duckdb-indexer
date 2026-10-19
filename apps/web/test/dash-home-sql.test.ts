@@ -18,7 +18,7 @@ test('home builders validate both addresses', () => {
 
 test('home SQL scopes live lists, placements and distinct creation and update days', async () => {
   const row = (n: number, type: string, attrs: Record<string, string> = {}, times: Partial<NativeRow> = {}): NativeRow => ({
-    key: key(n), creator: W, created_at: 100, updated_at: 100, expires_at: 143201,
+    key: key(n), creator: W, owner: attrs.user ?? U, created_at: 100, updated_at: 100, expires_at: 143201,
     attrs: { project: DASH_PROJECT, user: U, type, ...attrs }, ...times,
   })
   const { db, close } = await nativeDb([
@@ -73,4 +73,27 @@ test('home SQL scopes live lists, placements and distinct creation and update da
     expect(await query(expiringSoonSql(W, U))).toHaveLength(10)
     expect(await query(recentSql(W, U))).toHaveLength(10)
   } finally { close() }
+})
+
+test('SQL distinguishes current widget ownership from authorship', async () => {
+ const { dashCte, officialSql, mineSql, widgetListSql, dashboardListSql } = await import('../lib/dash/sql')
+ expect(dashCte(W)).toContain('e.owner')
+ expect(() => officialSql('d', 'bad')).toThrow()
+ expect(() => mineSql('w', 'bad')).toThrow()
+ const { db, close } = await nativeDb([
+  {key:key(101),creator:W,owner:U,attrs:{project:DASH_PROJECT,type:'widget',user:V,name:'Owned',chart:'table'}},
+  {key:key(102),creator:W,owner:V,attrs:{project:DASH_PROJECT,type:'widget',user:U,name:'Authored',chart:'table'}},
+  {key:key(103),creator:W,owner:U,attrs:{project:DASH_PROJECT,type:'dashboard',user:W,title:'Transferred'}},
+  {key:key(104),creator:W,owner:W,attrs:{project:DASH_PROJECT,type:'dashboard',user:U,title:'Mine'}}
+ ])
+ const query = async (sql:string) => (await db.runAndReadAll(sql)).getRowObjects()
+ try {
+  await db.run('CREATE TABLE live_head AS SELECT 99999 AS block')
+  expect((await query(myWidgetsSql(W,U))).map(r=>r.key)).toEqual([key(101)])
+  expect((await query(myDashboardsSql(W,U))).map(r=>r.key)).toEqual([key(104)])
+  expect(await query(activityCountsSql(W,U))).toMatchObject([{live_widgets:BigInt(1),live_dashboards:BigInt(1)}])
+  for (const build of [recentSql, expiringSoonSql]) expect((await query(build(W,U))).map(r=>r.key).sort()).toEqual([key(101),key(104)])
+  expect(await query(dashboardListSql(W,{search:'',sort:'newest',official:true,limit:12,offset:0}))).toEqual([])
+  expect(await query(widgetListSql(W,{search:'',chart:null,sort:'newest',user:U,limit:12,offset:0}))).toMatchObject([{key:key(101),owner:U}])
+ } finally { close() }
 })

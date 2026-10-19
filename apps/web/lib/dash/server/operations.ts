@@ -2,7 +2,7 @@ import { isOfficialUser } from '../official'
 import { ExpirationTime, type AttributeInputs, type WalletArkivClient, type PublicArkivClient } from '@arkiv-network/sdk'
 import { addr, key } from '@arkiv-network/sdk/attr'
 import { RpcError, type ArkivRpc } from '@asi/core'
-import { type DashboardEntity, type LinkEntity, type WidgetEntity, asDashboard, asLink, asWidget, dashboardBundleExpr, jsonPayload, keysExprs, queryAll, widgetExtendExpr } from '../entities'
+import { type DashboardEntity, type LinkEntity, type WidgetEntity, asDashboard, asLink, asWidget, dashboardBundleExpr, jsonPayload, keysExprs, queryAll, widgetVersionExpr } from '../entities'
 import { BLOCKS_PER_DAY, DASHBOARD_LIFETIME_DAYS, SIZES, isEntityKey, parseDashboardPayload, type Parsed, CONTENT_TYPE, DASH_PROJECT, MAX_LINKS_PER_DASHBOARD, MAX_REMAINING_DAYS, type Size, type WidgetPayload, type WriteResult } from '../schema'
 import { dashErrors } from './errors'
 import type { WriteQueue } from './queue'
@@ -96,7 +96,7 @@ export function updateWidget(deps: OpsDeps, s: Session, entityKey: string, widge
 export function extendWidget(deps: OpsDeps, s: Session, entityKey: string): Promise<WriteResult> {
   return deps.queue.run(async () => {
     requireUser(deps, s)
-    const { head, entities, widget } = await readWidget(deps, entityKey, widgetExtendExpr(deps.wallet, entityKey, s.address.toLowerCase()))
+    const { head, entities, widget } = await readWidget(deps, entityKey, widgetVersionExpr(deps.wallet, entityKey, s.address.toLowerCase()))
     const linked = entities.filter(e => e.expiresAt > head).map(e => asLink(e, deps.wallet))
       .some(l => l !== null && l.widgetKey === widget.key && l.user === s.address.toLowerCase())
     if (widget.user !== s.address.toLowerCase() && !linked) throw dashErrors.forbidden()
