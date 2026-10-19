@@ -2,7 +2,7 @@
 
 Date: 20 October 2026. Companion to `2026-10-20-widget-dashboards-design.md` (section 9). Choices the spec leaves open are marked (design call).
 
-Section 10 (live dashboards redesign, owner approved 20 October 2026) supersedes the visual parts of sections 0, 1, 5 and 6 where they conflict. Each superseded paragraph carries a note pointing to the replacing subsection.
+Section 11 (user owned widgets, owner approved 20 October 2026) supersedes the Extend, owner and LoginGate rules of sections 0 to 4 and 7. Section 10 (live dashboards redesign, owner approved 20 October 2026) supersedes the visual parts of sections 0, 1, 5 and 6 where they conflict. Each superseded paragraph carries a note pointing to the replacing subsection.
 
 ## 0. Shared building blocks
 
@@ -276,3 +276,55 @@ The faint widget border is decorative (1.15:1 to 1.22:1); figure boundaries are 
 ### 10.12 Other pages
 
 `/me`, `/widgets/new`, `/widgets/<key>`, `/d/<key>/edit`, the import modal, the add to dashboard picker, the login gate, the playground and the about page keep their layout and copy from sections 2 to 9 and take the new tokens, buttons, chips and focus styles. The widget page follows the mock screen 4: breadcrumb "Explore / Widgets / <name>", title with the chart type chip, a facts line (author, "on N dashboards", lifetime chip, "Live, computed in your browser" with timing), actions on the right (`.btn-quiet` "Copy link", `.btn` "Open in playground", `.btn-primary` "+ Add to dashboard"), then a two column body: chart card (with a "Chart / Table" segment) and a read only SQL card ("Copy SQL") on the left; on the right a "Used on N dashboards" panel (up to 4 rows linking to `/d/<key>`, "Show all N" expands the list in place) and a "Lifetime" panel (time left, "Lives for 7 days per extend", key, and the Extend button with its eligibility note when the viewer may extend). The owner view keeps the editor of §4 under the same header.
+
+## 11. User owned widgets (owner decision, 20 October 2026)
+
+Spec §6.5 holds the decision and its reasons. This section holds the flow and the exact copy. It overrides the "Expiry and Extend" paragraph of §0, the saved page and owner rules of §4, the Extend rules of §3 and §7, and the LoginGate body of §2.
+
+### 11.1 Who sees what
+
+- Owner view of `/widgets/<key>` (editor, Delete, Transfer) when the viewer's session address equals the widget's Arkiv owner. Authorship in bylines stays the `user` attribute.
+- Extend: every logged in viewer on every live widget owned by a user wallet (not official, and not a legacy widget still owned by the app wallet, since only user owned widgets are permissionlessly extendable), in the places that already offer it (widget page Lifetime panel, `/me` rows, Expiring soon, organize rows). Dashboard figures still show no Extend. Logged out, the Lifetime panel note reads "Log in to extend this widget." and no button shows.
+- Lifetime panel eligibility note (replaces both old notes): "Anyone can extend this widget. Your wallet signs and pays a small network fee."
+- "My widgets" on `/me`, the "Mine only" explorer toggle and the import modal "My widgets" tab list widgets the viewer owns on Arkiv.
+
+### 11.2 Edit saves a new version
+
+- Owner editor Save button: "Save new version" (was "Save changes").
+- Under the header, a quiet note in `--text-3`: "Widgets are read only on Arkiv. Saving creates a new version and moves your dashboards to it."
+- After saving, route to `/widgets/<new key>` with the Syncing chip and a `role="status"` note: "Saved as a new version. Your dashboards now use it. The old version stays until it expires, because other dashboards may still use it." followed by a `.btn-quiet` "Delete old version". Dismissing or leaving the page keeps the old version.
+
+### 11.3 Signing dialogs
+
+All three reuse the §0 dialog shell (`role="dialog"`, `aria-modal`, max width 380px, focus trapped, Escape or "Cancel" closes and refocuses the trigger). While signing, the confirm button reads "Waiting for wallet…" and both buttons are disabled.
+
+- Extend: title "Extend “<name>”?", body "Adds N days. New expiry: in 13d 23h. Your wallet signs and pays a small network fee.", buttons "Cancel" and `.btn-primary` "Extend". Done and cap states as in §0.
+- Delete (owner only, `.btn-quiet` "Delete widget" in the Lifetime panel and on `/me` rows): title "Delete “<name>”?", body "It disappears from Arkiv now. Dashboards that use it show it as expired. Your wallet signs and pays a small network fee.", buttons "Cancel" and `.btn-primary` "Delete". Success on the widget page routes to `/me`; on `/me` the row disappears optimistically.
+- Transfer (owner only, `.btn-quiet` "Transfer" in the Lifetime panel): title "Transfer “<name>”?", body "The new owner can extend, transfer or delete it. You stay the author, but you can no longer delete it or save new versions.", input label "New owner address", placeholder "0x…", buttons "Cancel" and `.btn-primary` "Transfer". Input errors (inline, under the input): "Enter a 0x address with 40 hex characters." and "That is already your address." Success closes the dialog and the page switches to the viewer view.
+
+### 11.4 Wallet errors
+
+Shown as `.error` with `role="alert"` inside the open dialog (the dialog stays open, the trigger keeps its label):
+
+| Cause | Copy |
+| :--- | :--- |
+| User rejected the request | none (silent, the dialog returns to its confirm state) |
+| `NotOwner` | "Only the widget's owner can do this. It may have been transferred." |
+| `EntityExpired` or `EntityNotFound` | "This widget has expired. Arkiv no longer has it." |
+| Insufficient funds | "Not enough GLM to pay the network fee. Fund your wallet and try again." |
+| `ExpiryNotExtended` or cap | "Already at the 90 day maximum" |
+| Wallet address differs from the session | "Your wallet changed. Log out and log in again." |
+| Anything else | "Your wallet couldn't sign. Try again." |
+
+### 11.5 Balance warning
+
+Balance is read over RPC for the session address when a page with signing actions mounts and after each signature. Threshold 0.1 GLM. Nothing shows while loading or when the read fails (buttons stay enabled).
+
+- Low (above zero, below 0.1): `.state .state-behind` block, `role="status"`: "Low balance: 0.04 GLM. Extending, transferring or deleting needs at least 0.1 GLM on Tiramisu. Fund 0x4a…c2." with a `.btn-quiet` "Copy address" (shows "✓ Copied" for 2 seconds). Actions stay enabled.
+- Empty (zero): same block with "Your wallet has no GLM. Extending, transferring or deleting needs at least 0.1 GLM on Tiramisu. Fund 0x4a…c2." Extend, Delete, Transfer and "Delete old version" are disabled with title "Fund your wallet to sign".
+- Placement: under the `/me` header, and inside the Lifetime panel of the widget page above its buttons.
+
+### 11.6 Copy changes elsewhere
+
+- LoginGate body (§2): "Use Google, Discord, X or Telegram. Saving widgets and dashboards is free and nothing personal goes on chain. Your widgets belong to your wallet; extending, transferring or deleting them is signed by it and needs a little GLM."
+- §0 "Our wallet pays, you pay nothing." is replaced by the §11.3 Extend body.

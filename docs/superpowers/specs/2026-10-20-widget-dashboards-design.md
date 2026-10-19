@@ -49,7 +49,7 @@ Why it matters: widgets and dashboards are stored as Arkiv entities. The indexer
 
 Rule **(user)**: attributes hold queryable information only. Layout and configuration (size, chart type, mapping, query text) live in the payload.
 
-All entities: `contentType: application/json`, created by the backend wallet, which is the Arkiv owner. The app level owner is the `user` attribute. **(call)**
+All entities: `contentType: application/json`, created by the backend wallet, which is the Arkiv owner. The app level owner is the `user` attribute. **(call)** Superseded for user widgets by §6.5 (owner decision, 20 October 2026): a user widget is owned on Arkiv by the user's wallet.
 
 ### 6.1 Widget entity
 
@@ -116,6 +116,20 @@ Payload: `{ "v": 1, "size": "xl", "position": 3, "name": "Top 10 creators" }`.
 - Organize save (reorder, resize, import, remove): one `executeBatch` that creates new links, updates changed links, deletes removed links, and extends the dashboard and its remaining links.
 - Delete dashboard: owner only; one batch deletes the dashboard and its links.
 
+### 6.5 User owned widgets (owner decision, 20 October 2026)
+
+Approved by the owner on 20 October 2026. It replaces the widget parts of §6.4 and §7 "Write rules".
+
+- Create: the backend wallet creates the widget with creation flags `readonly: true` and `permissionlessExtension: true`, and hands Arkiv ownership to the session address (the Privy embedded wallet that signed the login message) in the same `executeBatch` (`ownershipChanges`). `$creator` stays the backend wallet, so every read keeps proving app provenance with `$creator = <wallet>` plus `project`. Attributes still carry `user` (the author, never changes) and `login`; the payload is unchanged. The server keeps the SQL guard and payload validation on create. With "Add to dashboard" the same batch also creates the link (the link stays owned by the backend wallet).
+- Lifecycle after create: the owner signs delete and transfer directly from the Privy wallet in the browser; anyone with gas may sign an extend (permissionless). The server endpoints `PUT /api/dash/widgets/<key>`, `DELETE /api/dash/widgets/<key>` and `POST /api/dash/widgets/<key>/extend` are removed.
+- Edit: a readonly entity cannot be patched, so saving changes creates a new version through `POST /api/dash/widgets` with `replaces: <old key>`. The server requires the old widget to be live and its Arkiv `owner` to be the session address, then in one batch creates the new version (flags, transfer to the user) and repoints the user's own links to it (links whose `user` is the session address, which the server only ever sets to the owner of the link's dashboard; patch of the `widget` attribute and the payload `name`). Links on other users' dashboards keep the old key. The old version is not deleted by the server: other dashboards may still use it, and deleting it needs the owner's signature. After saving, the page offers "Delete old version" (a direct signature); otherwise it expires on its own.
+- Extend eligibility: any logged in user may extend any live user widget, because the chain allows it and the signer pays their own fee. The old rule "only users who have it on one of their dashboards" existed only because the backend wallet paid; keeping it in the UI would be a restriction anyone can bypass with a script, so it is dropped. Official widgets still show "Kept live" and no Extend.
+- Official marker: an entity is official when its `user` attribute AND its Arkiv owner are the backend wallet. Official widgets are never transferred (the seed does not transfer), and keepalive extends only entities that satisfy both. The session guard (no session or write for the wallet address) stays.
+- Legacy widgets created before this decision stay owned by the app wallet without flags. They are read only for everyone and expire on their own. They are never transferred: a non readonly widget in a user's hands could have its `user` attribute patched to the app wallet and be transferred back, forging the official marker. Readonly on every user widget is what keeps the `user` attribute trustworthy after a transfer.
+- Ownership in the UI: owner view, Delete, Transfer and "My widgets" use the Arkiv `owner` field, not `user`. The byline keeps showing `user` as the author.
+- Gas: a user wallet needs GLM (Tiramisu native token) for direct signing. Below 0.1 GLM the UI shows a low balance warning next to Extend, Delete and Transfer and on `/me`, with the address to fund, and still allows the action; at exactly zero the signing buttons are disabled. Creating widgets, dashboards and organizing stay gasless (the backend wallet pays).
+- Signing runs in the browser through the Privy embedded wallet's EIP 1193 provider, switched to Tiramisu when needed (Privy `supportedChains` and `defaultChain` include Tiramisu), and the Arkiv SDK wallet client. Wallet errors map to friendly copy (UI §11.4); a user rejection is silent, like a cancelled login.
+
 ## 7. Auth and backend
 
 **(user)** The backend verifies ownership with the Privy JWT plus an EIP 191 personal_sign by the user's wallet. User info goes into attributes.
@@ -131,8 +145,8 @@ Backend location: Next.js route handlers in `apps/web`. New secret `DASHBOARD_PR
 
 Write rules enforced server side:
 
-- Update or delete of a widget or dashboard: the entity's `user` attribute must equal the session address.
-- Extend: caller is the widget's `user`, or a live link exists with `widget` equal to that widget and `user` equal to the caller. The backend checks this with one selective `arkiv_query` on link attributes (it does not depend on the indexer being caught up). **(call)**
+- Update or delete of a widget or dashboard: the entity's `user` attribute must equal the session address. Superseded for widgets by §6.5: the backend no longer updates, deletes or extends widgets; the chain enforces ownership (`NotOwner`) for direct signatures, and a new version (`replaces`) requires the old widget's Arkiv owner to be the session address.
+- Extend: caller is the widget's `user`, or a live link exists with `widget` equal to that widget and `user` equal to the caller. The backend checks this with one selective `arkiv_query` on link attributes (it does not depend on the indexer being caught up). **(call)** Superseded by §6.5: extend is permissionless on chain and signed by the caller.
 - Payload validation: JSON schema, size cap, chart enum, size enum, lifetime enum.
 - Per user rate limit on writes, and one serial write queue for the backend wallet to avoid nonce clashes. **(call; limits left to builder)**
 

@@ -16,6 +16,7 @@ Plan order (each depends on the previous ones being merged):
 4. `04-explorer-home-docs.md`: explorer `/widgets`, home `/me` with activity, "Widgets" nav item, README, SPECS.md, DEVELOPER.md, CHANGELOG.md, `arkiv/schema.md`.
 5. `05` to `08`: review and fix plans.
 9. `09-live-dashboards-redesign.md`: v5 theme and shell, chart types `stacked-bar` and `histogram`, Official dashboards (marker, seed, keepalive), `/explore` with tabs, landing without the showcase, report style dashboard view, page sweep. Shared interfaces it adds are in section 11.
+10. `10-user-owned-widgets.md`: widgets created readonly and permissionlessly extendable, transferred to the user's wallet in the creating batch; the user extends, deletes and transfers by signing in the browser; edit saves a new version. Shared interfaces it adds are in section 12, and section 12 overrides sections 6, 7 and 8 where they conflict.
 
 ## 2. Executor rules (apply to every task)
 
@@ -74,7 +75,7 @@ recharts 3: `LineChart`, `Line`, `LabelList` exported (`types/index.d.ts:22`); `
 
 ## 6. Entity schema (spec §6, exact values)
 
-All three types: `contentType: 'application/json'`, payload is `JSON.stringify` UTF-8 bytes, Arkiv owner and creator is the backend wallet. `project` value is `arkiv-sql-indexer-dash`.
+All three types: `contentType: 'application/json'`, payload is `JSON.stringify` UTF-8 bytes, Arkiv creator is the backend wallet. Dashboards, links and official widgets are also owned by the backend wallet. User widgets are owned by the user's wallet from plan 10 on (section 12). `project` value is `arkiv-sql-indexer-dash`.
 
 | Type | Attributes (Arkiv type) | Payload |
 | :--- | :--- | :--- |
@@ -233,10 +234,8 @@ All under `/api/dash`, JSON in and out, `export const dynamic = 'force-dynamic'`
 | POST `auth/session` | `{ nonce, signature }` plus header `Authorization: Bearer <Privy access token>` | `SessionInfo`, sets cookie | Privy |
 | GET `auth/session` | none | `SessionInfo` or 401 | cookie |
 | DELETE `auth/session` | none | `{ ok: true }`, clears cookie | none |
-| POST `widgets` | `{ widget: WidgetPayload, addTo?: { dashboard, size } }` | `WriteResult` with `key`, `expiresAt`, optional `linkKey` | cookie |
-| PUT `widgets/<key>` | `{ widget: WidgetPayload }` | `WriteResult` | cookie, widget `user` |
-| DELETE `widgets/<key>` | `{}` | `WriteResult` | cookie, widget `user` |
-| POST `widgets/<key>/extend` | `{}` | `WriteResult` with `expiresAt` | cookie, widget `user` or owner of a live link to it |
+| POST `widgets` | `{ widget: WidgetPayload, addTo?: { dashboard, size }, replaces?: string }` (`addTo` and `replaces` are mutually exclusive) | `WriteResult` with `key`, `expiresAt`, optional `linkKey`, optional `relinked` | cookie; with `replaces`, the old widget's Arkiv owner must be the session address |
+| ~~PUT `widgets/<key>`~~, ~~DELETE `widgets/<key>`~~, ~~POST `widgets/<key>/extend`~~ | removed in plan 10 | | the widget owner signs extend, delete and transfer in the browser (section 12) |
 | POST `dashboards` | `{ title, description? }` | `WriteResult` with `key`, `expiresAt` | cookie |
 | PUT `dashboards/<key>` | `{ title, description? }` | `WriteResult` | cookie, dashboard `user` |
 | DELETE `dashboards/<key>` | `{}` | `WriteResult` | cookie, dashboard `user` |
@@ -368,4 +367,96 @@ export function toDashboardItems(rows: unknown[][]): DashboardListItem[]
 
 // lib/dash/read.ts
 export function fetchDashboards(rpc: Rpc, wallet: string, keys: string[]): Promise<{ head: number; dashboards: Map<string, DashboardEntity> }>
+```
+
+## 12. User owned widgets (plan 10)
+
+Owner decision of 20 October 2026, recorded in spec §6.5 and UI §11. This section overrides sections 6, 7.1, 8 and 11.3 where they conflict.
+
+### 12.1 Ownership model
+
+| Entity | Creator | Arkiv owner | Creation flags | Who writes after creation |
+| :--- | :--- | :--- | :--- | :--- |
+| user widget | backend wallet | the session address (Privy embedded wallet), transferred in the creating batch | `readonly: true`, `permissionlessExtension: true` | owner signs delete and transfer; anyone signs extend |
+| official widget | backend wallet | backend wallet (never transferred) | none | backend wallet (keepalive) |
+| dashboard, link | backend wallet | backend wallet | none | backend wallet through the existing endpoints |
+
+- Reads stay scoped by `$creator = <wallet>` plus `project` (section 7.1 `scopeExpr`). The creator never changes on transfer (`@arkiv-network/sdk/src/query/queryBuilder.ts`, comment on `createdBy`: "The creator never changes; the owner does").
+- The `user` attribute is the author (who created it) and never changes. The Arkiv `owner` field decides who may delete or transfer, and every UI ownership check (owner view, Delete, Transfer, "My widgets") uses `owner`, never `user`.
+- Official means `user == wallet` AND `owner == wallet` for every entity type.
+
+### 12.2 Verified library facts (read from installed source on 20 October 2026)
+
+- `createEntity` and each `executeBatch` create accept `flags?: CreationFlags` (`actions/wallet/createEntity.ts:81`), packed by `encodeCreationFlags` into `creationFlags` for every create in a batch (`utils/arkivTransactions.ts:127`). `CreationFlags = { readonly?: boolean; permissionlessExtension?: boolean }` (`entity/flags.ts`), fixed for life.
+- `executeBatch({ creates, patches, deletes, extensions, ownershipChanges })`; `ownershipChanges: { entityKey: Hex; newOwner: Hex }[]` (`actions/wallet/executeBatch.ts`, `actions/wallet/changeOwnership.ts`). Operations apply in the order creates, patches, deletes, extensions, ownership changes (`utils/arkivTransactions.ts:152-165`), so one batch can create a widget and hand it to the user.
+- Wallet client actions `extendEntity`, `deleteEntity`, `changeOwnership`, `executeBatch` (`clients/decorators/arkivWallet.ts:204-276`).
+- Engine reverts, rendered into `EntityMutationError` messages by `describeEntityRevert` (`utils/revert.ts`): `NotOwner` ("entity 0x… is owned by 0x…, not 0x…"), `EntityExpired` ("expired at block"), `EntityNotFound` ("no entity 0x…"), `ReadOnlyEntity`, `ExpiryNotExtended`, `TransferToSelf`, `TransferToZeroAddress`. `sendArkivTransaction` wraps every failure in `EntityMutationError` with the original as `cause` (`utils/arkivTransactions.ts`, catch block after `writeContract`).
+- `tiramisu` chain: id `7738577`, native currency `{ name: 'Golem', symbol: 'GLM', decimals: 18 }` (`chains/tiramisu.ts`). 0.1 GLM is `10n ** 17n` wei.
+- `createWalletClient({ chain, account, transport })` takes a viem transport (`clients/createWalletClient.ts`); `account` may be a bare address (JSON RPC account), in which case viem sends `eth_sendTransaction` through the transport after `assertCurrentChain` (`apps/web/node_modules/viem/actions/wallet/sendTransaction.ts`, around lines 226 and 261). viem 2.57.7 exports `custom(provider)` and `http(url)` (`viem/_types/clients/transports/custom.d.ts`, `http.d.ts`). `createPublicClient(...).getBalance({ address })` comes from viem `publicActions`, which the SDK public client extends (`clients/createPublicClient.ts`).
+- The indexer applies `OwnershipTransferred` by updating `entities.owner` and `updated_at` (`apps/indexer/src/sync.ts`, the `OwnershipTransferred` branch), and `ExpiryExtended` also bumps `updated_at`, so `syncedSql` (section 10) works for direct extends and transfers.
+
+Privy React 3.50.0 (`apps/web/node_modules/@privy-io/react-auth/dist/dts`):
+- `useWallets(): { wallets: ConnectedWallet[]; ready: boolean }` (`index.d.ts:1346-1356`).
+- `ConnectedWallet` has `address`, `walletClientType` (`'privy'` for the embedded wallet), `chainId` (CAIP 2 string such as `eip155:7738577`), `switchChain(id: number | 0x string): Promise<void>`, `getEthereumProvider(): Promise<EIP1193Provider>` (`types-CoijvGho.d.ts:1089-1150`; `EmbeddedWalletClientType` in the `WalletClientType` union at line 889). `switchChain` does not update an existing provider; request the provider after switching.
+- `PrivyClientConfig.supportedChains?: Chain[]` and `defaultChain?: Chain` (`types-CoijvGho.d.ts:1930-1947`); `switchChain` on a chain outside `supportedChains` throws. The embedded provider (`Embedded1193Provider`, `index.d.ts:462-520`) signs `eth_sendTransaction` itself and, with `showWalletUIs: false`, without a prompt.
+
+### 12.3 Interfaces
+
+```ts
+// lib/dash/official.ts (adds)
+export function isOfficialOwned(user: string, owner: string, wallet: string): boolean   // isOfficialUser(user, wallet) && isOfficialUser(owner, wallet)
+// officialExpr(wallet) now renders scope AND user = addr(wallet) AND $owner = addr(wallet)
+
+// lib/dash/entities.ts
+// WidgetEntity, DashboardEntity, LinkEntity: official = isOfficialOwned(attrs.user, owner, wallet)
+export function widgetVersionExpr(wallet: string, widgetKey: string, user: string): string   // renamed from widgetExtendExpr, same expression
+
+// lib/dash/sql.ts
+// dashCte gains the column `owner` (e.owner, lowercase as stored)
+export function officialSql(alias: string, wallet: string): string   // `(${alias}.usr = '<w>' AND ${alias}.owner = '<w>')`
+export function mineSql(alias: string, address: string): string      // `((${alias}.type = 'widget' AND ${alias}.owner = '<a>') OR (${alias}.type <> 'widget' AND ${alias}.usr = '<a>'))`
+// WidgetListItem gains owner: string; WidgetListQuery.user filters on w.owner
+
+// lib/dash/schema.ts
+export type WriteResult = { txHash: string; afterBlock: number; key?: string; linkKey?: string; expiresAt?: number; relinked?: string[] }
+export const WIDGET_FLAGS: { readonly: true; permissionlessExtension: true }
+
+// lib/dash/time.ts (moved from server/operations.ts, same body)
+export function extendTarget(expiresAt: number, head: number, lifetimeDays: number): number
+
+// lib/dash/wallet.ts (isomorphic, no React)
+export const TIRAMISU_CHAIN_ID = 7738577
+export const MIN_SIGNING_BALANCE_WEI = 10n ** 17n
+export type Eip1193 = { request(args: { method: string; params?: unknown }): Promise<unknown> }
+export function tiramisuChain(rpcUrl: string): Chain                // tiramisu with rpcUrls.default.http = [rpcUrl]
+export function routeRpc(method: string): 'wallet' | 'rpc'
+export function splitTransport(wallet: Eip1193, rpc: Eip1193): Transport   // viem custom transport
+export type UserWalletClient = Pick<WalletArkivClient, 'account' | 'extendEntity' | 'deleteEntity' | 'changeOwnership' | 'getBlockNumber'>
+export function createUserWalletClient(provider: Eip1193, address: `0x${string}`, rpcUrl: string): UserWalletClient
+export type BalanceLevel = 'unknown' | 'empty' | 'low' | 'ok'
+export function balanceLevel(wei: bigint | null): BalanceLevel
+export function formatGlm(wei: bigint): string                     // up to 4 decimals, trailing zeros trimmed, e.g. '0.04 GLM'
+export function readBalance(rpcUrl: string, address: string, client?: { getBalance(a: { address: `0x${string}` }): Promise<bigint> }): Promise<bigint | null>
+
+// lib/dash/widget-actions.ts (isomorphic)
+export type DirectResult = { txHash: string; afterBlock: number; expiresAt?: number }
+export function extendWidgetDirect(client: UserWalletClient, w: { key: string; expiresAt: number; lifetimeDays: LifetimeDays }): Promise<DirectResult>
+export function deleteWidgetDirect(client: UserWalletClient, key: string): Promise<DirectResult>
+export function transferWidgetDirect(client: UserWalletClient, key: string, to: string): Promise<DirectResult>
+export type WalletErrorKind = 'rejected' | 'not_owner' | 'expired' | 'funds' | 'at_cap' | 'mismatch' | 'invalid_address' | 'self' | 'wallet'
+export class WalletActionError extends Error { kind: WalletErrorKind }
+export function walletErrorKind(error: unknown): WalletErrorKind
+export function walletErrorMessage(kind: WalletErrorKind): string | null   // null for 'rejected' (silent)
+export function transferAddressError(value: string, self: string): string | null
+export function canExtendWidget(w: { owner: string; expiresAt: number; official: boolean }, head: number | undefined, viewer: string | null, wallet: string): boolean   // logged in, not official, owner is not the app wallet, live
+
+// components/auth/DashAuthProvider.tsx (adds to DashAuth)
+sign<T>(job: (client: UserWalletClient) => Promise<T>): Promise<T>   // mounts PrivyBridge in mode 'sign'; one job at a time
+
+// components/auth/PrivyBridge.tsx (adds)
+export function pickEmbeddedWallet<W extends { address: string; walletClientType: string }>(wallets: W[], address: string): W | null
+export function needsChainSwitch(chainId: string | undefined): boolean   // false only for 'eip155:7738577'
+
+// lib/dash/use-balance.ts (client)
+export function useWalletBalance(address: string | undefined, rpcUrl: string | undefined, revision?: number): { wei: bigint | null; level: BalanceLevel; refresh(): void }
 ```
