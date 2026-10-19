@@ -10,6 +10,7 @@ export const NAV_ITEMS = [
  { href: '/', label: 'Overview' },
  { href: '/showcase', label: 'Showcase' },
  { href: '/playground', label: 'Playground' },
+ { href: '/widgets', label: 'Widgets' },
  { href: '/about', label: 'About' },
 ] as const
 
