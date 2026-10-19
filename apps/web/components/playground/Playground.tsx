@@ -75,7 +75,7 @@ export function Playground({ db, rpcUrl, head }: { db: IndexDb | null; rpcUrl: s
  return <div className={s.shell}>
   <SnippetSidebar id="pg-snippets" groups={GROUPS} activeId={activeId} edited={edited} schema={schema} open={drawer} onClose={() => setDrawer(false)} onPick={pick} onInsert={insert}/>
   {drawer && <div className={s.backdrop} onClick={() => setDrawer(false)} aria-hidden="true"/>}
-  <main className={s.main}>
+  <main id="main" className={s.main}>
    <header className={s.head}>
     <button className={`btn ${s.drawerBtn}`} onClick={() => setDrawer(true)} aria-controls="pg-snippets" aria-expanded={drawer}>☰ Snippets</button>
     <div className={s.headText}>

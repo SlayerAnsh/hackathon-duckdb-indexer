@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Console theme with dark and light modes, calm navigation and the index status bar on every page.
+
 * Removed the demo writer; the dashboard wallet is the only writer and widgets, dashboards and links are the live application data.
 
 * Public SQL widgets and shareable dashboards stored on Arkiv, with Privy social login, chart configuration, expiry and extension, dashboard organization and imports, a widget explorer and personal activity home; backend paid writes, scoped reads and documented self hosting setup.

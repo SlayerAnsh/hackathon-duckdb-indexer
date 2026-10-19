@@ -33,3 +33,8 @@ test('top bar chip carries only the state', () => {
  expect(html).toContain('live')
  expect(html).not.toContain('749')
 })
+
+test('TopBar includes the status bar without an explicit index state', async () => {
+ const { TopBar } = await import('../components/dash/TopBar')
+ expect(renderToStaticMarkup(<TopBar/>)).toContain('class="sbar"')
+})

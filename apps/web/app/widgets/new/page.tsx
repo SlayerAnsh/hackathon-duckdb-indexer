@@ -23,5 +23,5 @@ export function NewWidgetBody() {
  return <Suspense fallback={null}><CreateEditor/></Suspense>
 }
 export default function NewWidgetPage() {
- return <><TopBar/><main className="wrap"><NewWidgetBody/></main><Footer/></>
+ return <><TopBar/><main id="main" className="wrap"><NewWidgetBody/></main><Footer/></>
 }

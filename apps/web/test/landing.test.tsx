@@ -38,17 +38,16 @@ test('average query time ignores figures that have not been measured yet', () =>
 })
 
 test('nav marks exactly the active route', () => {
- expect(NAV_ITEMS.map(i => i.href)).toEqual(['/', '/showcase', '/playground', '/widgets', '/about'])
- expect(isActiveRoute('/', '/')).toBe(true)
- expect(isActiveRoute('/showcase', '/')).toBe(false)
- expect(isActiveRoute('/showcase', '/showcase')).toBe(true)
- expect(isActiveRoute('/showcase/', '/showcase')).toBe(true)
- expect(isActiveRoute('/showcases', '/showcase')).toBe(false)
- expect(isActiveRoute(null, '/')).toBe(false)
+ expect(NAV_ITEMS.map(i => i.href)).toEqual(['/', '/explore', '/playground', '/about'])
+ const explore = NAV_ITEMS[1]
+ for (const path of ['/explore', '/d/0xabc', '/widgets/0xabc', '/widgets/new']) expect(isActiveRoute(path, explore)).toBe(true)
+ for (const path of ['/', '/me', '/explorer']) expect(isActiveRoute(path, explore)).toBe(false)
+ expect(isActiveRoute('/', NAV_ITEMS[0])).toBe(true)
+ expect(isActiveRoute('/me', NAV_ITEMS[0])).toBe(false)
+ expect(isActiveRoute(null, NAV_ITEMS[0])).toBe(false)
  const html = renderToStaticMarkup(<PageNav pathname="/playground"/>)
  expect(html.match(/aria-current="page"/g)).toHaveLength(1)
- expect(html).toMatch(/aria-current="page"[^>]*href="\/playground"|href="\/playground"[^>]*aria-current="page"/)
- expect(html).toContain('Overview'); expect(html).toContain('Showcase'); expect(html).toContain('Playground')
+ expect(html).toContain('Home'); expect(html).toContain('Explore')
 })
 
 test('hero figures show placeholders while loading and the pipeline shows the measured time', () => {

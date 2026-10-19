@@ -7,5 +7,5 @@ import { explorerReducer, initExplorer } from '../../lib/dash/explorer-state'
 
 export default function WidgetsPage() {
  const [state, dispatch] = useReducer(explorerReducer, undefined, initExplorer)
- return <><TopBar/><main className="wrap"><ExplorerGrid state={state} dispatch={dispatch}/></main><Footer/></>
+ return <><TopBar/><main id="main" className="wrap"><ExplorerGrid state={state} dispatch={dispatch}/></main><Footer/></>
 }

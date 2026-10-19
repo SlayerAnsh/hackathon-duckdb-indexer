@@ -20,7 +20,7 @@ function Section({ id, title, lead, children }: { id: string; title: string; lea
 export default function AboutPage() {
  return <>
   <TopBar/>
-  <main className={`wrap ${s.main}`}>
+  <main id="main" className={`wrap ${s.main}`}>
    <header className={s.hero}>
     <div>
      <h1 className={s.title}>SQL over live Arkiv data, in your browser.</h1>

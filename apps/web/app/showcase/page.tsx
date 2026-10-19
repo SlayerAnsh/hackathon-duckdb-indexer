@@ -16,7 +16,7 @@ export default function ShowcasePage() {
  const live = useLiveMode(headBlock(state))
  return <>
   <TopBar state={state}/>
-  <main className={`wrap ${s.page}`}>
+  <main id="main" className={`wrap ${s.page}`}>
    <header className={s.intro}>
     <div>
      <h1>Showcase</h1>
