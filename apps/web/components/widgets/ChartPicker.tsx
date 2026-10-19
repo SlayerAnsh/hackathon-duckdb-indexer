@@ -1,0 +1,23 @@
+'use client'
+import { CHART_TYPES, type ChartType } from '../../lib/dash/schema'
+import { ChartIcon } from './ChartIcon'
+
+export const CHART_LABELS: Record<ChartType, string> = { table: 'Table', counter: 'Counter', bar: 'Bar', hbar: 'H bar', line: 'Line', area: 'Area', donut: 'Donut' }
+export function pickerIndex(key: string, index: number): number {
+ if (key === 'Home') return 0
+ if (key === 'End') return 6
+ if (key === 'ArrowRight' || key === 'ArrowDown') return (index + 1) % 7
+ if (key === 'ArrowLeft' || key === 'ArrowUp') return (index + 6) % 7
+ return index
+}
+export function ChartPicker({ value, onChange }: { value: ChartType; onChange(c: ChartType): void }) {
+ return <div role="radiogroup" aria-label="Chart type" style={{ display: 'flex', overflowX: 'auto', gap: 4 }}>
+  {CHART_TYPES.map((type, index) => <button key={type} type="button" role="radio" aria-checked={value === type} tabIndex={value === type ? 0 : -1} className="btn" style={{ height: 32, flexShrink: 0, ...(value === type ? { background: 'var(--accent-soft)', color: 'var(--accent)' } : {}) }} onClick={() => onChange(type)} onKeyDown={event => {
+   if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+   event.preventDefault()
+   const next = pickerIndex(event.key, index)
+   onChange(CHART_TYPES[next])
+   ;(event.currentTarget.parentElement?.children[next] as HTMLButtonElement)?.focus()
+  }}><ChartIcon type={type}/>{CHART_LABELS[type]}</button>)}
+ </div>
+}
