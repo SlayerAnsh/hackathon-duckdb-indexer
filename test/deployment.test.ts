@@ -25,6 +25,14 @@ test('compose keeps data persistent, credentials isolated, and writer opt in', (
   expect(s.web.build.args.NEXT_PUBLIC_TIRAMISU_RPC_URL).toBe(s.web.environment.NEXT_PUBLIC_TIRAMISU_RPC_URL);
   expect(s.web.build.args.NEXT_PUBLIC_EXPLORER_URL).toBe('${NEXT_PUBLIC_EXPLORER_URL:-https://tiramisu.explorer.arkiv.network}');
   expect(s.web.environment.NEXT_PUBLIC_EXPLORER_URL).toBe(s.web.build.args.NEXT_PUBLIC_EXPLORER_URL);
+  for (const name of ['PRIVY_APP_SECRET', 'DASHBOARD_PRIVATE_KEY', 'NEXT_PUBLIC_PRIVY_APP_ID', 'NEXT_PUBLIC_DASHBOARD_WALLET'])
+    expect(s.web.environment[name]).toBe('${' + name + ':-}');
+  for (const name of ['NEXT_PUBLIC_PRIVY_APP_ID', 'NEXT_PUBLIC_DASHBOARD_WALLET'])
+    expect(s.web.build.args[name]).toBe('${' + name + ':-}');
+  for (const name of ['indexer', 'demo-writer']) {
+    expect(JSON.stringify(s[name])).not.toContain('DASHBOARD_PRIVATE_KEY');
+    expect(JSON.stringify(s[name])).not.toContain('PRIVY_APP_SECRET');
+  }
   expect(s['demo-writer'].profiles).toEqual(['demo']);
   for (const name of ['web', 'demo-writer']) {
     expect(s[name].env_file).toBeUndefined();
@@ -34,6 +42,8 @@ test('compose keeps data persistent, credentials isolated, and writer opt in', (
     expect(service.restart).toBe('unless-stopped');
     expect(service.build.context).toBe('.');
     expect(JSON.stringify(service.build.args ?? {})).not.toContain('TIRAMISU_API_KEY');
+    expect(JSON.stringify(service.build.args ?? {})).not.toContain('DASHBOARD_PRIVATE_KEY');
+    expect(JSON.stringify(service.build.args ?? {})).not.toContain('PRIVY_APP_SECRET');
   }
 });
 
@@ -67,6 +77,12 @@ test('images use locked workspace installs and the standalone runtime layout', (
   const web = read('apps/web/Dockerfile');
   expect(web).toContain('ARG NEXT_PUBLIC_EXPLORER_URL=https://tiramisu.explorer.arkiv.network');
   expect(web).toContain('ENV NEXT_PUBLIC_EXPLORER_URL=$NEXT_PUBLIC_EXPLORER_URL');
+  for (const name of ['NEXT_PUBLIC_PRIVY_APP_ID', 'NEXT_PUBLIC_DASHBOARD_WALLET']) {
+    expect(web).toContain(`ARG ${name}=`);
+    expect(web).toContain(`ENV ${name}=$${name}`);
+  }
+  expect(web).not.toContain('DASHBOARD_PRIVATE_KEY');
+  expect(web).not.toContain('PRIVY_APP_SECRET');
   expect(web).toContain('node:22-slim');
   expect(web).toContain('bun run --cwd apps/web build');
   expect(web).toContain('/.next/standalone ./');
@@ -76,6 +92,8 @@ test('images use locked workspace installs and the standalone runtime layout', (
   const ignore = read('.dockerignore');
   for (const value of ['**/node_modules', '**/.next', '.env', '.env.*', '.git', 'data']) expect(ignore).toContain(value);
   const env = read('.env.example');
+  for (const name of ['NEXT_PUBLIC_PRIVY_APP_ID', 'PRIVY_APP_SECRET', 'DASHBOARD_PRIVATE_KEY', 'NEXT_PUBLIC_DASHBOARD_WALLET'])
+    expect(env).toContain(`${name}=`);
   for (const value of ['TIRAMISU_API_KEY=', 'SYNC_USE_API_KEY=false', 'FILL_USE_API_KEY=false', 'INDEX_EXPRESSION=', 'DEMO_PRIVATE_KEY=', 'DEMO_AGENT_ADDRESSES=', 'NEXT_PUBLIC_TIRAMISU_RPC_URL=', 'NEXT_PUBLIC_EXPLORER_URL=']) expect(env).toContain(value);
 });
 
