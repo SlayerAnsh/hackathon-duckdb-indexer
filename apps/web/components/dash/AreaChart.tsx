@@ -56,7 +56,7 @@ export function QueryChart({ widget, data }: ChartProps) {
      <CartesianGrid stroke="var(--grid)" horizontal={false}/><XAxis type="number" tickFormatter={tickFormatter} tickLine={false} axisLine={false} label={widget.xTitle ? { value: widget.xTitle, position: 'insideBottom' } : undefined}/>
      <YAxis dataKey={x} type="category" width={100} tickLine={false} axisLine={false} tickFormatter={v => shortHex(String(v))} label={widget.yTitle ? { value: widget.yTitle, angle: -90, position: 'insideLeft' } : undefined}/>
      {keys.map((k, i) => <Bar key={k} dataKey={k} stackId={stackId} fill={color(k, i)} radius={[0, 3, 3, 0]} isAnimationActive={false}>{valueLabel}</Bar>)}{tip}
-    </BarChart> : <BarChart barCategoryGap={widget.kind === 'histogram' ? 0 : undefined} stackOffset={widget.stacking === 'percent' ? 'expand' : undefined} data={rows} margin={{ right: 16 }}>
+    </BarChart> : <BarChart barCategoryGap={widget.binned ? 0 : undefined} stackOffset={widget.stacking === 'percent' ? 'expand' : undefined} data={rows} margin={{ right: 16 }}>
      {axes}{keys.map((k, i) => <Bar key={k} dataKey={k} stackId={stackId} fill={color(k, i)} radius={[3, 3, 0, 0]} isAnimationActive={false}>{valueLabel}</Bar>)}{tip}
     </BarChart>}
    </ResponsiveContainer>

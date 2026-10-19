@@ -76,5 +76,5 @@ test('Explore exposes accessible tabs and dashboard empty states',()=>{
 
 test('component and page links use the Explore widgets tab', () => {
  const walk = (dir: string): string[] => readdirSync(dir, {withFileTypes:true}).flatMap(entry => entry.isDirectory() ? walk(dir+'/'+entry.name) : [dir+'/'+entry.name])
- for(const root of ['apps/web/components','apps/web/app']) for(const file of walk(root).filter(file=>file.endsWith('.tsx'))) expect(readFileSync(file,'utf8')).not.toMatch(/href=["']\/widgets["']/)
+ for(const root of ['../components','../app'].map(p=>new URL(p,import.meta.url).pathname)) for(const file of walk(root).filter(file=>file.endsWith('.tsx'))) expect(readFileSync(file,'utf8')).not.toMatch(/href=["']\/widgets["']/)
 })

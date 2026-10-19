@@ -11,7 +11,7 @@ const finite = (v: unknown): number | null => {
 }
 export function toChartWidget(p: WidgetPayload, id: string): Widget {
  const kind = p.chart === 'counter' ? 'stat' : p.chart === 'hbar' ? 'bar' : p.chart === 'bar' ? (p.mapping.groupBy || p.mapping.stacking !== 'off' ? 'stacked-bar' : 'histogram') : p.chart
- return { id, title: p.name, sql: p.sql, kind, x: p.chart === 'histogram' ? 'bin' : p.mapping.x ?? undefined, y: p.chart === 'histogram' ? ['count'] : p.mapping.y, series: p.mapping.groupBy ?? undefined,
+ return { id, title: p.name, sql: p.sql, kind, binned: p.chart === 'histogram' || undefined, x: p.chart === 'histogram' ? 'bin' : p.mapping.x ?? undefined, y: p.chart === 'histogram' ? ['count'] : p.mapping.y, series: p.mapping.groupBy ?? undefined,
   stacking: p.chart === 'stacked-bar' && p.mapping.stacking === 'off' ? 'stack' : p.mapping.stacking, numberFormat: p.format.number, colors: Object.fromEntries(Object.entries(p.format.colors).map(([k,v]) => [k, `var(--${v})`])),
   legend: p.chart === 'histogram' ? false : p.format.legend, labels: p.format.labels, xTitle: p.format.xTitle ?? undefined, yTitle: p.format.yTitle ?? undefined }
 }

@@ -28,8 +28,9 @@ export async function runSeedCli(argv: string[], env: Record<string, string | un
       for (const slug of result.skipped) io.log(`${slug}: exists`)
     }
     return 0
-  } catch {
+  } catch (error) {
     io.log('Official dashboard operation failed. Check DASHBOARD_PRIVATE_KEY and NEXT_PUBLIC_TIRAMISU_RPC_URL.')
+    if (error instanceof Error) io.log(error.message.replace(/0x[0-9a-fA-F]{64}/g, '[redacted]'))
     return 1
   }
 }

@@ -27,7 +27,7 @@ export function SavedWidgetCard({ id, name, payload, status, size, version, head
  const style = { '--lg': SIZE_SPAN[size], '--md': size === 'xs' || size === 'sm' ? 6 : 12, '--sm': 12 } as CSSProperties
  const sqlId = id + '-sql'
  return <article id={id} className={`${r.figure}${stat ? ' ' + r.counter : ''}`} style={style} aria-labelledby={id + '-t'} aria-busy={status === 'loading' || (live && q.loading)} data-actions-open={actionsOpen}
-  onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setActionsOpen(false); overflow.current?.focus() } }}>
+  onKeyDown={event => { if (event.key === 'Escape' && actionsOpen) { event.preventDefault(); setActionsOpen(false); overflow.current?.focus() } }}>
   <header className={r.caption}>
    <div>{!stat && figure !== undefined && <div className={r.number}>Figure {figure}</div>}<h3 id={id + '-t'}>{name}</h3>{subtitle && <p className={r.subtitle}>{subtitle}</p>}</div>
    {live && <button ref={overflow} type="button" className={`ib ${r.overflow}`} aria-label={'Actions for ' + name} aria-expanded={actionsOpen} aria-controls={id + '-actions'} onClick={() => setActionsOpen(value => !value)}><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1"/><circle cx="8" cy="8" r="1"/><circle cx="13" cy="8" r="1"/></svg></button>}

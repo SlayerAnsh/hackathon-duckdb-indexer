@@ -27,7 +27,7 @@
 .actions{position:absolute;top:10px;right:10px;z-index:2;display:flex;align-items:center;flex-wrap:wrap;gap:4px;max-width:calc(100% - 20px);padding:4px;background:var(--card);border:1px solid var(--border-strong);border-radius:var(--r-md);box-shadow:var(--shadow-pop);opacity:0;pointer-events:none;transition:opacity .15s}
 .figure:hover .actions,.figure:focus-within .actions,.figure[data-actions-open="true"] .actions{opacity:1;pointer-events:auto}
 .overflow{position:absolute;right:10px;top:10px;opacity:0;pointer-events:none}
-.figure:focus-within .overflow{opacity:1;pointer-events:auto}
+.figure:focus-within .overflow{opacity:1;pointer-events:auto}.figure:focus-within .actions{right:52px}
 .sql{border:1px solid var(--border);border-radius:var(--r-md);margin-top:12px;background:var(--inset);overflow:hidden}
 .sql :global(.sqlpane){margin:0}
 @media (max-width:1100px){.figure{grid-column:span var(--md,6)}}
