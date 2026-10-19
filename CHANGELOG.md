@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Browser signing with the Privy wallet on Tiramisu, wallet error copy and balance checks.
+
 * Official items require app ownership; my widgets and the Mine filter follow the Arkiv owner.
 
 * Widget page and remaining pages restyled; official widgets show Kept live instead of Extend.

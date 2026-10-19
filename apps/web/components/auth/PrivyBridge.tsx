@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useRef } from 'react'
-import { PrivyProvider, usePrivy, useLogin, useModalStatus, useSignMessage } from '@privy-io/react-auth'
+import { PrivyProvider, usePrivy, useLogin, useModalStatus, useSignMessage, useWallets } from '@privy-io/react-auth'
+import { createUserWalletClient, tiramisuChain, TIRAMISU_CHAIN_ID, type UserWalletClient } from '../../lib/dash/wallet'
+import { WalletActionError } from '../../lib/dash/widget-actions'
 import { dashApi } from '../../lib/dash/api'
 import { runSessionHandshake } from '../../lib/dash/auth-client'
 import type { SessionInfo } from '../../lib/dash/schema'
@@ -22,7 +24,7 @@ export function bridgeErrorReason(error: unknown): 'cancelled' | 'failed' {
  if (error && typeof error === 'object' && ['privyErrorCode', 'code', 'message'].some(key => (error as Record<string, unknown>)[key] === 'exited_auth_flow')) return 'cancelled'
  return 'failed'
 }
-type Props = { appId: string; mode: 'login' | 'logout'; resume?: boolean; onDone(session: SessionInfo | null): void; onError(reason: 'cancelled' | 'no_wallet' | 'failed'): void }
+type Props = { appId: string; mode: 'login' | 'logout' | 'sign'; rpcUrl: string; sessionAddress?: string; job?: (client: UserWalletClient) => Promise<unknown>; onSigned?(value: unknown): void; onSignError?(error: unknown): void; resume?: boolean; onDone(session: SessionInfo | null): void; onError(reason: 'cancelled' | 'no_wallet' | 'failed'): void }
 function Runner(props: Props) {
  const privy = usePrivy()
  const { signMessage } = useSignMessage()
@@ -75,6 +77,60 @@ function Runner(props: Props) {
  }, [isOpen, privy.authenticated, props.mode])
  return null
 }
+export function pickEmbeddedWallet<W extends { address: string; walletClientType: string }>(wallets: W[], address: string): W | null {
+ return wallets.find(wallet => wallet.walletClientType === 'privy' && wallet.address.toLowerCase() === address.toLowerCase()) ?? null
+}
+export function needsChainSwitch(chainId: string | undefined): boolean {
+ return chainId !== `eip155:${TIRAMISU_CHAIN_ID}` && chainId !== String(TIRAMISU_CHAIN_ID)
+}
+function Signer(props: Props) {
+ const privy = usePrivy()
+ const wallets = useWallets()
+ const { isOpen } = useModalStatus()
+ const latest = useRef({ props, privy, wallets })
+ latest.current = { props, privy, wallets }
+ const mounted = useRef(false), started = useRef(false), working = useRef(false), finished = useRef(false), opened = useRef(false)
+ useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+ function fail(error: unknown) {
+  if (!mounted.current || finished.current) return
+  finished.current = true; latest.current.props.onSignError?.(error)
+ }
+ const { login } = useLogin({ onError: error => fail(new WalletActionError(bridgeErrorReason(error) === 'cancelled' ? 'rejected' : 'wallet')) })
+ useEffect(() => {
+  if (!privy.ready || finished.current) return
+  if (!privy.authenticated) {
+   if (!started.current) { started.current = true; login() }
+   return
+  }
+  if (!wallets.ready || working.current) return
+  working.current = true
+  void (async () => {
+   try {
+    const select = () => pickEmbeddedWallet(latest.current.wallets.wallets, latest.current.props.sessionAddress ?? '')
+    try { await waitForWallet(() => select()?.address) }
+    catch { throw new WalletActionError('mismatch') }
+    if (!mounted.current || finished.current) return
+    const wallet = select()
+    if (!wallet) throw new WalletActionError('mismatch')
+    if (needsChainSwitch(wallet.chainId)) await wallet.switchChain(TIRAMISU_CHAIN_ID)
+    if (!mounted.current || finished.current) return
+    const provider = await wallet.getEthereumProvider()
+    if (!mounted.current || finished.current) return
+    const { job, rpcUrl } = latest.current.props
+    if (!job) throw new WalletActionError('wallet')
+    const client = createUserWalletClient(provider, wallet.address as `0x${string}`, rpcUrl)
+    const value = await job(client)
+    if (mounted.current && !finished.current) { finished.current = true; latest.current.props.onSigned?.(value) }
+   } catch (error) { fail(error) }
+  })()
+ }, [privy.ready, privy.authenticated, wallets.ready, login])
+ useEffect(() => {
+  if (isOpen) opened.current = true
+  else if (opened.current && !privy.authenticated) fail(new WalletActionError('rejected'))
+ }, [isOpen, privy.authenticated])
+ return null
+}
 export default function PrivyBridge(props: Props) {
- return <PrivyProvider appId={props.appId} config={{ loginMethods: ['google', 'discord', 'twitter', 'telegram'], embeddedWallets: { ethereum: { createOnLogin: 'all-users' }, showWalletUIs: false } }}><Runner {...props}/></PrivyProvider>
+ const chain = tiramisuChain(props.rpcUrl)
+ return <PrivyProvider appId={props.appId} config={{ supportedChains: [chain], defaultChain: chain, loginMethods: ['google', 'discord', 'twitter', 'telegram'], embeddedWallets: { ethereum: { createOnLogin: 'all-users' }, showWalletUIs: false } }}>{props.mode === 'sign' ? <Signer {...props}/> : <Runner {...props}/>}</PrivyProvider>
 }

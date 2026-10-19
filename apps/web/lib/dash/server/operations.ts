@@ -1,9 +1,11 @@
+import { extendTarget } from '../time'
+export { extendTarget } from '../time'
 import { isOfficialUser } from '../official'
 import { ExpirationTime, type AttributeInputs, type WalletArkivClient, type PublicArkivClient } from '@arkiv-network/sdk'
 import { addr, key } from '@arkiv-network/sdk/attr'
 import { RpcError, type ArkivRpc } from '@asi/core'
 import { type DashboardEntity, type LinkEntity, type WidgetEntity, asDashboard, asLink, asWidget, dashboardBundleExpr, jsonPayload, keysExprs, queryAll, widgetVersionExpr } from '../entities'
-import { BLOCKS_PER_DAY, DASHBOARD_LIFETIME_DAYS, SIZES, isEntityKey, parseDashboardPayload, type Parsed, CONTENT_TYPE, DASH_PROJECT, MAX_LINKS_PER_DASHBOARD, MAX_REMAINING_DAYS, type Size, type WidgetPayload, type WriteResult } from '../schema'
+import { BLOCKS_PER_DAY, DASHBOARD_LIFETIME_DAYS, SIZES, isEntityKey, parseDashboardPayload, type Parsed, CONTENT_TYPE, DASH_PROJECT, MAX_LINKS_PER_DASHBOARD, type Size, type WidgetPayload, type WriteResult } from '../schema'
 import { dashErrors } from './errors'
 import type { WriteQueue } from './queue'
 import type { Session } from './session'
@@ -17,9 +19,6 @@ function requireUser(deps: OpsDeps, session: Session): void {
   if (isOfficialUser(session.address, deps.wallet)) throw dashErrors.forbidden()
 }
 
-export function extendTarget(expiresAt: number, head: number, lifetimeDays: number): number {
-  return Math.min(expiresAt + lifetimeDays * BLOCKS_PER_DAY, head + MAX_REMAINING_DAYS * BLOCKS_PER_DAY)
-}
 export function widgetAttributes(w: WidgetPayload, s: Session): AttributeInputs {
   return { type: 'widget', project: DASH_PROJECT, user: addr(hex(s.address)), login: s.login, name: w.name, chart: w.chart }
 }

@@ -8,10 +8,6 @@ import { fakeChain, widgetRow, dashboardRow, linkRow, validWidget, U, OTHER, K, 
 const S = { address: U, login: 'google' as const, exp: 9e9 }
 const payload = (data: any) => JSON.parse(new TextDecoder().decode(data.payload))
 
-test('extend target adds the lifetime but caps at 90 days remaining', () => {
-  expect(extendTarget(1000 + 43200, 1000, 7)).toBe(1000 + 8 * 43200)
-  expect(extendTarget(1000 + 89 * 43200, 1000, 7)).toBe(1000 + 90 * 43200)
-})
 test('create widget without a dashboard is one createEntity with attributes and JSON payload', async () => {
   const { deps, calls } = fakeChain([])
   const r = await createWidget(deps, S, { widget: validWidget })

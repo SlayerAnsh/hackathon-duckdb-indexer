@@ -39,7 +39,7 @@ test('activity links entities and displays kind and relative time without transa
  expect(html).not.toContain('transaction')
 })
 test('anonymous home shows login gate', () => {
- const auth: DashAuth = { config: null, status: 'anonymous', confirming: false, error: null, requestLogin: async () => false, logout: async () => {}, refresh: async () => {} }
+ const auth: DashAuth = { config: null, status: 'anonymous', confirming: false, error: null, sign: async () => { throw Error('unused') }, requestLogin: async () => false, logout: async () => {}, refresh: async () => {} }
  const html = render(<DashAuthContext.Provider value={auth}><HomePage/></DashAuthContext.Provider>)
  expect(html).toContain('Log in to build dashboards')
  expect(html).toContain('Use Google, Discord, X or Telegram. You never pay gas or hold tokens, and nothing personal goes on chain.')

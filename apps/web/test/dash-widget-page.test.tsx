@@ -121,7 +121,7 @@ test('organize rows show Kept live and hide Extend for official widgets', async 
  const { OrganizeRow } = await import('../components/widgets/OrganizeRow')
  const { DashAuthContext } = await import('../components/auth/DashAuthProvider')
  const wallet = '0x'+'ab'.repeat(20)
- const auth = {config:{enabled:true,wallet,privyAppId:'test',rpcUrl:'offline'},status:'authenticated' as const,address:U,confirming:false,error:null,requestLogin:async()=>true,logout:async()=>{},refresh:async()=>{}}
+ const auth = {config:{enabled:true,wallet,privyAppId:'test',rpcUrl:'offline'},status:'authenticated' as const,address:U,confirming:false,error:null,sign:async()=>{throw Error('unused')},requestLogin:async()=>true,logout:async()=>{},refresh:async()=>{}}
  const item = {id:'row',link:D,widget:K,name:'Official count',chart:'counter' as const,size:'xs' as const,imported:true,expiresAt:999999,lifetimeDays:7 as const,expired:false,flash:false}
  const html = render(<DashAuthContext.Provider value={auth}><OrganizeRow item={item} index={0} count={1} head={10} importedUser={wallet} onResize={()=>{}} onRemove={()=>{}}/></DashAuthContext.Provider>)
  expect(html).toContain('Kept live')

@@ -15,3 +15,7 @@ export function extendPreview(expiresAt: number, head: number, lifetimeDays: num
   const target = Math.min(expiresAt + lifetimeDays * BLOCKS_PER_DAY, head + MAX_REMAINING_DAYS * BLOCKS_PER_DAY)
   return { daysAdded: Math.floor((target - expiresAt) / BLOCKS_PER_DAY), atCap: target <= expiresAt }
 }
+
+export function extendTarget(expiresAt: number, head: number, lifetimeDays: number): number {
+  return Math.min(expiresAt + lifetimeDays * BLOCKS_PER_DAY, head + MAX_REMAINING_DAYS * BLOCKS_PER_DAY)
+}

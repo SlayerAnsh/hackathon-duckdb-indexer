@@ -3,6 +3,8 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import dynamic from 'next/dynamic'
 import { fetchDashWallet, readPublicDashConfig, type PublicDashConfig } from '../../lib/dash/config'
 import { dashApi } from '../../lib/dash/api'
+import type { UserWalletClient } from '../../lib/dash/wallet'
+import { WalletActionError } from '../../lib/dash/widget-actions'
 import type { Login, SessionInfo } from '../../lib/dash/schema'
 
 const PrivyBridge = dynamic(() => import('./PrivyBridge'), { ssr: false })
@@ -10,10 +12,11 @@ export type DashAuth = {
  config: PublicDashConfig | null
  status: 'loading' | 'anonymous' | 'authenticated' | 'disabled'
  address?: string; login?: Login; confirming: boolean; error: string | null
+ sign<T>(job: (client: UserWalletClient) => Promise<T>): Promise<T>
  requestLogin(): Promise<boolean>; logout(): Promise<void>; refresh(): Promise<void>
 }
 export const DashAuthContext = createContext<DashAuth>({ config: null, status: 'loading', confirming: false, error: null,
- requestLogin: async () => false, logout: async () => {}, refresh: async () => {} })
+ sign: async () => { throw new WalletActionError('wallet') }, requestLogin: async () => false, logout: async () => {}, refresh: async () => {} })
 export const useDashAuth = () => useContext(DashAuthContext)
 export function oauthReturnPending(search: string): boolean {
  const params = new URLSearchParams(search)
@@ -23,10 +26,28 @@ export function DashAuthProvider({ children }: { children: ReactNode }) {
  const [config, setConfig] = useState<PublicDashConfig | null>(null)
  const [session, setSession] = useState<SessionInfo | null>(null)
  const [status, setStatus] = useState<DashAuth['status']>('loading')
- const [mode, setMode] = useState<'login' | 'logout' | null>(null)
+ const [mode, setMode] = useState<'login' | 'logout' | 'sign' | null>(null)
  const [resume, setResume] = useState(false)
  const [error, setError] = useState<string | null>(null)
  const pending = useRef<{ promise: Promise<boolean>; resolve(value: boolean): void } | null>(null)
+ const signing = useRef<{ job: (client: UserWalletClient) => Promise<unknown>; resolve(value: unknown): void; reject(error: unknown): void } | null>(null)
+ function cancelSigning() {
+  const current = signing.current; signing.current = null
+  current?.reject(new WalletActionError('rejected'))
+ }
+ function sign<T>(job: (client: UserWalletClient) => Promise<T>): Promise<T> {
+  if (status !== 'authenticated' || !config?.enabled || signing.current) return Promise.reject(new WalletActionError('wallet'))
+  return new Promise<T>((resolve, reject) => {
+   signing.current = { job, resolve: value => resolve(value as T), reject }
+   setMode('sign')
+  })
+ }
+ function signed(value: unknown) {
+  const current = signing.current; signing.current = null; setMode(null); current?.resolve(value)
+ }
+ function signFailed(error: unknown) {
+  const current = signing.current; signing.current = null; setMode(null); current?.reject(error)
+ }
  const revision = useRef(0)
  function apply(value: SessionInfo | null) { setSession(value); setStatus(value ? 'authenticated' : 'anonymous') }
  async function refresh() {
@@ -42,7 +63,7 @@ export function DashAuthProvider({ children }: { children: ReactNode }) {
    setConfig(readPublicDashConfig({ privyAppId: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
     wallet, rpcUrl: process.env.NEXT_PUBLIC_TIRAMISU_RPC_URL }))
   })
-  return () => { active = false; revision.current++; pending.current?.resolve(false); pending.current = null }
+  return () => { active = false; cancelSigning(); revision.current++; pending.current?.resolve(false); pending.current = null }
  }, [])
  useEffect(() => {
   if (!config) return
@@ -54,6 +75,7 @@ export function DashAuthProvider({ children }: { children: ReactNode }) {
   return () => { revision.current++ }
  }, [config])
  function requestLogin(): Promise<boolean> {
+  cancelSigning()
   if (!config?.enabled) return Promise.resolve(false)
   if (pending.current) return pending.current.promise
   revision.current++
@@ -64,6 +86,7 @@ export function DashAuthProvider({ children }: { children: ReactNode }) {
   return promise
  }
  async function logout() {
+  if (signing.current) { cancelSigning(); setMode(null) }
   await dashApi.logout()
   revision.current++; apply(null); setError(null); setMode('logout')
  }
@@ -82,7 +105,7 @@ export function DashAuthProvider({ children }: { children: ReactNode }) {
   setMode(null); setError(reason === 'cancelled' ? null : "Login didn't finish. Try again.")
   pending.current?.resolve(false); pending.current = null
  }
- return <DashAuthContext.Provider value={{ config, status, ...session, confirming: mode === 'login', error, requestLogin, logout, refresh }}>
-  {children}{mode && config?.enabled && <PrivyBridge key={mode} appId={config.privyAppId} mode={mode} resume={resume} onDone={done} onError={failed}/>}
+ return <DashAuthContext.Provider value={{ config, status, ...session, confirming: mode === 'login', error, sign, requestLogin, logout, refresh }}>
+  {children}{mode && config?.enabled && <PrivyBridge key={mode} appId={config.privyAppId} mode={mode} rpcUrl={config.rpcUrl} sessionAddress={session?.address} job={signing.current?.job} onSigned={signed} onSignError={signFailed} resume={resume} onDone={done} onError={failed}/>}
  </DashAuthContext.Provider>
 }
