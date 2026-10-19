@@ -84,7 +84,7 @@ test('widget detail header, used on and lifetime panels', async () => {
  for (const text of ['Used on 6 dashboards','Show all 6','Official']) expect(panel).toContain(text)
  expect((panel.match(/href="\/d\//g)??[]).length).toBe(4)
  expect((render(<UsedOnPanel items={items} total={6} expanded/>).match(/href="\/d\//g)??[]).length).toBe(6)
- const lifetime = {...props,lifetimeDays:7 as const,canExtend:true}
+ const lifetime = {...props,owner:false,lifetimeDays:7 as const,canExtend:true}
  const kept = render(<LifetimePanel {...lifetime} official/> )
  const loggedOut = render(<LifetimePanel {...lifetime} canExtend={false} reason="Log in to extend this widget."/>)
  expect(loggedOut).toContain('Log in to extend this widget.'); expect(loggedOut).not.toContain('Extend by')
@@ -158,4 +158,20 @@ test('organize rows allow any logged in viewer to extend user owned widgets and 
  const show = (owner: string) => render(<DashAuthContext.Provider value={auth}><OrganizeRow item={{ ...item, owner }} importedUser={OTHER} index={0} count={1} head={1000} onResize={() => {}} onRemove={() => {}}/></DashAuthContext.Provider>)
  expect(show(OTHER)).toContain('>Extend<')
  expect(show(W)).not.toContain('>Extend<')
+})
+
+test('lifetime owner controls respect balance, ownership and official status', async () => {
+ const { LifetimePanel } = await import('../components/widgets/WidgetPage')
+ const props = {official:false, owner:true, address:U, expiresAt:2000, head:1000, lifetimeDays:7 as const,widgetKey:K,canExtend:true}
+ const low = render(<LifetimePanel {...props} balance={{wei:BigInt(40000000000000000),level:'low'}}/> )
+ for (const text of ['Low balance: 0.04 GLM.', 'Delete widget', 'Transfer', 'Extend by 7 days']) expect(low).toContain(text)
+ expect(low).not.toContain('disabled=""')
+ const empty = render(<LifetimePanel {...props} balance={{wei:BigInt(0),level:'empty'}}/> )
+ expect(empty.match(/<button[^>]*title="Fund your wallet to sign"[^>]*disabled=""/g)).toHaveLength(3)
+ const viewer = render(<LifetimePanel {...props} owner={false}/> )
+ expect(viewer).toContain('Extend by 7 days'); expect(viewer).not.toContain('Delete widget'); expect(viewer).not.toContain('Transfer')
+ const official = render(<LifetimePanel {...props} official balance={{wei:BigInt(0),level:'empty'}}/> )
+ expect(official).toContain('Kept live'); expect(official).not.toContain('<button'); expect(official).not.toContain('Your wallet has no GLM.')
+ const expired = render(<LifetimePanel {...props} expiresAt={900}/> )
+ expect(expired).not.toContain('<button')
 })

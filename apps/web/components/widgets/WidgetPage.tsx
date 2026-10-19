@@ -1,7 +1,11 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { canExtendWidget, deleteWidgetDirect, walletErrorKind, walletErrorMessage } from '../../lib/dash/widget-actions'
+import { canExtendWidget, deleteWidgetDirect, walletErrorKind, walletErrorMessage, type DirectResult } from '../../lib/dash/widget-actions'
+import { BalanceNotice, signDisabledReason } from './BalanceNotice'
+import { WidgetOwnerActions } from './WidgetActionDialog'
+import { useWalletBalance } from '../../lib/dash/use-balance'
+import type { BalanceLevel } from '../../lib/dash/wallet'
 import { useDashAuth } from '../auth/DashAuthProvider'
 import type { WidgetEntity } from '../../lib/dash/entities'
 import { initEditor } from '../../lib/dash/editor-state'
@@ -69,13 +73,19 @@ export function UsedOnPanel({ items, total, expanded = false }: { items: ReturnT
  const [open, setOpen] = useState(expanded)
  return <section className={s.panel}><h2>Used on {total} dashboards</h2><ul className={s.uses}>{(open ? items : items.slice(0, 4)).map(item => <li key={item.key}><a href={`/d/${item.key}`}><span><strong>{item.title}</strong><small>{item.widgets} widgets</small></span>{item.official && <span className="chip chip-official">⛨ Official</span>}</a></li>)}</ul>{!open && total > 4 && <button className="btn btn-quiet" aria-expanded={false} onClick={() => setOpen(true)}>Show all {total}</button>}</section>
 }
-export function LifetimePanel({ official, expiresAt, head, lifetimeDays, widgetKey, canExtend, reason, onExtended }: {
- official: boolean; expiresAt: number; head?: number; lifetimeDays: LifetimeDays; widgetKey: string; canExtend: boolean; reason?: string; onExtended?(result: WriteResult): void
+export function LifetimePanel({ official, owner, expiresAt, head, lifetimeDays, widgetKey, name = 'widget', canExtend, reason, balance, address, onExtended, onDeleted, onTransferred, onSigned }: {
+ official: boolean; owner: boolean; expiresAt: number; head?: number; lifetimeDays: LifetimeDays; widgetKey: string; name?: string; canExtend: boolean; reason?: string; balance?: { wei: bigint | null; level: BalanceLevel }; address?: string; onExtended?(result: WriteResult): void; onDeleted?(r: DirectResult): void; onTransferred?(r: DirectResult, to: string): void; onSigned?(): void
 }) {
- return <section className={s.panel}><h2>Lifetime</h2>{official ? <span className="chip">◷ Kept live</span> : <><TimeLeft expiresAt={expiresAt} head={head}/><p>Lives for {lifetimeDays} days per extend</p></>}<p className={s.entityKey}>{widgetKey}</p>{!official && <>{canExtend && <div className={s.extend}><ExtendButton widgetKey={widgetKey} expiresAt={expiresAt} head={head} lifetimeDays={lifetimeDays} canExtend={canExtend} label={`Extend by ${lifetimeDays} days`} onExtended={onExtended}/></div>}<p>{reason ?? (canExtend ? 'Anyone can extend this widget. Your wallet signs and pays a small network fee.' : 'Log in to extend this widget.')}</p></>}</section>
+ const live = head === undefined || expiresAt > head
+ const disabledReason = signDisabledReason(balance?.level ?? 'unknown')
+ return <section className={s.panel}><h2>Lifetime</h2>{official ? <span className="chip">◷ Kept live</span> : <><TimeLeft expiresAt={expiresAt} head={head}/><p>Lives for {lifetimeDays} days per extend</p></>}<p className={s.entityKey}>{widgetKey}</p>{!official && live && <>
+  {address && balance && <BalanceNotice address={address} {...balance}/>}
+  <div className={s.extend}>{canExtend && <ExtendButton widgetKey={widgetKey} expiresAt={expiresAt} head={head} lifetimeDays={lifetimeDays} canExtend={canExtend} label={`Extend by ${lifetimeDays} days`} disabledReason={disabledReason} onExtended={onExtended} onSigned={onSigned}/>}{owner && address && <WidgetOwnerActions widgetKey={widgetKey} name={name} address={address} transfer disabledReason={disabledReason} onDeleted={onDeleted} onTransferred={onTransferred} onSigned={onSigned}/>}</div>
+  <p>{reason ?? (canExtend ? 'Anyone can extend this widget. Your wallet signs and pays a small network fee.' : 'Log in to extend this widget.')}</p>
+ </>}</section>
 }
-export function NewVersionNotice({ oldKey, busy, disabled, error, onDelete }: { oldKey: string; busy: boolean; disabled: boolean; error: string | null; onDelete(): void }) {
- return <section><p role="status">Saved as a new version. Your dashboards now use it. The old version stays until it expires, because other dashboards may still use it.</p><button type="button" className="btn btn-quiet" data-old-key={oldKey} disabled={disabled || busy} onClick={onDelete}>{busy ? 'Waiting for wallet…' : 'Delete old version'}</button>{error && <p className="error" role="alert">{error}</p>}</section>
+export function NewVersionNotice({ oldKey, busy, disabled, disabledReason, error, onDelete }: { oldKey: string; busy: boolean; disabled: boolean; disabledReason?: string; error: string | null; onDelete(): void }) {
+ return <section><p role="status">Saved as a new version. Your dashboards now use it. The old version stays until it expires, because other dashboards may still use it.</p><button type="button" className="btn btn-quiet" data-old-key={oldKey} title={disabledReason} disabled={disabled || busy} onClick={onDelete}>{busy ? 'Waiting for wallet…' : 'Delete old version'}</button>{error && <p className="error" role="alert">{error}</p>}</section>
 }
 type Runner = (sql: string, version: number, control: { maxRows: number }) => TimedResult
 function StoredQuery({ payload, version, run, onTiming }: { payload: WidgetPayload; version: number; run: Runner; onTiming?(ms?: number): void }) {
@@ -93,6 +103,7 @@ export function StoredWidgetPreview({ payload, version, run = useTimedQuery, onT
 export function WidgetPage({ widgetKey }: { widgetKey: string }) {
  const router = useRouter()
  const key = widgetKey.toLowerCase(), auth = useDashAuth(), config = auth.config
+ const balance = useWalletBalance(auth.address, config?.rpcUrl)
  const { version, state } = useIndex()
  const [replaced, setReplaced] = useState<string | null>(null)
  const [oldWidget, setOldWidget] = useState<WidgetEntity | null>(null)
@@ -113,14 +124,14 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
   return () => { active = false }
  }, [replaced, config?.enabled, config?.wallet, config?.rpcUrl, auth.address])
  async function deleteOld() {
-  if (!oldWidget || deleteBusy.current || oldWidget.owner !== auth.address?.toLowerCase()) return
+  if (signDisabledReason(balance.level) || !oldWidget || deleteBusy.current || oldWidget.owner !== auth.address?.toLowerCase()) return
   deleteBusy.current = true; setDeletingOld(true); setDeleteError(null)
   try {
    const result = await auth.sign(c => deleteWidgetDirect(c, oldWidget.key))
    addPending({ key: oldWidget.key, kind: 'widget', op: 'delete', afterBlock: result.afterBlock, txHash: result.txHash })
    setOldWidget(null)
   } catch (error) { setDeleteError(walletErrorMessage(walletErrorKind(error))) }
-  finally { deleteBusy.current = false; setDeletingOld(false) }
+  finally { deleteBusy.current = false; setDeletingOld(false); balance.refresh() }
  }
 
  const [record, setRecord] = useState<{ key: string; widget: WidgetEntity | null; head: number } | null>(null)
@@ -135,7 +146,8 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
  const sequence = useRef(0)
  const pending = usePending()
  const write = pending.find(p => p.key === key && p.kind === 'widget' && p.op === 'upsert')
- const widget = record?.key === key ? record.widget : null
+ const storedWidget = record?.key === key ? record.widget : null
+ const widget = storedWidget && typeof write?.fields?.owner === 'string' ? { ...storedWidget, owner: write.fields.owner } : storedWidget
  const loadState = widgetLoadState({ authStatus: auth.status, widget, pending: !!write, attempts, loadError: !!loadError })
  const usage = useTimedQuery(config?.enabled && isEntityKey(key) ? widgetUsageSql(config.wallet, key, auth.address ?? null) : 'SELECT 0, false', version)
  const usedOn = useTimedQuery(config?.enabled && isEntityKey(key) ? widgetDashboardsSql(config.wallet, key, Number.MAX_SAFE_INTEGER) : 'SELECT NULL WHERE false', version)
@@ -177,6 +189,16 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
   if (payload) setEditorRevision(n => n + 1)
   setRefresh(n => n + 1)
  }
+ function deleted(result: DirectResult) {
+  addPending({ key, kind: 'widget', op: 'delete', afterBlock: result.afterBlock, txHash: result.txHash })
+  router.push('/me')
+ }
+ function transferred(result: DirectResult, to: string) {
+  const owner = to.toLowerCase()
+  addPending({ key, kind: 'widget', op: 'upsert', afterBlock: result.afterBlock, txHash: result.txHash, fields: { owner } })
+  written(result)
+  setRecord(previous => previous?.key === key && previous.widget ? { ...previous, widget: { ...previous.widget, owner } } : previous)
+ }
  async function openPicker() {
   if (auth.status !== 'authenticated' && !await auth.requestLogin()) return
   setPicker(true)
@@ -197,10 +219,10 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
  return <div className={s.editor}>
   <WidgetHeader name={name} chart={widget.chart} user={widget.user} official={official} uses={uses} expiresAt={expiresAt} head={head} ms={ms} widgetKey={key} sql={widget.widget.sql} canAdd onAdd={() => void openPicker()}/>
   <SyncChip write={write} version={version}/>
-  {oldWidget && oldWidget.owner === auth.address?.toLowerCase() && <NewVersionNotice oldKey={oldWidget.key} busy={deletingOld} disabled={false} error={deleteError} onDelete={() => void deleteOld()}/>}
+  {oldWidget && oldWidget.owner === auth.address?.toLowerCase() && <NewVersionNotice oldKey={oldWidget.key} busy={deletingOld} disabled={!!signDisabledReason(balance.level)} disabledReason={signDisabledReason(balance.level)} error={deleteError} onDelete={() => void deleteOld()}/>}
   <div className={s.widgetColumns}>
    {owner ? <WidgetEditor key={`${key}:${editorRevision}`} mode="edit" widgetKey={key} initial={initEditor({ ...widget.widget, name })} onSaved={written}/> : <StoredWidgetPreview key={key} payload={widget.widget} version={version} onTiming={setMs}/>}
-   <aside><UsedOnPanel key={key} items={toUsedOn(usedOn.data?.rows ?? [], config.wallet)} total={uses}/><LifetimePanel official={official} expiresAt={expiresAt} head={head} lifetimeDays={widget.widget.lifetimeDays} widgetKey={key} canExtend={canExtendWidget({ ...widget, expiresAt }, head, auth.address ?? null, config.wallet)} onExtended={written}/></aside>
+   <aside><UsedOnPanel key={key} items={toUsedOn(usedOn.data?.rows ?? [], config.wallet)} total={uses}/><LifetimePanel key={key} name={name} owner={owner} balance={balance} address={auth.address} onSigned={balance.refresh} onDeleted={deleted} onTransferred={transferred} official={official} expiresAt={expiresAt} head={head} lifetimeDays={widget.widget.lifetimeDays} widgetKey={key} canExtend={canExtendWidget({ ...widget, expiresAt }, head, auth.address ?? null, config.wallet)} onExtended={written}/></aside>
   </div>
   {auth.error && <p className="error">{auth.error}</p>}
   {picker && auth.status === 'authenticated' && <AddToDashboardPicker widgetKey={key} chart={widget.widget.chart} onClose={closePicker}/>}

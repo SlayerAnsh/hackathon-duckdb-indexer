@@ -42,7 +42,7 @@ test('anonymous home shows login gate', () => {
  const auth: DashAuth = { config: null, status: 'anonymous', confirming: false, error: null, sign: async () => { throw Error('unused') }, requestLogin: async () => false, logout: async () => {}, refresh: async () => {} }
  const html = render(<DashAuthContext.Provider value={auth}><HomePage/></DashAuthContext.Provider>)
  expect(html).toContain('Log in to build dashboards')
- expect(html).toContain('Use Google, Discord, X or Telegram. You never pay gas or hold tokens, and nothing personal goes on chain.')
+ expect(html).toContain('Use Google, Discord, X or Telegram. Saving widgets and dashboards is free and nothing personal goes on chain. Your widgets belong to your wallet; extending, transferring or deleting them is signed by it and needs a little GLM.')
 })
 test('empty home collections use exact copy', () => {
  const html = render(<HomeCollections dashboards={[]} widgets={[]} onCreate={() => {}}/> )
@@ -62,4 +62,25 @@ test('home dashboard cards share Explore styles and retain syncing', async () =>
  const source = await Bun.file(new URL('../components/widgets/DashboardCard.tsx', import.meta.url)).text()
  expect(source).toContain('../explore/explore.module.css')
  expect(render(<DashboardCard item={{key:'key',title:'Title',widgets:4,updatedAt:100,syncing:true}} head={3700}/>)).toContain('Syncing')
+})
+
+test('home rows accept owner delete actions and header displays the balance warning', async () => {
+ const { HomeHeader } = await import('../components/widgets/HomePage')
+ const address = '0x' + 'ef'.repeat(20)
+ const html = render(<HomeCollections dashboards={[]} widgets={[["one", "First", "bar", 100], ["two", "Second", "bar", 100]]} onCreate={() => {}} renderDelete={key => <button data-key={key}>Delete widget</button>}/> )
+ expect(html.match(/Delete widget/g)).toHaveLength(2)
+ expect(html).toContain('data-key="one"')
+ expect(html).toContain('data-key="two"')
+ expect(render(<HomeHeader address={address} balance={{wei:BigInt(40000000000000000),level:'low'}}/>)).toContain('Low balance: 0.04 GLM.')
+})
+test('pending owner changes and deletes hide home widgets until the index catches up', async () => {
+ const { visibleWidgetRows } = await import('../components/widgets/HomePage')
+ const address = '0x' + 'ef'.repeat(20), other = '0x' + 'ab'.repeat(20)
+ const rows = [['stay'], ['gone'], ['moved'], ['received']]
+ const writes: PendingWrite[] = [
+  {key:'gone',kind:'widget',op:'delete',at:1,afterBlock:10},
+  {key:'moved',kind:'widget',op:'upsert',at:1,afterBlock:10,fields:{owner:other}},
+  {key:'received',kind:'widget',op:'upsert',at:1,afterBlock:10,fields:{owner:address.toUpperCase()}},
+ ]
+ expect(visibleWidgetRows(rows,writes,address)).toEqual([rows[0],rows[3]])
 })

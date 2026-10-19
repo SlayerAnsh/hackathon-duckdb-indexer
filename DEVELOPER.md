@@ -10,6 +10,9 @@ Use Bun 1.3.x (tested with 1.3.11). Docker uses `oven/bun:1.3` for workspace ins
 | `apps/indexer` | DuckDB store, log replay backfill, attribute filler, live sync, snapshots, delta, internal HTTP |
 | `apps/web` | Next.js data proxy with disk fallback, DuckDB WASM loader, browser live tail, Official dashboards, /explore, playground, about page |
 | `apps/web/lib/dash` | Widget schemas, SQL, RPC reads, pending writes, authentication and serialized wallet operations |
+| `apps/web/lib/dash/wallet.ts` | Tiramisu wallet transport, balance reads and GLM formatting |
+| `apps/web/lib/dash/widget-actions.ts` | Direct widget extend, delete and transfer with safe wallet errors |
+| `apps/web/lib/dash/use-balance.ts` | Session wallet balance state and refresh after signatures |
 | `apps/web/app/api/dash` | Runtime wallet config, session and authenticated write routes |
 | `arkiv` | Entity schema, exact queries, and the friction report |
 | `test/deployment.test.ts` | Offline deployment and documentation checks |
@@ -31,6 +34,8 @@ Start the frontend with `INDEXER_URL=http://localhost:8080 bun run --cwd apps/we
 ## Widget dashboard development
 
 Next.js loads environment files from `apps/web`, not the repository root. Copy or link the root `.env.local` to `apps/web/.env.local`, or export the variables before starting Next.js. Set `NEXT_PUBLIC_PRIVY_APP_ID`, `PRIVY_APP_SECRET` and `DASHBOARD_PRIVATE_KEY`; the RPC uses `NEXT_PUBLIC_TIRAMISU_RPC_URL`. Keep secret values out of logs and browser bundles. See the README for Privy provider and embedded wallet setup.
+
+Browser signing needs Tiramisu (chain ID `7738577`) in Privy `supportedChains` and as the `defaultChain`. Fund a test wallet with 0.1 GLM or more before testing Extend, Transfer or Delete. Saving widgets and dashboards remains paid by the backend wallet. Balance warnings appear below 0.1 GLM; a zero balance disables signing actions.
 
 Nonces, rate limits and the serial backend wallet queue are in memory. Run one web instance to preserve nonce checks, abuse limits and wallet serialization. The dashboard wallet's public address comes from `GET /api/dash/config` at runtime.
 

@@ -46,7 +46,7 @@ The web app includes: `/` (story, live stats and Official dashboards), `/explore
 
 Log in with Google, Discord, X or Telegram through Privy to save SQL as widgets, choose a chart and lifetime, and arrange your own or other people's widgets into shareable dashboards. Browse and view without logging in. Your home shows dashboards, widgets, expiry and activity over live entities. Queries run in each viewer's browser; payloads come directly from Arkiv RPC and are never stored in Parquet.
 
-Everything is public, including SQL and dashboard content. The app stores the embedded wallet address and login provider, never email addresses, social handles or Privy user IDs on chain. Do not put personal information in widget SQL, names or dashboard content. The backend wallet pays for every write; users need no tokens.
+Everything is public, including SQL and dashboard content. The app stores the embedded wallet address and login provider, never email addresses, social handles or Privy user IDs on chain. Do not put personal information in widget SQL, names or dashboard content. Widgets belong to the user's wallet. The app still creates them, so `$creator` scoping and the self hosting `INDEX_EXPRESSION` remain valid after transfer. Saving widgets and dashboards stays free. Extending, transferring and deleting widgets is signed in the browser and needs GLM in the user's wallet on Tiramisu.
 
 The deployment owner must enable Google, Discord, X and Telegram in the Privy dashboard and enable Ethereum embedded wallets for all users. Configure these variables before building and starting the web service:
 

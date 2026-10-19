@@ -27,7 +27,7 @@ test('open avatar menu and login gate use specified copy', () => {
  const menu = render(<AvatarMenu address={address} login="google" open onClose={() => {}} onLogout={async () => {}}/>)
  for (const text of [shortHex(address), 'via Google', 'My home', 'href="/me"', 'Log out']) expect(menu).toContain(text)
  const gate = render(<LoginGate/>)
- for (const text of ['Log in to build dashboards', 'Use Google, Discord, X or Telegram. You never pay gas or hold tokens, and nothing personal goes on chain.', '>Log in<']) expect(gate).toContain(text)
+ for (const text of ['Log in to build dashboards', 'Use Google, Discord, X or Telegram. Saving widgets and dashboards is free and nothing personal goes on chain. Your widgets belong to your wallet; extending, transferring or deleting them is signed by it and needs a little GLM.', '>Log in<']) expect(gate).toContain(text)
 })
 test('menu keyboard navigation wraps', () => {
  expect(menuIndex('ArrowDown', 1, 2)).toBe(0)
@@ -92,4 +92,8 @@ test('default auth rejects signing with a safe wallet error', async () => {
  function Consumer() { result = useDashAuth().sign(async () => 1); return null }
  render(<Consumer/>)
  await expect(result).rejects.toMatchObject({ kind: 'wallet', message: 'wallet' })
+})
+
+test('login copy no longer promises free wallet actions', () => {
+ expect(render(<LoginGate/>)).not.toContain('You never pay gas or hold tokens')
 })

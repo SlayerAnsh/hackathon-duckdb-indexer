@@ -65,7 +65,7 @@ Payload and Verify use bare key predicates without the configured expression, wi
 
 ## Widget dashboards
 
-The web backend writes `widget`, `dashboard` and `link` entities with `contentType: application/json` and UTF-8 JSON payloads. Its wallet is both Arkiv creator and owner. The `user` attribute is application ownership, represented by a Privy embedded wallet. Login values are `google`, `discord`, `x` or `telegram`; no email, social handle or Privy user ID is written. Payloads remain off Parquet. Everything is public.
+The web backend writes `widget`, `dashboard` and `link` entities with `contentType: application/json` and UTF-8 JSON payloads. The app wallet is the Arkiv creator of every entity. A user widget's Arkiv owner is the user's wallet; dashboards, links and official widgets remain app owned. The `user` attribute records widget authorship and application ownership for dashboards and links, represented by a Privy embedded wallet. Widget owner controls and My widgets use the Arkiv owner, never the author. Login values are `google`, `discord`, `x` or `telegram`; no email, social handle or Privy user ID is written. Payloads remain off Parquet. Everything is public.
 
 | Entity type | Attribute | Arkiv type | Value or purpose |
 | :--- | :--- | :--- | :--- |
@@ -129,22 +129,23 @@ Size spans on a 12 column row are `xs: 3`, `sm: 4`, `md: 6`, `xl: 12`; phones sh
 
 ### Expiry and operations
 
-One day is 43,200 blocks at two seconds per block. Writes run through `apps/web/lib/dash/server/operations.ts` inside one serial wallet queue. The backend checks the session's application ownership against live RPC state before mutation.
+One day is 43,200 blocks at two seconds per block. Server writes run through `apps/web/lib/dash/server/operations.ts` inside one serial wallet queue and check ownership against live RPC state. User widgets have `readonly: true` and `permissionlessExtension: true`, fixed at creation. Creating and transferring happen in one `executeBatch` with `creates` then `ownershipChanges`; only the predicted widget key is transferred to the session address. Links have no creation flags and are never transferred. Direct widget lifecycle actions are signed in the browser and need GLM; saving stays free.
 
 | Entity or action | Implemented operation and expiry |
 | :--- | :--- |
-| Create widget | `createEntity` with `ExpirationTime.fromSeconds(lifetimeDays * 86400)`; `lifetimeDays` is 1, 7, 30 or 90 |
-| Create widget plus placement | One `executeBatch` creates the widget and link. Inside the same queue slot, `predictEntityKeys({ owner, count: 2 })` supplies keys and salts; each create reuses its salt, and the link references the predicted widget key. The link uses the existing dashboard's expiry with `ExpirationTime.atBlock`. |
-| Edit widget | `patchEntity` sets name and chart attributes and replaces the payload. The original `lifetimeDays` is preserved; edit does not reset expiry. |
-| Extend widget | `extendEntity` with `ExpirationTime.atBlock(BigInt(target))`, where `target = min(expiresAt + lifetimeDays * 43200, head + 90 * 43200)`. The caller must be the widget creator or have a live link to it with their `user` address. Expired widgets cannot extend; a target no later than the existing expiry is rejected as at cap. |
-| Delete widget | Creator only, `deleteEntity`. Links stay and display the stored name in a missing or expired slot; no SQL runs for that slot. |
+| Create widget | One `executeBatch` with a flagged widget create and an ownership change to the session wallet. `predictEntityKeys({ owner, count: 1 })` runs in the same queue slot; the create reuses the predicted salt. Expiry is `ExpirationTime.fromSeconds(lifetimeDays * 86400)`; `lifetimeDays` is 1, 7, 30 or 90. |
+| Create widget plus placement | One `executeBatch` creates the flagged widget and link and transfers only the widget to the session wallet. Inside the same queue slot, `predictEntityKeys({ owner, count: 2 })` supplies keys and salts; each create reuses its salt, and the link references the predicted widget key. The link uses the existing dashboard's expiry with `ExpirationTime.atBlock`. |
+| Edit widget | Owner only, create a new version through `POST /api/dash/widgets` with `replaces`. One batch creates and transfers the new widget and uses link patches (`patchEntity` semantics) to repoint only the author's live dashboard links, including their copied names. The old version stays until expiry or owner deletion. |
+| Extend widget | `extendEntity` with `ExpirationTime.atBlock(BigInt(target))`, where `target = min(expiresAt + lifetimeDays * 43200, head + 90 * 43200)`. Permissionless on user widgets: any logged in viewer signs in the browser and pays the fee. Expired widgets cannot extend; a target no later than the existing expiry is rejected as at cap. |
+| Delete widget | Arkiv owner only, browser signed `deleteEntity`. Links stay and display the stored name in a missing or expired slot; no SQL runs for that slot. |
+| Transfer widget | Arkiv owner only, browser signed `changeOwnership` to a different nonzero address. The `user` author and `$creator` stay unchanged. |
 | Create dashboard | `createEntity`, 90 days through `ExpirationTime.fromSeconds`; title and description in payload |
 | Rename or edit dashboard | Owner only, `patchEntity` sets title and replaces payload; this operation alone does not reset expiry |
 | Add existing widget | Dashboard owner only, `createEntity` for a link at the next position, with `ExpirationTime.atBlock` set to dashboard expiry |
 | Organize dashboard | Owner only, one `executeBatch` creates imported links, patches changed link sizes and positions, optionally patches the dashboard title, deletes removed links, and extends the dashboard and retained links to `head + 90 * 43200`. New links use the same target. Extensions are sent only when the target is later. An empty plan sends no transaction. |
 | Delete dashboard | Owner only, one `executeBatch` deletes the dashboard and its live links; referenced widgets remain |
 
-Native batch order is creates, patches, deletes, extensions. Links follow their dashboard's expiry rather than their widget's expiry, so expired widget slots can remain until removed.
+Native batch order is creates, patches, deletes, extensions, ownership changes. Links follow their dashboard's expiry rather than their widget's expiry, so expired widget slots can remain until removed.
 
 ### Dashboard RPC reads and trust boundary
 
@@ -157,7 +158,7 @@ $creator = addr(W) AND project = str('arkiv-sql-indexer-dash')
 dashboardBundleExpr(W, D, [E1, E2]):
 S AND ($key = key(D) OR $key = key(E1) OR $key = key(E2) OR type = str('link') AND dashboard = key(D))
 
-widgetExtendExpr(W, K, U):
+widgetVersionExpr(W, K, U):
 S AND ($key = key(K) OR type = str('link') AND widget = key(K) AND user = addr(U))
 
 keysExprs(W, [K1, K2]):
@@ -187,8 +188,7 @@ Every expression is sent through `queryAll` as `arkiv_query(expression, { limit:
 
 | Caller and purpose | Expression |
 | :--- | :--- |
-| Server widget edit or delete | `keysExprs(W, [K])` |
-| Server widget extension and permission check | `widgetExtendExpr(W, K, U)` |
+| Server new widget version and link lookup | `widgetVersionExpr(W, K, U)` |
 | Server create widget with placement, dashboard edit or delete | `dashboardBundleExpr(W, D)` |
 | Server organize or add existing widget | `dashboardBundleExpr(W, D, extraKeys)` with newly imported widget keys |
 | Browser dashboard and placement layout | `dashboardBundleExpr(W, D)` |
@@ -196,10 +196,10 @@ Every expression is sent through `queryAll` as `arkiv_query(expression, { limit:
 
 Dashboard reads always filter `$creator` on the configured dashboard wallet as well as project. Another wallet can copy every attribute, so attributes alone are never trusted identity. Decoders recheck creator, project, type, required attributes and payload validity before accepting an entity. Lists, counts and activity use creator and project scoped local DuckDB SQL; RPC reads supply payloads only where needed. Stored widget SQL must pass `checkWidgetSql` before execution in the viewer's DuckDB, capped at 5,000 result rows.
 
-User widgets are owned by the user's wallet from plan 10 on.
+Legacy widgets without creation flags remain owned by the app wallet and have no user Extend, Delete or Transfer actions. Do not transfer them to users: mutable attributes could undermine the Official marker.
 
 ## Official entities
 
-An entity is Official when its `user` attribute and Arkiv owner both equal the app wallet address. Readers still require the app wallet as creator and the dashboard project tag. Official widgets and dashboards use `login = arkiv`. Official dashboards also carry a string `slug` attribute with at most 64 bytes, matching `^[a-z0-9]+(?:-[a-z0-9]+)*$`.
+An entity is Official when its `user` attribute and `$owner` both equal the app wallet address. Readers still require the app wallet as creator and the dashboard project tag. Official widgets and dashboards use `login = arkiv`. Official dashboards also carry a string `slug` attribute with at most 64 bytes, matching `^[a-z0-9]+(?:-[a-z0-9]+)*$`.
 
 Official dashboards, widgets and links have 90 day lifetimes and are renewed by the app wallet. A user cannot forge an Official entity through the API: the server derives `user` from the verified session, refuses app wallet sessions and rejects app wallet addresses in every user write operation. Readers accept `login = arkiv` only when `user` equals the app wallet.

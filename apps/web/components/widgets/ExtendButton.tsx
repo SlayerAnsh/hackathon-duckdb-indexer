@@ -22,8 +22,8 @@ export function extendStep(phase: ExtendPhase, event: ExtendEvent): ExtendPhase 
  if (phase === 'done' && event === 'settled') return 'idle'
  return phase
 }
-export function ExtendButton({ widgetKey, expiresAt, head: suppliedHead, lifetimeDays, canExtend, onExtended, label = 'Extend', disabledReason }: {
- widgetKey: string; expiresAt: number; head?: number; lifetimeDays: LifetimeDays; canExtend: boolean; label?: string; disabledReason?: string; onExtended?(r: WriteResult): void
+export function ExtendButton({ widgetKey, expiresAt, head: suppliedHead, lifetimeDays, canExtend, onExtended, label = 'Extend', disabledReason, onSigned }: {
+ widgetKey: string; expiresAt: number; head?: number; lifetimeDays: LifetimeDays; canExtend: boolean; label?: string; disabledReason?: string; onExtended?(r: WriteResult): void; onSigned?(): void
 }) {
  const auth = useDashAuth()
  const { state } = useIndex()
@@ -48,6 +48,7 @@ export function ExtendButton({ widgetKey, expiresAt, head: suppliedHead, lifetim
   setError(null)
   try { result = await auth.sign(c => extendWidgetDirect(c, { key: widgetKey, expiresAt: expiry, lifetimeDays })) }
   catch (e) { const kind = walletErrorKind(e); setError(walletErrorMessage(kind)); setPhase(p => extendStep(p, kind === 'rejected' ? 'rejected' : 'failure')); busy.current = false; return }
+  finally { onSigned?.() }
   busy.current = false
   if (result.expiresAt !== undefined) setOptimistic({ key: widgetKey, expiresAt: result.expiresAt })
   addPending({ key: widgetKey, kind: 'widget', op: 'upsert', afterBlock: result.afterBlock, txHash: result.txHash, fields: result.expiresAt === undefined ? undefined : { expiresAt: result.expiresAt } })

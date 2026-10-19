@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Owners delete and transfer their widgets by signing in the browser; low balance warnings below 0.1 GLM.
+
 * Widgets belong to the user's wallet: created readonly and transferred in one batch, edits save a new version, Extend is signed by the viewer.
 
 * Browser signing with the Privy wallet on Tiramisu, wallet error copy and balance checks.

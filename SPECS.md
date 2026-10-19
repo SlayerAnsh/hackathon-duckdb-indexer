@@ -319,11 +319,17 @@ The dashboard wallet is the only application writer. Widgets, dashboards and lin
 
 ## 11. Widgets and dashboards
 
-Implemented in `apps/web/lib/dash`, `components/widgets` and `app/api/dash`. Privy supports Google, Discord, X and Telegram with embedded Ethereum wallets. The backend wallet creates every widget, dashboard and placement link; the `user` attribute identifies application ownership. Widgets save SQL, chart mappings, formatting and a chosen lifetime. Dashboards import widgets from any user with ordered size settings and at most 48 links. Public pages need no login; creation and ownership controls require a session.
+Implemented in `apps/web/lib/dash`, `components/widgets` and `app/api/dash`. Privy supports Google, Discord, X and Telegram with embedded Ethereum wallets. The backend wallet creates every widget, dashboard and placement link; the `user` attribute identifies widget authorship and application ownership for dashboards and links. The Arkiv owner decides widget ownership. Widgets save SQL, chart mappings, formatting and a chosen lifetime. Dashboards import widgets from any user with ordered size settings and at most 48 links. Public pages need no login; creation and ownership controls require a session.
 
 Lists, usage counts and activity come from local DuckDB, scoped by creator and project. Payloads come from scoped Arkiv RPC key batches. Pending writes appear until the index catches up. Stored SQL passes the guard before running in the viewer's browser with at most 5,000 result rows. Home counts cover live entities only, placements include other users' links to your widgets, and active days count distinct creation and update days for your widgets and dashboards.
 
-See the [design spec](docs/superpowers/specs/2026-10-20-widget-dashboards-design.md) for the feature design and [Arkiv schema](arkiv/schema.md#widget-dashboards) for implemented attributes, payloads, expiry, operations and exact read expressions. The implementation uses SDK `patchEntity` for edits.
+See the [design spec](docs/superpowers/specs/2026-10-20-widget-dashboards-design.md) for the feature design and [Arkiv schema](arkiv/schema.md#widget-dashboards) for implemented attributes, payloads, expiry, operations and exact read expressions. Dashboard and link edits use SDK `patchEntity`; widget edits create a new version.
+
+### User owned widgets (owner decision, 20 October 2026)
+
+User widgets are created by the app wallet with fixed `readonly` and `permissionlessExtension` flags and transferred to the session wallet in the same batch. The immutable `user` attribute records the author; the Arkiv owner controls deletion, transfer and saving new versions. Editing creates a new widget and repoints only the author's dashboard links. The old version stays until expiry unless its owner deletes it. Anyone logged in can extend a live user widget by signing in the browser. Extend, transfer and delete need GLM in the signing wallet; saving stays free. Legacy widgets owned by the app wallet have no user signing actions. Official widgets require both `user` and `$owner` to equal the app wallet and use backend keepalive.
+
+Removed widget endpoints: `PATCH /api/dash/widgets/[key]`, `DELETE /api/dash/widgets/[key]` and `POST /api/dash/widgets/[key]/extend`. New versions use `POST /api/dash/widgets` with `replaces`; widget extend, delete and transfer use direct browser signatures.
 
 ## 12. Security and abuse
 
