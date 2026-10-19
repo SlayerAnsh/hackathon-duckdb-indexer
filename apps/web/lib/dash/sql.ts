@@ -87,3 +87,51 @@ export function widgetListSql(wallet: string, q: WidgetListQuery): string {
 export function widgetCountSql(wallet: string, q: Omit<WidgetListQuery, 'sort' | 'limit' | 'offset'>): string {
  return `${dashCte(wallet)} SELECT count(*) AS n FROM dash w WHERE ${widgetFilters(q)}`
 }
+
+export function myDashboardsSql(wallet: string, user: string): string {
+  return `${dashCte(wallet)}
+ SELECT d.key, d.title, count(l.key) AS widgets, d.updated_at
+ FROM dash d LEFT JOIN dash l ON l.type = 'link' AND l.dashboard = d.key
+ WHERE d.type = 'dashboard' AND d.usr = ${address(user)}
+ GROUP BY d.key, d.title, d.updated_at
+ ORDER BY d.updated_at DESC, d.key`
+}
+
+export function myWidgetsSql(wallet: string, user: string): string {
+  return `${dashCte(wallet)}
+ SELECT key, name, chart, expires_at, updated_at FROM dash
+ WHERE type = 'widget' AND usr = ${address(user)}
+ ORDER BY expires_at, key`
+}
+
+export function activityCountsSql(wallet: string, user: string): string {
+  return `${dashCte(wallet)}, mine AS (
+ SELECT * FROM dash WHERE usr = ${address(user)} AND type IN ('widget', 'dashboard')
+ ), days AS (
+ SELECT floor(created_at / 43200) AS day FROM mine
+ UNION
+ SELECT floor(updated_at / 43200) AS day FROM mine
+ )
+ SELECT
+ (SELECT count(*) FROM mine WHERE type = 'widget') AS live_widgets,
+ (SELECT count(*) FROM mine WHERE type = 'dashboard') AS live_dashboards,
+ (SELECT count(*) FROM dash l JOIN mine w ON w.type = 'widget' AND w.key = l.widget
+  WHERE l.type = 'link') AS placements,
+ (SELECT count(*) FROM days) AS active_days`
+}
+
+export function expiringSoonSql(wallet: string, user: string): string {
+  return `${dashCte(wallet)}
+ SELECT key, type, CASE WHEN type = 'widget' THEN name ELSE title END AS label, expires_at
+ FROM dash WHERE usr = ${address(user)} AND type IN ('widget', 'dashboard')
+ AND expires_at <= (SELECT block FROM live_head) + 43200
+ ORDER BY expires_at, key LIMIT 10`
+}
+
+export function recentSql(wallet: string, user: string): string {
+  return `${dashCte(wallet)}
+ SELECT key, type, CASE WHEN type = 'widget' THEN name ELSE title END AS label,
+ CASE WHEN created_at = updated_at THEN 'Created' ELSE 'Patched' END AS kind, updated_at
+ FROM dash WHERE usr = ${address(user)} AND type IN ('widget', 'dashboard')
+ ORDER BY updated_at DESC, key LIMIT 10`
+}
