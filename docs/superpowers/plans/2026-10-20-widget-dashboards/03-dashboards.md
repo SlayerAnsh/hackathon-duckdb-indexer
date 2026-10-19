@@ -82,7 +82,7 @@ git commit -m "feat(web): saved widget card that runs only live, allowed widget 
 - Test: `apps/web/test/dash-view.test.tsx`
 
 **Interfaces:**
-- Consumes: `fetchDashboardBundle`, `fetchWidgets`, `createBrowserRpc`, `publicDashConfig`, `useDashAuth`, `usePending`, `SyncChip`, `SavedWidgetCard`.
+- Consumes: `fetchDashboardBundle`, `fetchWidgets`, `createBrowserRpc`, `useDashAuth().config`, `useDashAuth`, `usePending`, `SyncChip`, `SavedWidgetCard`.
 - Produces:
 
 ```ts

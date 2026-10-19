@@ -2,7 +2,7 @@
 
 Required reading: `CONTEXT.md` in this directory, then `01-backend-write-api.md` for the modules touched here.
 
-These fix four verified review findings against the plan 1 backend (`apps/web/lib/dash/server/*`). One task, one commit.
+Task 1 fixes four verified review findings against the plan 1 backend (`apps/web/lib/dash/server/*`). Task 2 is an owner decision: the dashboard wallet address is served by a Next.js API route instead of a `NEXT_PUBLIC_` build variable. One commit per task.
 
 ## Global Constraints
 
@@ -69,4 +69,37 @@ And these still return null: `SELECT "creator", count(*) AS "n" FROM entities GR
 
 ```bash
 git commit -m "fix(web): public origin check, real Arkiv revert matching, stricter widget SQL guard and per IP nonce quota"
+```
+
+### Task 2: Serve the dashboard wallet address from the backend, drop `NEXT_PUBLIC_DASHBOARD_WALLET`
+
+Owner decision (20 October 2026): the browser learns the dashboard wallet address from a Next.js API route. The address is derived from `DASHBOARD_PRIVATE_KEY` on the server, so there is one source of truth, no build argument, and no rebuild when the key changes. The indexer is not touched.
+
+**Files:**
+- Create: `apps/web/app/api/dash/config/route.ts` (`export const dynamic = 'force-dynamic'`).
+- Modify: `apps/web/lib/dash/config.ts`, `apps/web/lib/dash/server/config.ts`, `apps/web/lib/dash/server/routes.ts` (add the handler), `apps/web/components/auth/DashAuthProvider.tsx`, every module that calls `publicDashConfig()` (`grep -rn publicDashConfig apps/web --include='*.ts' --include='*.tsx'`), `apps/web/Dockerfile`, `docker-compose.yml`, `docker-compose.dokploy.yml`, `.env.example`, `test/deployment.test.ts`, `docs/superpowers/plans/2026-10-20-widget-dashboards/CONTEXT.md` is already updated by the coordinator.
+- Test: `apps/web/test/dash-routes.test.ts`, `apps/web/test/dash-auth.test.ts` (or the provider test that covers config), `test/deployment.test.ts`.
+
+**Interfaces:**
+- Produces: `handleDashConfig(deps: { config: ServerDashConfig | null }): Response`. `GET /api/dash/config` returns 200 `{ "wallet": "0x<lowercase address>" }` when the server config is valid, else 200 `{ "wallet": null }`. Cache header `Cache-Control: no-store`.
+- Changes: `ServerDashConfig.wallet` is derived with `privateKeyToAccount(DASHBOARD_PRIVATE_KEY).address.toLowerCase()` (`viem/accounts`). Remove the "wallet must match key" check and every read of `NEXT_PUBLIC_DASHBOARD_WALLET`.
+- Changes: `readPublicDashConfig(env: { privyAppId?: string; wallet?: string | null; rpcUrl?: string })` keeps its shape. `publicDashConfig()` is removed. New `fetchDashWallet(fetchImpl = fetch): Promise<string | null>` in `lib/dash/config.ts` calls `/api/dash/config` once per page load (module level promise cache; a failed request resolves null and is not cached).
+- Changes: `DashAuthProvider` fetches the wallet on mount with `fetchDashWallet`, builds the config with `readPublicDashConfig({ privyAppId: process.env.NEXT_PUBLIC_PRIVY_APP_ID, wallet, rpcUrl: process.env.NEXT_PUBLIC_TIRAMISU_RPC_URL })`, and exposes it as `config: PublicDashConfig | null` on `useDashAuth()` (null while loading). Status is `loading` until the wallet request settles, then `disabled` when `enabled` is false. Every former `publicDashConfig()` caller reads `useDashAuth().config` instead and renders its loading state while it is null.
+
+- [ ] **Step 1: Write the failing tests**
+- `handleDashConfig({ config })` with a config built from the test key returns `{ wallet: <address of that key, lowercase> }` and `Cache-Control: no-store`; with `config: null` returns `{ wallet: null }`.
+- Server config: for a valid `DASHBOARD_PRIVATE_KEY` and no `NEXT_PUBLIC_DASHBOARD_WALLET` in env, `wallet` equals the key's lowercase address.
+- `fetchDashWallet` with a fake fetch returning `{ wallet: '0xABC...' }` (valid address) resolves the lowercase address, calls fetch once for two calls; a rejected fetch resolves null and the next call fetches again.
+- `test/deployment.test.ts`: no file among `apps/web/Dockerfile`, `docker-compose.yml`, `docker-compose.dokploy.yml`, `.env.example`, `apps/web/lib`, `apps/web/components` contains `NEXT_PUBLIC_DASHBOARD_WALLET`.
+
+- [ ] **Step 2: Run** the touched test files. Expected: FAIL.
+
+- [ ] **Step 3: Implement** as described in Interfaces.
+
+- [ ] **Step 4: Run** `bun test ./apps/web/test`, `bun test ./test/deployment.test.ts`, and `cd apps/web && ./node_modules/.bin/tsc --noEmit -p .`. Expected: all pass, clean.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git commit -m "feat(web): serve the dashboard wallet address from an API route instead of a public build variable"
 ```

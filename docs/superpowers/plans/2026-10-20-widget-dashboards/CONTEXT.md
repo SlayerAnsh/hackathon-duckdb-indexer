@@ -168,9 +168,11 @@ Expressions (exact semantics):
 
 ```ts
 export type PublicDashConfig = { enabled: boolean; privyAppId: string; wallet: string; rpcUrl: string }
-export function readPublicDashConfig(env: { privyAppId?: string; wallet?: string; rpcUrl?: string }): PublicDashConfig
-export function publicDashConfig(): PublicDashConfig     // passes process.env.NEXT_PUBLIC_PRIVY_APP_ID, process.env.NEXT_PUBLIC_DASHBOARD_WALLET, process.env.NEXT_PUBLIC_TIRAMISU_RPC_URL written out literally so Next inlines them
+export function readPublicDashConfig(env: { privyAppId?: string; wallet?: string | null; rpcUrl?: string }): PublicDashConfig
+export function fetchDashWallet(fetchImpl?: typeof fetch): Promise<string | null>   // GET /api/dash/config, cached per page load
 ```
+
+Owner decision (plan 05 Task 2): the wallet address is NOT a build variable. The server derives it from `DASHBOARD_PRIVATE_KEY` and serves it at `GET /api/dash/config` as `{ wallet: string | null }`. Client components read the config from `useDashAuth().config` (`PublicDashConfig | null`, null while loading); there is no `publicDashConfig()`.
 
 `enabled` is true only when the app id is non blank and the wallet is a valid address. `wallet` is lowercase. `rpcUrl` defaults to `https://rpc.tiramisu.db-chain.testnet.arkiv.network`. When disabled, the nav shows no login button and the new pages render a short "not configured" note (UI doc has no copy for it; use "Dashboards are not enabled on this deployment.").
 
@@ -264,7 +266,6 @@ Rate limits (spec §10 leaves numbers to the builder): writes per session addres
 | `NEXT_PUBLIC_PRIVY_APP_ID` | web build arg and runtime env | Privy app id; blank disables the feature |
 | `PRIVY_APP_SECRET` | web runtime env only | Privy app secret (user lookup, session HMAC key) |
 | `DASHBOARD_PRIVATE_KEY` | web runtime env only | Backend wallet key that writes every entity. The owner reuses the demo "agent one" wallet; its address is the first entry of `DEMO_AGENT_ADDRESSES` |
-| `NEXT_PUBLIC_DASHBOARD_WALLET` | web build arg and runtime env | Address of `DASHBOARD_PRIVATE_KEY`, the creator filter for every widget, dashboard and link read; the server refuses writes (503 `disabled`) when it does not match the key |
 | `NEXT_PUBLIC_TIRAMISU_RPC_URL` | existing | Also used server side for dashboard reads and the wallet transport |
 
 Secrets never reach the indexer or demo writer services, never appear in build args and never use a `NEXT_PUBLIC_` name. Server dashboard reads (`arkiv_query`) run without an API key on the web container's anonymous budget (about 100 queries per hour, SPECS.md §4); every write does at most two queries.

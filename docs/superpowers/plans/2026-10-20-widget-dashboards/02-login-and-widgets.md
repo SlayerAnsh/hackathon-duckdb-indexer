@@ -255,7 +255,7 @@ git commit -m "feat(web): dashboard API client, login handshake, pending writes 
 - Produces:
 
 ```ts
-// read.ts (rpc is createBrowserRpc(publicDashConfig().rpcUrl) in components, a fake in tests)
+// read.ts (rpc is createBrowserRpc(useDashAuth().config.rpcUrl) in components, a fake in tests)
 type Rpc = Pick<ArkivRpc, 'query'>
 export function fetchWidget(rpc: Rpc, wallet: string, key: string): Promise<{ head: number; widget: WidgetEntity | null }>
 export function fetchWidgets(rpc: Rpc, wallet: string, keys: string[]): Promise<{ head: number; widgets: Map<string, WidgetEntity> }>
@@ -290,7 +290,7 @@ git commit -m "feat(web): creator scoped widget reads over RPC and DuckDB"
 - Test: `apps/web/test/dash-auth-ui.test.tsx`
 
 **Interfaces:**
-- Consumes: `publicDashConfig`, `dashApi`, `runSessionHandshake`, `withSession`.
+- Consumes: `useDashAuth().config`, `dashApi`, `runSessionHandshake`, `withSession`.
 - Produces:
 
 ```ts
