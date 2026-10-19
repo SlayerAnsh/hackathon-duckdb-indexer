@@ -1,7 +1,6 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDashAuth } from '../auth/DashAuthProvider'
-import { publicDashConfig } from '../../lib/dash/config'
 import type { WidgetEntity } from '../../lib/dash/entities'
 import { initEditor } from '../../lib/dash/editor-state'
 import { usePending } from '../../lib/dash/pending'
@@ -45,7 +44,7 @@ export function StoredWidgetPreview({ payload, version, run = useTimedQuery }: {
  return <StoredQuery payload={payload} version={version} run={run}/>
 }
 export function WidgetPage({ widgetKey }: { widgetKey: string }) {
- const key = widgetKey.toLowerCase(), auth = useDashAuth(), config = publicDashConfig()
+ const key = widgetKey.toLowerCase(), auth = useDashAuth(), config = auth.config
  const { version, state } = useIndex()
  const [record, setRecord] = useState<{ key: string; widget: WidgetEntity | null; head: number } | null>(null)
  const [loadError, setLoadError] = useState<string | null>(null)
@@ -57,11 +56,11 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
  const pending = usePending()
  const write = pending.find(p => p.key === key && p.kind === 'widget' && p.op === 'upsert')
  const widget = record?.key === key ? record.widget : null
- const usage = useTimedQuery(config.enabled && isEntityKey(key) ? widgetUsageSql(config.wallet, key, auth.address ?? null) : 'SELECT 0, false', version)
+ const usage = useTimedQuery(config?.enabled && isEntityKey(key) ? widgetUsageSql(config.wallet, key, auth.address ?? null) : 'SELECT 0, false', version)
  useEffect(() => {
   const current = ++sequence.current
   setLoadError(null)
-  if (!config.enabled) return
+  if (!config?.enabled) return
   if (!isEntityKey(key)) { setRecord({ key, widget: null, head: 0 }); return }
   void fetchWidget(createBrowserRpc(config.rpcUrl), config.wallet, key).then(result => {
    if (sequence.current !== current) return
@@ -75,7 +74,7 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
    })
   }).catch(() => { if (sequence.current === current) setLoadError('Preview unavailable') })
   return () => { sequence.current++ }
- }, [key, config.enabled, config.wallet, config.rpcUrl, refresh])
+ }, [key, config?.enabled, config?.wallet, config?.rpcUrl, refresh])
  function localTxSeen(value: WidgetEntity | null) {
   const local = latestLocal.current
   if (local?.key === key && local.updatedAt === undefined && value && value.updatedAt > local.afterBlock) local.updatedAt = value.updatedAt
@@ -92,6 +91,7 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
   setPicker(true)
  }
  const mode = widgetPageMode({ loaded: record?.key === key, widget, address: auth.address })
+ if (!config) return <p>Loading the index into your browser…</p>
  if (!config.enabled) return <p>Dashboards are not enabled on this deployment.</p>
  if (loadError) return <p className="error">{loadError}</p>
  if (mode === 'loading') return <p>Loading the index into your browser…</p>

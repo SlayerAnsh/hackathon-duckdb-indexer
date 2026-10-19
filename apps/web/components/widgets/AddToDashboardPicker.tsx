@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useDashAuth } from '../auth/DashAuthProvider'
 import { dashApi, DashApiError } from '../../lib/dash/api'
 import { saveErrorMessage, withSession } from '../../lib/dash/auth-client'
-import { publicDashConfig } from '../../lib/dash/config'
 import { addPending, usePending, useSynced, type PendingWrite } from '../../lib/dash/pending'
 import { defaultSize, type ChartType } from '../../lib/dash/schema'
 import { userDashboardsSql } from '../../lib/dash/sql'
@@ -34,11 +33,11 @@ export function PickerList({ rows, phase, onPick, onNew }: { rows: PickerRow[]; 
 }
 function PendingSync({ write, version }: { write: PendingWrite; version: number }) { useSynced(write, version); return null }
 export function AddToDashboardPicker({ widgetKey, chart, onClose }: { widgetKey: string; chart: ChartType; onClose(): void }) {
- const auth = useDashAuth(), config = publicDashConfig()
+ const auth = useDashAuth(), config = auth.config
  const { version } = useIndex()
  const pending = usePending()
  const mine = pending.filter(p => !p.fields?.user || String(p.fields.user).toLowerCase() === auth.address?.toLowerCase())
- const query = useTimedQuery(config.enabled && auth.address ? userDashboardsSql(config.wallet, auth.address, widgetKey) : 'SELECT NULL WHERE false', version)
+ const query = useTimedQuery(config?.enabled && auth.address ? userDashboardsSql(config.wallet, auth.address, widgetKey) : 'SELECT NULL WHERE false', version)
  const rows = pickerRows(query.data?.rows ?? [], mine.filter(p => p.kind !== 'dashboard' || p.fields?.user !== undefined), widgetKey)
  const [phase, setPhase] = useState<Record<string, Phase>>({})
  const [creating, setCreating] = useState(false), [title, setTitle] = useState(''), [error, setError] = useState<string | null>(null)
@@ -75,6 +74,8 @@ export function AddToDashboardPicker({ widgetKey, chart, onClose }: { widgetKey:
    else { if (key) setPhase(p => { const next = { ...p }; delete next[key!]; return next }); setError(saveErrorMessage(err)) }
   } finally { busy.current = false }
  }
+ if (!config) return <p>Loading the index into your browser…</p>
+ if (!config.enabled) return <p>Dashboards are not enabled on this deployment.</p>
  return <section className={s.picker} ref={root} tabIndex={-1} role="dialog" aria-label="Add to dashboard">
   <h2>Add to dashboard</h2><button className="btn btn-quiet" onClick={onClose} aria-label="Close">×</button>
   {mine.map(p => <PendingSync key={p.key} write={p} version={version}/>)}

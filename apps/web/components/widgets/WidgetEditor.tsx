@@ -9,7 +9,6 @@ import { checkWidgetSql } from '../../lib/dash/sql-guard'
 import { dashApi } from '../../lib/dash/api'
 import { saveErrorMessage, withSession } from '../../lib/dash/auth-client'
 import { addPending, usePending } from '../../lib/dash/pending'
-import { publicDashConfig } from '../../lib/dash/config'
 import { userDashboardsSql } from '../../lib/dash/sql'
 import { defaultSize, LIFETIME_DAYS, LIMITS, SIZES, type WidgetPayload, type WriteResult, type Size } from '../../lib/dash/schema'
 import { useDashAuth } from '../auth/DashAuthProvider'
@@ -31,9 +30,9 @@ export function WidgetEditor({ mode, initial, widgetKey, onSaved }: { mode: 'cre
  const runBusy = useRef(false), saveBusy = useRef(false)
  const { db, version } = useIndex()
  const auth = useDashAuth()
- const config = publicDashConfig()
+ const config = auth.config
  const pending = usePending()
- const dashboards = useTimedQuery(mode === 'create' && config.enabled && auth.address ? userDashboardsSql(config.wallet, auth.address, null) : 'SELECT NULL AS key, NULL AS title WHERE false', version)
+ const dashboards = useTimedQuery(mode === 'create' && config?.enabled && auth.address ? userDashboardsSql(config.wallet, auth.address, null) : 'SELECT NULL AS key, NULL AS title WHERE false', version)
  const choices = new Map<string, string>((dashboards.data?.rows ?? []).map(row => [String(row[0]), String(row[1])]))
  for (const write of pending) if (write.kind === 'dashboard' && write.op === 'upsert' && auth.address && (!write.fields?.user || String(write.fields.user).toLowerCase() === auth.address.toLowerCase())) choices.set(write.key, String(write.fields?.title ?? choices.get(write.key) ?? ''))
  if (state.addTo && !choices.has(state.addTo.dashboard)) choices.set(state.addTo.dashboard, state.addTo.dashboard)
@@ -65,6 +64,8 @@ export function WidgetEditor({ mode, initial, widgetKey, onSaved }: { mode: 'cre
   } catch (error) { setSaveError(saveErrorMessage(error)) }
   finally { saveBusy.current = false; setSaving(false) }
  }
+ if (!config) return <p>Loading the index into your browser…</p>
+ if (!config.enabled) return <p>Dashboards are not enabled on this deployment.</p>
  return <div className={s.editor}>
   <header className={s.header}>
    <a href="/me">← My home</a>

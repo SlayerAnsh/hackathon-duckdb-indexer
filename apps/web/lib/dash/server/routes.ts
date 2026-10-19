@@ -1,3 +1,4 @@
+import type { ServerDashConfig } from './config'
 import { SIZES, isEntityKey, parseDashboardPayload, parseWidgetPayload, type Parsed, type Size, type WriteResult } from '../schema'
 import { assertWriteRequest, readJson, requireSession } from './auth'
 import type { DashDeps } from './deps'
@@ -76,4 +77,8 @@ export function handleOrganize(req: Request, deps: DashDeps, key: string): Promi
 }
 export function handleAddLink(req: Request, deps: DashDeps, key: string): Promise<Response> {
   return write(req, deps, (session, body) => ops.addLink(deps.ops, session, entityKey(key), { widget: entityKey(body.widget), size: size(body.size) }))
+}
+
+export function handleDashConfig(deps: { config: ServerDashConfig | null }): Response {
+  return json({ wallet: deps.config?.wallet ?? null }, { headers: { 'Cache-Control': 'no-store' } })
 }

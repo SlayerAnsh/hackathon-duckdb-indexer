@@ -1,3 +1,5 @@
+import { privateKeyToAccount } from 'viem/accounts'
+import { readServerDashConfig } from '../lib/dash/server/config'
 import { expect, test } from 'bun:test'
 import { deriveSessionSecret, signSession } from '../lib/dash/server/session'
 import { NonceStore } from '../lib/dash/server/nonce'
@@ -157,7 +159,7 @@ test('disabled deps answer 503 disabled', async () => {
 
 test('route files are thin and force dynamic without constructing production deps on import', async () => {
   for (const [path, methods] of [
-    ['auth/nonce', ['POST']], ['auth/session', ['GET', 'POST', 'DELETE']], ['widgets', ['POST']],
+    ['config', ['GET']], ['auth/nonce', ['POST']], ['auth/session', ['GET', 'POST', 'DELETE']], ['widgets', ['POST']],
     ['widgets/[key]', ['PUT', 'DELETE']], ['widgets/[key]/extend', ['POST']], ['dashboards', ['POST']],
     ['dashboards/[key]', ['PUT', 'DELETE']], ['dashboards/[key]/organize', ['POST']], ['dashboards/[key]/links', ['POST']],
   ] as const) {
@@ -166,3 +168,16 @@ test('route files are thin and force dynamic without constructing production dep
     for (const method of methods) expect(typeof module[method]).toBe('function')
   }
 })
+
+ test('public dashboard config returns only the derived wallet without caching', async () => {
+  const privateKey = ('0x' + '42'.repeat(32)) as `0x${string}`
+  const result = readServerDashConfig({ NEXT_PUBLIC_PRIVY_APP_ID: 'app', PRIVY_APP_SECRET: 'offline fixture', DASHBOARD_PRIVATE_KEY: privateKey })
+  expect(result.ok).toBe(true)
+  if (!result.ok) return
+  for (const config of [result.config, null]) {
+   const response = routes.handleDashConfig({ config })
+   expect(response.status).toBe(200)
+   expect(response.headers.get('cache-control')).toBe('no-store')
+   expect(await response.json()).toEqual({ wallet: config ? privateKeyToAccount(privateKey).address.toLowerCase() : null })
+  }
+ })

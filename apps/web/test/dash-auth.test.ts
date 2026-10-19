@@ -30,12 +30,12 @@ async function signed(deps: AuthDeps, signer = account) {
   return { nonce, signature: await signer.signMessage({ message }) }
 }
 
-test('server config requires values and a matching wallet without echoing secrets', () => {
+test('server config derives the wallet from the key without echoing secrets', () => {
   const key = '0x' + '42'.repeat(32)
-  const env = { NEXT_PUBLIC_PRIVY_APP_ID: 'app', PRIVY_APP_SECRET: 's3cret', DASHBOARD_PRIVATE_KEY: key, NEXT_PUBLIC_DASHBOARD_WALLET: account.address }
+  const env = { NEXT_PUBLIC_PRIVY_APP_ID: 'app', PRIVY_APP_SECRET: 's3cret', DASHBOARD_PRIVATE_KEY: key }
   expect(readServerDashConfig(env)).toMatchObject({ ok: true, config: { wallet: info.address, rpcUrl: 'https://rpc.tiramisu.db-chain.testnet.arkiv.network' } })
   for (const missing of Object.keys(env)) expect(readServerDashConfig({ ...env, [missing]: '' }).ok).toBe(false)
-  for (const patch of [{ NEXT_PUBLIC_DASHBOARD_WALLET: '0x' + '11'.repeat(20) }, { DASHBOARD_PRIVATE_KEY: 'bad' }, { DASHBOARD_PRIVATE_KEY: '0x' + '00'.repeat(32) }]) {
+  for (const patch of [{ DASHBOARD_PRIVATE_KEY: 'bad' }, { DASHBOARD_PRIVATE_KEY: '0x' + '00'.repeat(32) }]) {
     const result = readServerDashConfig({ ...env, ...patch })
     expect(result.ok).toBe(false)
     expect(JSON.stringify(result).includes('42424242')).toBe(false)

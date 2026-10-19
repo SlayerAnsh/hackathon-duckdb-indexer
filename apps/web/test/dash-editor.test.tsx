@@ -53,7 +53,7 @@ test('dashboard size follows chart defaults until explicitly changed', () => {
 })
 
 test('new widget body requires a session', () => {
- const auth: DashAuth = { status: 'anonymous', confirming: false, error: null, requestLogin: async () => false, logout: async () => {}, refresh: async () => {} }
+ const auth: DashAuth = { config: { enabled: true, privyAppId: 'app', wallet: '0x' + 'ab'.repeat(20), rpcUrl: 'https://offline.test' }, status: 'anonymous', confirming: false, error: null, requestLogin: async () => false, logout: async () => {}, refresh: async () => {} }
  const html = renderToStaticMarkup(<DashAuthContext.Provider value={auth}><NewWidgetBody/></DashAuthContext.Provider>)
  expect(html).toContain('Log in to build dashboards')
  expect(html).toContain('Use Google, Discord, X or Telegram.')
@@ -61,7 +61,8 @@ test('new widget body requires a session', () => {
 })
 
 test('editor renders the required initial controls and preview', () => {
- const html = renderToStaticMarkup(<WidgetEditor mode="create" initial={initEditor()} onSaved={() => {}}/> )
+ const auth: DashAuth = { config: { enabled: true, privyAppId: 'app', wallet: '0x' + 'ab'.repeat(20), rpcUrl: 'https://offline.test' }, status: 'authenticated', confirming: false, error: null, requestLogin: async () => true, logout: async () => {}, refresh: async () => {} }
+ const html = renderToStaticMarkup(<DashAuthContext.Provider value={auth}><WidgetEditor mode="create" initial={initEditor()} onSaved={() => {}}/></DashAuthContext.Provider>)
  for (const text of ['Untitled widget', '1 day', '7 days', '30 days', '90 days', 'Save to Arkiv', 'Run the query to see a preview.', 'role="radiogroup"', 'Chart type']) expect(html).toContain(text)
 })
 

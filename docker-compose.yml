@@ -36,7 +36,6 @@ services:
         NEXT_PUBLIC_TIRAMISU_RPC_URL: ${NEXT_PUBLIC_TIRAMISU_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
         NEXT_PUBLIC_EXPLORER_URL: ${NEXT_PUBLIC_EXPLORER_URL:-https://tiramisu.explorer.arkiv.network}
         NEXT_PUBLIC_PRIVY_APP_ID: ${NEXT_PUBLIC_PRIVY_APP_ID:-}
-        NEXT_PUBLIC_DASHBOARD_WALLET: ${NEXT_PUBLIC_DASHBOARD_WALLET:-}
     expose: ["3000"]
     # Read only copy of the index so stored data stays reachable while the indexer is down.
     volumes: ["${INDEX_DATA_PATH:-./data}:/data:ro"]
@@ -46,7 +45,6 @@ services:
       NEXT_PUBLIC_TIRAMISU_RPC_URL: ${NEXT_PUBLIC_TIRAMISU_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
       NEXT_PUBLIC_EXPLORER_URL: ${NEXT_PUBLIC_EXPLORER_URL:-https://tiramisu.explorer.arkiv.network}
       NEXT_PUBLIC_PRIVY_APP_ID: ${NEXT_PUBLIC_PRIVY_APP_ID:-}
-      NEXT_PUBLIC_DASHBOARD_WALLET: ${NEXT_PUBLIC_DASHBOARD_WALLET:-}
       PRIVY_APP_SECRET: ${PRIVY_APP_SECRET:-}
       DASHBOARD_PRIVATE_KEY: ${DASHBOARD_PRIVATE_KEY:-}
     depends_on:

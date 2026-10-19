@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
 test('compose keeps data persistent, credentials isolated, and writer opt in', () => {
@@ -25,9 +25,9 @@ test('compose keeps data persistent, credentials isolated, and writer opt in', (
   expect(s.web.build.args.NEXT_PUBLIC_TIRAMISU_RPC_URL).toBe(s.web.environment.NEXT_PUBLIC_TIRAMISU_RPC_URL);
   expect(s.web.build.args.NEXT_PUBLIC_EXPLORER_URL).toBe('${NEXT_PUBLIC_EXPLORER_URL:-https://tiramisu.explorer.arkiv.network}');
   expect(s.web.environment.NEXT_PUBLIC_EXPLORER_URL).toBe(s.web.build.args.NEXT_PUBLIC_EXPLORER_URL);
-  for (const name of ['PRIVY_APP_SECRET', 'DASHBOARD_PRIVATE_KEY', 'NEXT_PUBLIC_PRIVY_APP_ID', 'NEXT_PUBLIC_DASHBOARD_WALLET'])
+  for (const name of ['PRIVY_APP_SECRET', 'DASHBOARD_PRIVATE_KEY', 'NEXT_PUBLIC_PRIVY_APP_ID'])
     expect(s.web.environment[name]).toBe('${' + name + ':-}');
-  for (const name of ['NEXT_PUBLIC_PRIVY_APP_ID', 'NEXT_PUBLIC_DASHBOARD_WALLET'])
+  for (const name of ['NEXT_PUBLIC_PRIVY_APP_ID'])
     expect(s.web.build.args[name]).toBe('${' + name + ':-}');
   for (const name of ['indexer', 'demo-writer']) {
     expect(JSON.stringify(s[name])).not.toContain('DASHBOARD_PRIVATE_KEY');
@@ -77,7 +77,7 @@ test('images use locked workspace installs and the standalone runtime layout', (
   const web = read('apps/web/Dockerfile');
   expect(web).toContain('ARG NEXT_PUBLIC_EXPLORER_URL=https://tiramisu.explorer.arkiv.network');
   expect(web).toContain('ENV NEXT_PUBLIC_EXPLORER_URL=$NEXT_PUBLIC_EXPLORER_URL');
-  for (const name of ['NEXT_PUBLIC_PRIVY_APP_ID', 'NEXT_PUBLIC_DASHBOARD_WALLET']) {
+  for (const name of ['NEXT_PUBLIC_PRIVY_APP_ID']) {
     expect(web).toContain(`ARG ${name}=`);
     expect(web).toContain(`ENV ${name}=$${name}`);
   }
@@ -92,7 +92,7 @@ test('images use locked workspace installs and the standalone runtime layout', (
   const ignore = read('.dockerignore');
   for (const value of ['**/node_modules', '**/.next', '.env', '.env.*', '.git', 'data']) expect(ignore).toContain(value);
   const env = read('.env.example');
-  for (const name of ['NEXT_PUBLIC_PRIVY_APP_ID', 'PRIVY_APP_SECRET', 'DASHBOARD_PRIVATE_KEY', 'NEXT_PUBLIC_DASHBOARD_WALLET'])
+  for (const name of ['NEXT_PUBLIC_PRIVY_APP_ID', 'PRIVY_APP_SECRET', 'DASHBOARD_PRIVATE_KEY'])
     expect(env).toContain(`${name}=`);
   for (const value of ['TIRAMISU_API_KEY=', 'SYNC_USE_API_KEY=false', 'FILL_USE_API_KEY=false', 'INDEX_EXPRESSION=', 'DEMO_PRIVATE_KEY=', 'DEMO_AGENT_ADDRESSES=', 'NEXT_PUBLIC_TIRAMISU_RPC_URL=', 'NEXT_PUBLIC_EXPLORER_URL=']) expect(env).toContain(value);
 });
@@ -115,3 +115,12 @@ test('submission docs cover demo identity, schema, expiry, and observed friction
     expect(prose).not.toMatch(/—|–| - /);
   }
 });
+
+ test('dashboard wallet is discovered at runtime instead of supplied as a public variable', () => {
+  function files(path: string): string[] {
+   return readdirSync(new URL(`../${path}`, import.meta.url), { withFileTypes: true }).flatMap(entry =>
+    entry.isDirectory() ? files(`${path}/${entry.name}`) : [`${path}/${entry.name}`])
+  }
+  for (const path of ['apps/web/Dockerfile', 'docker-compose.yml', 'docker-compose.dokploy.yml', '.env.example', ...files('apps/web/lib'), ...files('apps/web/components')])
+   expect(read(path)).not.toContain('NEXT_PUBLIC_DASHBOARD_WALLET')
+ })

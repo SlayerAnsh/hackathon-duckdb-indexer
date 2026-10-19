@@ -2,7 +2,7 @@ import React from 'react'
 import { expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup as render } from 'react-dom/server'
-import { DashAuthContext, type DashAuth } from '../components/auth/DashAuthProvider'
+import { DashAuthContext, DashAuthProvider, useDashAuth, type DashAuth } from '../components/auth/DashAuthProvider'
 import { AccountButton } from '../components/widgets/AccountButton'
 import { AvatarMenu, menuIndex } from '../components/widgets/AvatarMenu'
 import { LoginGate } from '../components/widgets/LoginGate'
@@ -11,7 +11,7 @@ import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared
 import { shortHex } from '../lib/format'
 
 const address = '0x1234567890123456789012345678901234567890'
-const auth: DashAuth = { status: 'anonymous', confirming: false, error: null, requestLogin: async () => true, logout: async () => {}, refresh: async () => {} }
+const auth: DashAuth = { config: { enabled: true, privyAppId: 'app', wallet: '0x' + 'ab'.repeat(20), rpcUrl: 'https://offline.test' }, status: 'anonymous', confirming: false, error: null, requestLogin: async () => true, logout: async () => {}, refresh: async () => {} }
 function account(value: Partial<DashAuth>) {
  const router = { bfcacheId: 'test', push() {}, replace() {}, refresh() {}, back() {}, forward() {}, prefetch: async () => {}, hmrRefresh() {} }
  return render(<AppRouterContext.Provider value={router}><DashAuthContext.Provider value={{ ...auth, ...value }}><AccountButton/></DashAuthContext.Provider></AppRouterContext.Provider>)
@@ -46,4 +46,12 @@ test('only the lazy bridge imports Privy', () => {
   expect(readFileSync(new URL('../' + file, import.meta.url), 'utf8')).not.toContain('@privy-io/react-auth')
  }
  expect(readFileSync(new URL('../components/auth/PrivyBridge.tsx', import.meta.url), 'utf8')).toContain('@privy-io/react-auth')
+})
+
+test('provider exposes a null config and loading status before wallet discovery', () => {
+ function State() {
+  const value = useDashAuth()
+  return <span>{value.status}:{value.config === null ? 'pending' : 'ready'}</span>
+ }
+ expect(render(<DashAuthProvider><State/></DashAuthProvider>)).toBe('<span>loading:pending</span>')
 })
