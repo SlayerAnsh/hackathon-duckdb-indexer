@@ -15,7 +15,7 @@ export function ThemeToggle() {
   return () => media.removeEventListener('change', update)
  }, [])
  const label = `Switch to ${nextTheme(theme)} theme`
- return <button type="button" className="theme-btn tip" data-tip={label} aria-label={label} onClick={() => {
+ return <button type="button" className="theme-btn has-tip" data-tip={label} aria-label={label} onClick={() => {
   const next = nextTheme(theme)
   writeStoredTheme(storage(), next)
   document.documentElement.dataset.theme = next

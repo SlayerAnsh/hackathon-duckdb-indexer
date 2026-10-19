@@ -20,7 +20,7 @@ export function ReportHeader({ title, description, user, official, count, owner,
   <div className={s.top}>
    <div className={s.eyebrow}>{official ? <><span className="chip chip-official"><span aria-hidden="true">⛨</span>Official</span><span>Network report</span></> : 'Dashboard'}</div>
    <div className={s.tools} role="toolbar" aria-label="Dashboard actions">
-    {owner && !official && <><Link className="ib tip" data-tip="Organize" aria-label="Organize dashboard" href={'/d/' + dashboardKey + '/edit'}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="m10 2 4 4-8 8H2v-4zM8 4l4 4"/></svg></Link><Link className="ib tip" data-tip="Add widgets" aria-label="Add widgets" href={'/d/' + dashboardKey + '/edit?import=1'}><svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M8 2v12M2 8h12"/></svg></Link></>}
+    {owner && !official && <><Link className="ib has-tip" data-tip="Organize" aria-label="Organize dashboard" href={'/d/' + dashboardKey + '/edit'}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="m10 2 4 4-8 8H2v-4zM8 4l4 4"/></svg></Link><Link className="ib has-tip" data-tip="Add widgets" aria-label="Add widgets" href={'/d/' + dashboardKey + '/edit?import=1'}><svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M8 2v12M2 8h12"/></svg></Link></>}
     <ShareMenu title={title} dashboardKey={dashboardKey}/>
    </div>
   </div>

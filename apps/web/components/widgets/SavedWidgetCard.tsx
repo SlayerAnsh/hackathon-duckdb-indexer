@@ -42,8 +42,8 @@ export function SavedWidgetCard({ id, name, payload, status, size, version, head
   {live && showSql && <div className={r.sql} id={sqlId}><SqlBlock sql={payload.sql}/></div>}
   {live && <div className={r.actions} id={id + '-actions'}>
    <RunBadge ms={q.ms} rows={stat ? undefined : q.data?.rows.length}/>
-   <button type="button" className="ib tip" data-tip={showSql ? 'Hide SQL' : 'View SQL'} aria-label={(showSql ? 'Hide SQL for ' : 'View SQL for ') + name} aria-expanded={showSql} aria-controls={showSql ? sqlId : undefined} onClick={() => setShowSql(value => !value)}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="m5 4-4 4 4 4m6-8 4 4-4 4M9 2 7 14"/></svg></button>
-   {widgetKey && <Link className="ib tip" data-tip="Open widget" aria-label={'Open widget ' + name} href={'/widgets/' + widgetKey}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M6 2H2v12h12v-4M9 2h5v5M7 9l7-7"/></svg></Link>}
+   <button type="button" className="ib has-tip" data-tip={showSql ? 'Hide SQL' : 'View SQL'} aria-label={(showSql ? 'Hide SQL for ' : 'View SQL for ') + name} aria-expanded={showSql} aria-controls={showSql ? sqlId : undefined} onClick={() => setShowSql(value => !value)}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="m5 4-4 4 4 4m6-8 4 4-4 4M9 2 7 14"/></svg></button>
+   {widgetKey && <Link className="ib has-tip" data-tip="Open widget" aria-label={'Open widget ' + name} href={'/widgets/' + widgetKey}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M6 2H2v12h12v-4M9 2h5v5M7 9l7-7"/></svg></Link>}
    {official ? <span className="chip chip-official"><span aria-hidden="true">⛨</span>Kept live</span> : expiresAt !== undefined && <TimeLeft expiresAt={expiresAt} head={head}/>}
   </div>}
  </article>

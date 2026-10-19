@@ -34,7 +34,7 @@ export function ShareMenu({ title, dashboardKey, initialOpen = false }: { title:
   } catch { /* Clipboard access may be unavailable. Keep the item unchanged. */ }
  }
  return <div className={s.share} ref={root}>
-  <button ref={button} type="button" className="ib tip" data-tip="Share" aria-label="Share dashboard" aria-haspopup="menu" aria-expanded={open} aria-controls={id}
+  <button ref={button} type="button" className="ib has-tip" data-tip="Share" aria-label="Share dashboard" aria-haspopup="menu" aria-expanded={open} aria-controls={id}
    onClick={() => setOpen(value => !value)} onKeyDown={event => {
     if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setOpen(true) }
     if (event.key === 'Escape') { event.preventDefault(); close() }
