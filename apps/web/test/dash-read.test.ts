@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import type { ArkivRpc, RpcEntity } from '@asi/core'
 import { emptyWidget, DASH_PROJECT } from '../lib/dash/schema'
-import { fetchWidget, fetchWidgets, fetchDashboardBundle } from '../lib/dash/read'
+import { fetchWidget, fetchWidgets, fetchDashboardBundle, fetchDashboards } from '../lib/dash/read'
 import { dashCte, userDashboardsSql, widgetUsageSql, syncedSql } from '../lib/dash/sql'
 import { nativeDb } from './dash-duckdb'
 
@@ -73,4 +73,16 @@ test('queries execute over native DuckDB public tables', async () => {
     expect(await query(syncedSql(key(99), 7, 'delete'))).toEqual([{ n: 1 }])
     expect(await query(widgetUsageSql(W, key(99), U))).toEqual([{ dashboards: BigInt(0), mine: false }])
   } finally { close() }
+})
+
+test('fetchDashboards chunks keys, validates scope and payloads, and ignores unrequested rows', async () => {
+ const keys = Array.from({length:51}, (_,i)=>key(i+1))
+ const dashboard = (k: string, creator = W, payload: object = {v:1,title:'Overview',description:'Report'}) => row(k,'dashboard',{title:'Overview'},payload,creator)
+ const rpc = fake([dashboard(K),dashboard(D,U),dashboard(key(3),W,{v:2}),dashboard(key(99))])
+ const result = await fetchDashboards(rpc,W,keys)
+ expect(rpc.calls).toHaveLength(2)
+ expect(result.head).toBe(42)
+ expect([...result.dashboards.keys()]).toEqual([K])
+ expect(result.dashboards.get(K)?.dashboard.description).toBe('Report')
+ expect(await fetchDashboards(fake([]),W,[])).toEqual({head:0,dashboards:new Map()})
 })

@@ -105,3 +105,11 @@ test('explorer and import share the tested debounce and render payload failures'
  expect(modal).toContain('value={search} onChange={event => setSearch(event.target.value)}')
  expect(modal).toContain("search: state.search")
 })
+
+test('official widget cards use official author and kept live', () => {
+ const html = render(<WidgetBrowseCard item={{ key: key(1), name: 'Official widget', chart: 'bar', user: W, expiresAt: 100, createdAt: 1, uses: 2 }} payload={undefined} version={0} variant="explorer" official/>)
+ expect(html).toContain('Official')
+ expect(html).toContain('Arkiv SQL Indexer')
+ expect(html).toContain('Kept live')
+ expect(html).not.toContain('Extend')
+})

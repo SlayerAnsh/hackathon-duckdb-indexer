@@ -14,9 +14,9 @@ import { TimeLeft } from './TimeLeft'
 import { WidgetPreview } from './WidgetPreview'
 import s from '../showcase/showcase.module.css'
 
-export function WidgetBrowseCard({ item, payload, head, version, variant, selected = false, disabled = false, onToggle, onAdd, visibleOverride, query }: {
+export function WidgetBrowseCard({ item, payload, head, version, variant, selected = false, disabled = false, onToggle, onAdd, visibleOverride, query, official = false }: {
  item: WidgetListItem; payload: WidgetEntity | null | undefined; head?: number; version: number; variant: 'explorer' | 'pick';
- selected?: boolean; disabled?: boolean; onToggle?(): void; onAdd?(): void; visibleOverride?: boolean; query?: TimedResult
+ official?: boolean; selected?: boolean; disabled?: boolean; onToggle?(): void; onAdd?(): void; visibleOverride?: boolean; query?: TimedResult
 }) {
  const [ref, seen] = useInView<HTMLElement>()
  const visible = visibleOverride ?? seen
@@ -31,8 +31,8 @@ export function WidgetBrowseCard({ item, payload, head, version, variant, select
    {!visible ? <span style={{ opacity: 0.3 }}><ChartIcon type={item.chart} size={32}/></span> : payload === undefined || (!!payload && showLoading({ loading: preview.loading, data: preview.data })) ? <div aria-label="Loading preview" style={{ width: '100%', height: '100%', background: 'var(--card-2)' }}/> : !payload || preview.error ? <span style={{ color: 'var(--text-3)' }}>Preview unavailable</span> : <div style={{ width: '100%', height: '100%' }}><WidgetPreview id={'browse-' + item.key} payload={payload.widget} query={preview}/></div>}
   </div>
   <style>{'.widget-browse-preview .chart-frame{height:100%;width:100%}.widget-browse-preview .recharts-cartesian-axis,.widget-browse-preview .chart-key{display:none}'}</style>
-  <header className={s.head}><h3>{item.name}{pick && selected && <span aria-label="Selected"> ✓</span>}</h3><p><ChartIcon type={item.chart}/> {CHART_LABELS[item.chart]} · by <span onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}><AddressLink address={item.user}/></span> · on {item.uses} {item.uses === 1 ? 'dashboard' : 'dashboards'}</p></header>
-  <div className={s.body}><TimeLeft expiresAt={item.expiresAt} head={head}/>{disabled && <span>Already on this dashboard</span>}</div>
+  <header className={s.head}><h3>{item.name}{pick && selected && <span aria-label="Selected"> ✓</span>}</h3><p><ChartIcon type={item.chart}/> {CHART_LABELS[item.chart]} · by <span onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>{official ? <><span className="chip chip-official">⛨ Official</span> Arkiv SQL Indexer</> : <AddressLink address={item.user}/>}</span> · on {item.uses} {item.uses === 1 ? 'dashboard' : 'dashboards'}</p></header>
+  <div className={s.body}>{official ? <span className="chip">◷ Kept live</span> : <TimeLeft expiresAt={item.expiresAt} head={head}/>}{disabled && <span>Already on this dashboard</span>}</div>
   {!pick && <footer className={s.foot}><Link className={s.action} href={'/widgets/' + item.key}>Open</Link><button type="button" className={`${s.action} ${s.primary}`} onClick={onAdd}>+ Add to dashboard</button></footer>}
  </article>
 }

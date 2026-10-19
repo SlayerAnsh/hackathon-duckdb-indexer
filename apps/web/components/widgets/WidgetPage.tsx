@@ -44,7 +44,7 @@ export function WidgetPageBody({ state, name }: { state: ReturnType<typeof widge
  if (state === 'missing') return <MissingWidget/>
  return null
 }
-export function MissingWidget() { return <section><p>This widget has expired. Its query is no longer on Arkiv.</p><a href="/widgets">Browse widgets</a></section> }
+export function MissingWidget() { return <section><p>This widget has expired. Its query is no longer on Arkiv.</p><a href="/explore?tab=widgets">Browse widgets</a></section> }
 export function ViewerHeader({ name, sql, onAdd }: { name: string; sql: string; onAdd(): void }) {
  return <header className={s.header}><h1>{name}</h1><button className="btn btn-primary" onClick={onAdd}>+ Add to my dashboard</button><a className="btn btn-quiet" href={playgroundHref(sql)}>Open in playground</a></header>
 }

@@ -64,7 +64,7 @@ test('root layout installs the head script and every shell page has the skip tar
  const layout = source('../app/layout.tsx')
  expect(layout).toContain('suppressHydrationWarning')
  expect(layout).toContain('<head><script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}/></head>')
- for (const path of ['../components/landing/Home.tsx', '../components/playground/Playground.tsx', '../app/about/page.tsx', '../app/me/page.tsx', '../app/d/[key]/page.tsx', '../app/d/[key]/edit/page.tsx', '../app/widgets/page.tsx', '../app/widgets/[key]/page.tsx', '../app/widgets/new/page.tsx', '../app/showcase/page.tsx']) expect(source(path)).toContain('<main id="main"')
+ for (const path of ['../components/landing/Home.tsx', '../components/playground/Playground.tsx', '../app/about/page.tsx', '../app/me/page.tsx', '../app/d/[key]/page.tsx', '../app/d/[key]/edit/page.tsx', '../components/explore/ExplorePage.tsx', '../app/widgets/[key]/page.tsx', '../app/widgets/new/page.tsx', '../app/showcase/page.tsx']) expect(source(path)).toContain('<main id="main"')
  const css = source('../app/theme.css').replace(/\s+/g, '')
  expect(css.match(/:root\[data-theme="light"\]\{([^}]+)/)![1]).toBe(css.match(/:root:not\(\[data-theme="dark"\]\)\{([^}]+)/)![1])
 })

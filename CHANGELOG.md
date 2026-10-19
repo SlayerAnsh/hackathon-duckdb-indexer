@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Explore page with Dashboards and Widgets tabs; /widgets redirects to the Widgets tab.
+
 * Seed script and in process keepalive for official dashboards.
 
 * Official dashboards: entities whose user is the app wallet, defined from the former showcase queries.

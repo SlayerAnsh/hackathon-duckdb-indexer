@@ -33,7 +33,7 @@ export function EmptyDashboard({ owner, dashboardKey }: { owner: boolean; dashbo
  return <section><p>{owner ? 'This dashboard is empty.' : 'This dashboard has no widgets yet.'}</p>{owner && <Link className="btn btn-primary" href={'/d/' + dashboardKey + '/edit?import=1'}>+ Add widget</Link>}</section>
 }
 export function MissingDashboard() {
- return <section><p>Dashboard not found. It may have expired or the link is wrong.</p><Link href="/widgets">Browse widgets</Link></section>
+ return <section><p>Dashboard not found. It may have expired or the link is wrong.</p><Link href="/explore?tab=widgets">Browse widgets</Link></section>
 }
 
 export function DashboardView({ dashboardKey }: { dashboardKey: string }) {

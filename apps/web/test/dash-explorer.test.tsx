@@ -25,6 +25,7 @@ test('explorer header, empty copy and login dependent controls', () => {
  expect(empty).toContain('No widgets yet. Be the first to build one.')
  expect(empty).toContain('href="/widgets/new"')
  expect(empty).toContain('+ New widget')
+ expect(empty).not.toContain('<h1')
  expect(empty).not.toContain('Mine only')
  const filtered = render(214, 0, true)
  expect(filtered).toContain('214 live')

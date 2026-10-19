@@ -40,7 +40,7 @@ test('viewer header links to the playground and missing copy links to browse', (
  expect(html).toContain(`href="${playgroundHref(widget.widget.sql)}"`)
  const missing = render(<MissingWidget/>)
  expect(missing).toContain('This widget has expired. Its query is no longer on Arkiv.')
- expect(missing).toContain('href="/widgets"')
+ expect(missing).toContain('href="/explore?tab=widgets"')
  expect(missing).toContain('Browse widgets')
 })
 test('unsafe stored SQL never mounts the query runner', () => {

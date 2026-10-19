@@ -38,3 +38,18 @@ export async function fetchDashboardBundle(rpc: Rpc, wallet: string, key: string
   links.sort((a, b) => a.link.position - b.link.position || a.key.localeCompare(b.key))
   return { head, dashboard, links }
 }
+
+export async function fetchDashboards(rpc: Rpc, wallet: string, keys: string[]): Promise<{ head: number; dashboards: Map<string, DashboardEntity> }> {
+ const wanted = new Set(keys.map(key => key.toLowerCase()))
+ const dashboards = new Map<string, DashboardEntity>()
+ let head = 0, first = true
+ for (const expression of keysExprs(wallet, [...wanted])) {
+  const result = await queryAll(rpc, expression)
+  if (first) { head = result.head; first = false }
+  for (const entity of result.entities) {
+   const dashboard = asDashboard(entity, wallet)
+   if (dashboard && wanted.has(dashboard.key)) dashboards.set(dashboard.key, dashboard)
+  }
+ }
+ return { head, dashboards }
+}

@@ -27,13 +27,14 @@ export function ExplorerView({ state, dispatch, liveCount, total, loggedIn, load
  const debouncedSearch = useDebounced(search)
  useEffect(() => { if (debouncedSearch !== state.search) dispatch({ type: 'search', value: debouncedSearch }) }, [debouncedSearch, state.search, dispatch])
  return <section className="explorer">
-  <style>{`.explorer{padding:32px 0;display:grid;gap:24px}.explorer-header,.explorer-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.explorer-header h1{margin:0}.explorer-header a{margin-left:auto}.explorer-controls input:not([type=checkbox]),.explorer-controls select{padding:8px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--inset);color:var(--text);font:inherit;max-width:100%}.explorer-controls input:not([type=checkbox]){flex:1;min-width:240px}.explorer-types{display:flex;gap:4px;overflow-x:auto;max-width:100%}.explorer-types button{flex-shrink:0}.explorer-types button[aria-pressed=true]{background:var(--accent-soft);color:var(--accent)}`}</style>
-  <header className="explorer-header"><h1>Widgets</h1><span className="quiet-chip">{liveCount ?? '…'} live</span><a className="btn btn-primary" href="/widgets/new">+ New widget</a></header>
+  <style>{`.explorer{padding:32px 0;display:grid;gap:24px}.explorer-header,.explorer-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.explorer-header h1{margin:0}.explorer-header a{margin-left:auto}.explorer-controls input:not([type=checkbox]),.explorer-controls select{padding:8px;border:1px solid var(--ui-edge);border-radius:var(--r-md);background:var(--inset);color:var(--text);font:inherit;max-width:100%}.explorer-controls input:not([type=checkbox]){flex:1;min-width:240px}.explorer-types{display:flex;gap:4px;overflow-x:auto;max-width:100%}.explorer-types button{flex-shrink:0;min-height:32px;padding:0 12px;border-radius:var(--r-md);border:1px solid var(--border-strong);background:var(--card-2);color:var(--text-2);font:inherit;cursor:pointer}.explorer-types button[aria-pressed=true]{border-color:var(--accent)}@media(hover:none){.explorer-types button{min-height:44px}}.explorer-types button[aria-pressed=true]{background:var(--accent-soft);color:var(--accent)}`}</style>
+  <header className="explorer-header"><span className="quiet-chip">{liveCount ?? '…'} live</span></header>
   <div className="explorer-controls">
    <input aria-label="Search by name or creator address" placeholder="Search by name or creator address" value={search} onChange={e => setSearch(e.target.value)}/>
-   <div className="explorer-types" role="group" aria-label="Chart type">{([null, ...CHART_TYPES] as const).map(chart => <button type="button" className="btn btn-quiet" key={chart ?? 'all'} aria-pressed={state.chart === chart} onClick={() => dispatch({ type: 'chart', value: chart })}>{chart && <ChartIcon type={chart}/>} {chart ? CHART_LABELS[chart] : 'All'}</button>)}</div>
+   <div className="explorer-types" role="group" aria-label="Chart type">{([null, ...CHART_TYPES] as const).map(chart => <button type="button" className="fchip" key={chart ?? 'all'} aria-pressed={state.chart === chart} onClick={() => dispatch({ type: 'chart', value: chart })}>{state.chart === chart && <span aria-hidden="true">✓</span>}{chart && <ChartIcon type={chart}/>} {chart ? CHART_LABELS[chart] : 'All'}</button>)}</div>
    <select aria-label="Sort widgets" value={state.sort} onChange={e => dispatch({ type: 'sort', value: e.target.value as ExplorerState['sort'] })}><option value="newest">Newest</option><option value="used">Most used</option><option value="expiring">Expiring soon</option></select>
    {loggedIn && <label><input type="checkbox" checked={state.mine} onChange={e => dispatch({ type: 'mine', value: e.target.checked })}/> Mine only</label>}
+   <a className="btn btn-primary" href="/widgets/new">+ New widget</a>
   </div>
   {error && <p className="error" role="alert">{error}</p>}
   {loading && <p role="status">Loading the index into your browser…</p>}
@@ -44,9 +45,10 @@ export function ExplorerView({ state, dispatch, liveCount, total, loggedIn, load
 }
 function ResultsPage({ q, version, head, onAdd, remember }: { q: WidgetListQuery; version: number; head?: number; onAdd(item: WidgetListItem): void; remember(page: number, keys: string[]): void }) {
  const list = useWidgetList(q, version)
+ const { config } = useDashAuth()
  const keys = list.items.map(item => item.key).join(',')
  useEffect(() => { remember(q.offset, keys ? keys.split(',') : []) }, [q.offset, keys, remember])
- return <><WidgetPayloadError error={list.payloadError}/>{list.items.map(item => <WidgetBrowseCard key={item.key} item={item} payload={list.payloads?.get(item.key) ?? (list.payloads ? null : undefined)} head={head} version={version} variant="explorer" onAdd={() => onAdd(item)}/>)}
+ return <><WidgetPayloadError error={list.payloadError}/>{list.items.map(item => <WidgetBrowseCard key={item.key} item={item} payload={list.payloads?.get(item.key) ?? (list.payloads ? null : undefined)} head={head} version={version} variant="explorer" official={item.user === config?.wallet} onAdd={() => onAdd(item)}/>)}
   {showLoading({ loading: list.loading, data: list.total }) && <p role="status">Loading the index into your browser…</p>}{list.error && <p className="error" role="alert">{list.error}</p>}
  </>
 }

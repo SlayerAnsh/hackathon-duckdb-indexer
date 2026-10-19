@@ -136,3 +136,37 @@ export function recentSql(wallet: string, user: string): string {
  FROM dash WHERE usr = ${address(user)} AND type IN ('widget', 'dashboard')
  ORDER BY updated_at DESC, key LIMIT 10`
 }
+
+export type DashboardListQuery = { search: string; sort: 'newest' | 'oldest' | 'widgets' | 'expiring'; official: boolean; limit: number; offset: number }
+export type DashboardListItem = { key: string; title: string; user: string; official: boolean; widgets: number; charts: import('./schema').ChartType[]; createdAt: number; updatedAt: number; expiresAt: number }
+function dashboardFilters(wallet: string, q: Pick<DashboardListQuery, 'search' | 'official'>): string {
+ const filters = ["d.type = 'dashboard'"]
+ if (q.official) filters.push(`d.usr = ${address(wallet)}`)
+ if (q.search) {
+  const term = q.search.toLowerCase()
+  const literal = term.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')
+  const title = `lower(d.title) LIKE ${quote('%' + literal + '%')} ESCAPE '\\'`
+  filters.push(/^0x[0-9a-f]{0,40}$/i.test(term) ? `(${title} OR d.usr LIKE ${quote(term + '%')})` : `(${title})`)
+ }
+ return filters.join(' AND ')
+}
+export function dashboardListSql(wallet: string, q: DashboardListQuery): string {
+ for (const n of [q.limit, q.offset]) if (!Number.isSafeInteger(n) || n < 0) throw new Error('Invalid pagination')
+ const order = { newest: 'd.created_at DESC', oldest: 'd.created_at ASC', widgets: 'widgets DESC', expiring: 'd.expires_at ASC' }[q.sort]
+ if (!order) throw new Error('Invalid sort')
+ return `${dashCte(wallet)}
+ SELECT d.key, d.title, d.usr, d.usr = ${address(wallet)} AS official,
+ count(DISTINCT l.key) AS widgets, list(DISTINCT w.chart ORDER BY w.chart) FILTER (WHERE w.chart IS NOT NULL) AS charts,
+ d.created_at, d.updated_at, d.expires_at
+ FROM dash d LEFT JOIN dash l ON l.type = 'link' AND l.dashboard = d.key
+ LEFT JOIN dash w ON w.type = 'widget' AND w.key = l.widget
+ WHERE ${dashboardFilters(wallet, q)}
+ GROUP BY d.key, d.title, d.usr, d.created_at, d.updated_at, d.expires_at
+ ORDER BY ${order}, d.key LIMIT ${q.limit} OFFSET ${q.offset}`
+}
+export function dashboardCountSql(wallet: string, q: Pick<DashboardListQuery, 'search' | 'official'>): string {
+ return `${dashCte(wallet)} SELECT count(*) AS n FROM dash d WHERE ${dashboardFilters(wallet, q)}`
+}
+export function toDashboardItems(rows: unknown[][]): DashboardListItem[] {
+ return rows.map(([key, title, user, official, widgets, charts, createdAt, updatedAt, expiresAt]) => ({ key: String(key).toLowerCase(), title: String(title), user: String(user).toLowerCase(), official: official === true || official === 1 || official === BigInt(1) || official === 'true', widgets: Number(widgets), charts: Array.isArray(charts) ? charts as DashboardListItem['charts'] : [], createdAt: Number(createdAt), updatedAt: Number(updatedAt), expiresAt: Number(expiresAt) }))
+}

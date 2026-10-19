@@ -46,6 +46,6 @@ test('empty and missing states use the specified copy and destinations', () => {
  expect(viewer).not.toContain('+ Add widget')
  const missing = render(<MissingDashboard/>)
  expect(missing).toContain('Dashboard not found. It may have expired or the link is wrong.')
- expect(missing).toContain('href="/widgets"')
+ expect(missing).toContain('href="/explore?tab=widgets"')
  expect(missing).toContain('Browse widgets')
 })
