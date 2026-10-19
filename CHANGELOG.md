@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Public SQL widgets and shareable dashboards stored on Arkiv, with Privy social login, chart configuration, expiry and extension, dashboard organization and imports, a widget explorer and personal activity home; backend paid writes, scoped reads and documented self hosting setup.
+
 * `docker-compose.dokploy.yml` stores the index in the named volume `index-data`, so Dokploy redeploys keep it. The indexer serves `/health` (with `bootstrapping: true`) while the first backfill runs, so the container stays healthy. A failed rollback no longer hides the original transaction error.
 * Multi page web app: home page with story sections and live stats, `/showcase` chart gallery (each card one SQL query naming the clause `arkiv_query` cannot express), `/playground` SQL editor with snippets, history, CSV export, Payload and Verify, and an `/about` page with architecture and expiry figures.
 * The web proxy serves stored index files from a read only mount of the data directory while the indexer is unavailable. Compose uses a bind mount at `INDEX_DATA_PATH` (default `./data`) instead of a named volume, and the base compose file publishes no host ports (`docker-compose.local.yml` publishes port 3000).

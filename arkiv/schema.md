@@ -102,3 +102,134 @@ No `arkiv_query` runs per event. A fill response is accepted only if its `blockN
 | Verify button (`verifyRows` in `apps/web/lib/verify.ts`) | `arkiv_query(<bare key chunk>, {select: {"key":true,"updatedAt":true,"expiresAt":true,"owner":true}, cursor})` for the result's keys, chunks of 50 | On click |
 
 Payload and Verify use bare key predicates without the configured expression, without `atBlock` and without an explicit limit. Verify compares returned metadata with the indexed row and the live head; it is an RPC comparison, not a cryptographic proof, and a missing entity cannot distinguish deletion from expiry. The browser relevance prefilter matches the indexer: a log is used when its key is already known, when its `EntityCreated` owner matches a `$creator` or `$owner` term, or when the expression has no such terms.
+
+## Widget dashboards
+
+The web backend writes `widget`, `dashboard` and `link` entities with `contentType: application/json` and UTF-8 JSON payloads. Its wallet is both Arkiv creator and owner. The `user` attribute is application ownership, represented by a Privy embedded wallet. Login values are `google`, `discord`, `x` or `telegram`; no email, social handle or Privy user ID is written. Payloads remain off Parquet. Everything is public.
+
+| Entity type | Attribute | Arkiv type | Value or purpose |
+| :--- | :--- | :--- | :--- |
+| widget | type | str | `widget` |
+| widget | project | str | `arkiv-sql-indexer-dash` |
+| widget | user | addr | Widget creator's embedded wallet |
+| widget | login | str | Login provider |
+| widget | name | str | Widget name |
+| widget | chart | str | Chart type |
+| dashboard | type | str | `dashboard` |
+| dashboard | project | str | `arkiv-sql-indexer-dash` |
+| dashboard | user | addr | Dashboard owner's embedded wallet |
+| dashboard | login | str | Login provider |
+| dashboard | title | str | Dashboard title |
+| link | type | str | `link` |
+| link | project | str | `arkiv-sql-indexer-dash` |
+| link | user | addr | Dashboard owner's embedded wallet |
+| link | dashboard | key | Dashboard entity key |
+| link | widget | key | Widget entity key |
+
+### Payloads and enums
+
+Widget payload:
+
+```json
+{
+  "v": 1,
+  "name": "Top 10 creators",
+  "sql": "SELECT creator, count(*) AS n FROM entities GROUP BY 1 ORDER BY n DESC LIMIT 10",
+  "chart": "hbar",
+  "mapping": { "x": "creator", "y": ["n"], "groupBy": null, "stacking": "off", "sort": "query" },
+  "counter": null,
+  "format": { "number": "0,0", "xTitle": null, "yTitle": null, "legend": true, "labels": false, "colors": {} },
+  "lifetimeDays": 7
+}
+```
+
+Dashboard payload:
+
+```json
+{ "v": 1, "title": "Top creators", "description": "" }
+```
+
+Link payload:
+
+```json
+{ "v": 1, "size": "xl", "position": 3, "name": "Top 10 creators" }
+```
+
+Charts: `table`, `counter`, `bar`, `hbar`, `line`, `area`, `donut`. Mapping has an optional X column, Y columns and optional `groupBy`; grouping and multiple Y columns are mutually exclusive. Stacking: `off`, `stack`, `percent`. Sort: `query`, `x`, `ydesc`. Number formats: `0,0`, `0.0a`, `0.00%`. Colors map series names to `c1` through `c8`.
+
+For a counter chart, `counter` holds a value column, zero based row, prefix, suffix, label, decimals and compact flag, for example:
+
+```json
+{ "column": "n", "row": 0, "prefix": "", "suffix": "", "label": "Creators", "decimals": 0, "compact": true }
+```
+
+Size spans on a 12 column row are `xs: 3`, `sm: 4`, `md: 6`, `xl: 12`; phones show full width. Defaults are counter `xs`, donut `sm`, other charts `md`. Link positions sort ascending; the copied name remains available when the widget expires or is deleted. A dashboard allows at most 48 links and cannot contain the same widget twice.
+
+### Expiry and operations
+
+One day is 43,200 blocks at two seconds per block. Writes run through `apps/web/lib/dash/server/operations.ts` inside one serial wallet queue. The backend checks the session's application ownership against live RPC state before mutation.
+
+| Entity or action | Implemented operation and expiry |
+| :--- | :--- |
+| Create widget | `createEntity` with `ExpirationTime.fromSeconds(lifetimeDays * 86400)`; `lifetimeDays` is 1, 7, 30 or 90 |
+| Create widget plus placement | One `executeBatch` creates the widget and link. Inside the same queue slot, `predictEntityKeys({ owner, count: 2 })` supplies keys and salts; each create reuses its salt, and the link references the predicted widget key. The link uses the existing dashboard's expiry with `ExpirationTime.atBlock`. |
+| Edit widget | `patchEntity` sets name and chart attributes and replaces the payload. The original `lifetimeDays` is preserved; edit does not reset expiry. |
+| Extend widget | `extendEntity` with `ExpirationTime.atBlock(BigInt(target))`, where `target = min(expiresAt + lifetimeDays * 43200, head + 90 * 43200)`. The caller must be the widget creator or have a live link to it with their `user` address. Expired widgets cannot extend; a target no later than the existing expiry is rejected as at cap. |
+| Delete widget | Creator only, `deleteEntity`. Links stay and display the stored name in a missing or expired slot; no SQL runs for that slot. |
+| Create dashboard | `createEntity`, 90 days through `ExpirationTime.fromSeconds`; title and description in payload |
+| Rename or edit dashboard | Owner only, `patchEntity` sets title and replaces payload; this operation alone does not reset expiry |
+| Add existing widget | Dashboard owner only, `createEntity` for a link at the next position, with `ExpirationTime.atBlock` set to dashboard expiry |
+| Organize dashboard | Owner only, one `executeBatch` creates imported links, patches changed link sizes and positions, optionally patches the dashboard title, deletes removed links, and extends the dashboard and retained links to `head + 90 * 43200`. New links use the same target. Extensions are sent only when the target is later. An empty plan sends no transaction. |
+| Delete dashboard | Owner only, one `executeBatch` deletes the dashboard and its live links; referenced widgets remain |
+
+Native batch order is creates, patches, deletes, extensions. Links follow their dashboard's expiry rather than their widget's expiry, so expired widget slots can remain until removed.
+
+### Dashboard RPC reads and trust boundary
+
+These expressions are built with the SDK helpers in `apps/web/lib/dash/entities.ts`. In the templates below, W is the lowercase backend wallet address, D a dashboard key, K a widget key, E an extra widget key and U the session wallet address. Substitute full hexadecimal addresses and keys before sending. `S` denotes the complete `scopeExpr(W)` expression, not a literal RPC identifier. The templates below match the SDK grouping. The SDK renders address literals in checksum case even though the application normalizes addresses to lowercase.
+
+```text
+scopeExpr(W):
+$creator = addr(W) AND project = str('arkiv-sql-indexer-dash')
+
+dashboardBundleExpr(W, D, [E1, E2]):
+S AND ($key = key(D) OR $key = key(E1) OR $key = key(E2) OR type = str('link') AND dashboard = key(D))
+
+widgetExtendExpr(W, K, U):
+S AND ($key = key(K) OR type = str('link') AND widget = key(K) AND user = addr(U))
+
+keysExprs(W, [K1, K2]):
+(S) AND ($key = key(K1) OR $key = key(K2))
+```
+
+Without extras, the dashboard bundle includes only the dashboard key alternative and its links. Key chunks contain at most 50 keys; a single key has no OR group and an empty key list sends no query. The actual two key chunk for agent one's dashboard wallet is:
+
+```text
+($creator = addr(0xb0B87EdDB0bc777Eb663c7a11703ba5ED4849A28) AND project = str('arkiv-sql-indexer-dash')) AND ($key = key(0x0000000000000000000000000000000000000000000000000000000000000001) OR $key = key(0x0000000000000000000000000000000000000000000000000000000000000002))
+```
+
+Every expression is sent through `queryAll` as `arkiv_query(expression, { limit: 200, select: DASH_SELECT, cursor })`. No `atBlock` is supplied; the returned head is the first page's `blockNumber`, and every cursor page is read. The shared selection is:
+
+```json
+{
+  "key": true,
+  "owner": true,
+  "creator": true,
+  "createdAt": true,
+  "updatedAt": true,
+  "expiresAt": true,
+  "attributes": true,
+  "payload": true
+}
+```
+
+| Caller and purpose | Expression |
+| :--- | :--- |
+| Server widget edit or delete | `keysExprs(W, [K])` |
+| Server widget extension and permission check | `widgetExtendExpr(W, K, U)` |
+| Server create widget with placement, dashboard edit or delete | `dashboardBundleExpr(W, D)` |
+| Server organize or add existing widget | `dashboardBundleExpr(W, D, extraKeys)` with newly imported widget keys |
+| Browser dashboard and placement layout | `dashboardBundleExpr(W, D)` |
+| Browser widget page, dashboard widget payloads, explorer previews, home lifetime data | `keysExprs(W, keys)` in chunks of 50; explorer preview batches contain 12 keys per page |
+
+Dashboard reads always filter `$creator` on the configured dashboard wallet as well as project. Another wallet can copy every attribute, so attributes alone are never trusted identity. Decoders recheck creator, project, type, required attributes and payload validity before accepting an entity. Lists, counts and activity use creator and project scoped local DuckDB SQL; RPC reads supply payloads only where needed. Stored widget SQL must pass `checkWidgetSql` before execution in the viewer's DuckDB, capped at 5,000 result rows.

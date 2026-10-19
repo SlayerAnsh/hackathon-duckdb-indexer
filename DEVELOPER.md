@@ -9,6 +9,8 @@ Use Bun 1.3.x (tested with 1.3.11). Docker uses `oven/bun:1.3` for workspace ins
 | `packages/core` | Direct JSON RPC client, typed attribute decoding, `$key` chunk builder, browser merge views |
 | `apps/indexer` | DuckDB store, log replay backfill, attribute filler, live sync, snapshots, delta, internal HTTP |
 | `apps/web` | Next.js data proxy with disk fallback, DuckDB WASM loader, browser live tail, showcase, playground, about page |
+| `apps/web/lib/dash` | Widget schemas, SQL, RPC reads, pending writes, authentication and serialized wallet operations |
+| `apps/web/app/api/dash` | Runtime wallet config, session and authenticated write routes |
 | `apps/demo-writer` | Synthetic support desk mutations through the Arkiv SDK wallet client |
 | `arkiv` | Entity schema, exact queries, and the friction report |
 | `test/deployment.test.ts` | Offline deployment and documentation checks |
@@ -27,6 +29,20 @@ bun test ./apps/demo-writer/test
 All automated tests use fixtures or fakes and need no RPC. The deployment tests inspect configuration and docs, not running containers. They also reject dash punctuation in the docs. Docker image builds, Range responses, credential absence in built bundles, restart persistence and public deployment need separate integration checks.
 
 Start the frontend with `INDEXER_URL=http://localhost:8080 bun run --cwd apps/web dev` when using a local indexer (`DATA_DIR=./data bun apps/indexer/src/main.ts`). The default upstream inside Compose is `http://indexer:8080`. Set `DATA_DIR` for the web app too if it should fall back to the stored files while the indexer is down.
+
+## Widget dashboard development
+
+Next.js loads environment files from `apps/web`, not the repository root. Copy or link the root `.env.local` to `apps/web/.env.local`, or export the variables before starting Next.js. Set `NEXT_PUBLIC_PRIVY_APP_ID`, `PRIVY_APP_SECRET` and `DASHBOARD_PRIVATE_KEY`; the RPC uses `NEXT_PUBLIC_TIRAMISU_RPC_URL`. Keep secret values out of logs and browser bundles. See the README for Privy provider and embedded wallet setup.
+
+Nonces, rate limits and the serial backend wallet queue are in memory. Run one web instance to preserve nonce checks, abuse limits and wallet serialization. The dashboard wallet's public address comes from `GET /api/dash/config` at runtime.
+
+Feature tests live in `apps/web/test/dash-*.test.ts` and `dash-*.test.tsx`, including `dash-schema`, `dash-entities`, `dash-auth`, `dash-routes`, `dash-read`, `dash-sql-guard`, `dash-explorer`, `dash-home-sql` and `dash-home`. They use offline fakes, static rendering and native DuckDB fixtures. `test/deployment.test.ts` checks environment isolation, schema documentation and the Compose creator expression. Verify changes with:
+
+```sh
+bun test ./apps/web/test
+bun test ./test/deployment.test.ts
+(cd apps/web && ./node_modules/.bin/tsc --noEmit -p .)
+```
 
 ## Data layout
 

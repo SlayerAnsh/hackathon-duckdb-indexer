@@ -23,7 +23,7 @@ Goals (P0 unless marked):
 7. Demo writer app that writes through the SDK (per type expiry, `extendEntity`, batch writes, ownership transfer).
 8. Verify button per row (P1).
 9. Browser live tail (P1). Implemented as direct `eth_getLogs` polling decoded with SDK `ENTITY_EVENTS_ABI`, not `watchEntityEvents`.
-10. Saved queries stored as Arkiv entities (P2). Not implemented.
+10. Saved SQL widgets and shareable dashboards stored as Arkiv entities. Implemented with Privy login, a public explorer and personal home.
 
 Non goals: server side SQL endpoint, history beyond current state, Parquet expiry buckets, DataFusion, DuckLake, multi expression indexes.
 
@@ -277,7 +277,7 @@ A demo wide view (for example `tickets`) is a `PIVOT` over `attributes` for one 
 ## 9. Frontend (Next.js)
 
 - Next.js App Router with `output: 'standalone'` (a Node server, needed for the proxy). Pages are client components; DuckDB WASM runs only in the browser.
-- Pages: `/` (story sections and live stats), `/showcase` (chart cards grouped into Overview, Expiry, Creators, Attributes and Activity views), `/playground` (SQL editor) and `/about` (architecture and expiry figures).
+- Pages: `/` (story sections and live stats), `/showcase` (chart gallery), `/playground` (SQL editor), `/about` (architecture and expiry), `/widgets` (public explorer), `/widgets/new` (create widget), `/widgets/<key>` (view or edit widget), `/d/<key>` (public dashboard), `/d/<key>/edit` (organize dashboard) and `/me` (login required home and activity).
 - Status bar: indexed expression, chain, stored and serving blocks, oldest block with complete attributes, head lag, and live tail pending count and budget state.
 
 ### 9.0 Data proxy
@@ -330,16 +330,22 @@ Bun script using the `@arkiv-network/sdk` wallet client with a synthetic testnet
 
 Runs one action every `DEMO_INTERVAL_MS` (default 8000) with a seeded generator (`DEMO_SEED`, default 1). The indexer does not depend on the domain.
 
-## 11. Saved queries on Arkiv (P2)
+## 11. Widgets and dashboards
 
-Not implemented. Plan: entity type `saved_query`, scratch 1 day, pinned 30 days, extended on view, author shown via `$creator`. It needs a browser wallet, so it stayed last in priority.
+Implemented in `apps/web/lib/dash`, `components/widgets` and `app/api/dash`. Privy supports Google, Discord, X and Telegram with embedded Ethereum wallets. The backend wallet creates every widget, dashboard and placement link; the `user` attribute identifies application ownership. Widgets save SQL, chart mappings, formatting and a chosen lifetime. Dashboards import widgets from any user with ordered size settings and at most 48 links. Public pages need no login; creation and ownership controls require a session.
+
+Lists, usage counts and activity come from local DuckDB, scoped by creator and project. Payloads come from scoped Arkiv RPC key batches. Pending writes appear until the index catches up. Stored SQL passes the guard before running in the viewer's browser with at most 5,000 result rows. Home counts cover live entities only, placements include other users' links to your widgets, and active days count distinct creation and update days for your widgets and dashboards.
+
+See the [design spec](docs/superpowers/specs/2026-10-20-widget-dashboards-design.md) for the feature design and [Arkiv schema](arkiv/schema.md#widget-dashboards) for implemented attributes, payloads, expiry, operations and exact read expressions. The implementation uses SDK `patchEntity` for edits.
 
 ## 12. Security and abuse
 
 - No server side SQL. Arbitrary queries run in the visitor's browser and only cost the visitor.
-- The only access control is the indexed expression. Only entities matching it are published, so `$creator` filtering is the Security track story. Startup warns when the expression has no `$creator` term.
+- The index expression controls published index data. Widget and dashboard reads also require the configured backend `$creator` and project, since attributes alone cannot establish identity. Startup warns when the expression has no `$creator` term.
 - `TIRAMISU_API_KEY` reaches only the indexer service, is unused by default, and never reaches the web build, the browser or the writer. The deployment test asserts this for the compose file and Dockerfiles.
-- The indexer serves static files and JSON only. No write endpoints.
+- The indexer serves static files and JSON only. The web app has write endpoints under `/api/dash`, authenticated through a verified Privy access token plus EIP 191 personal_sign of a single use nonce. The recovered signer must be a linked Privy embedded wallet. An HMAC signed HttpOnly session lasts eight hours, with SameSite=Lax and Secure on HTTPS.
+- Writes enforce application ownership, JSON payload and SQL guard validation, same origin checks when Origin is supplied, and a serial backend wallet queue with at most 25 waiting jobs. Per address limits are 5 writes per minute and 40 per hour; the global limit is 80 per hour. Nonce requests allow 20 per minute per client IP bucket. Nonces expire after five minutes. State is in memory, so deploy one web instance.
+- `PRIVY_APP_SECRET` and `DASHBOARD_PRIVATE_KEY` exist only in the web runtime environment. `NEXT_PUBLIC_PRIVY_APP_ID` is public at build and runtime. `GET /api/dash/config` derives the public wallet address at runtime; no public wallet build variable is needed.
 
 ## 13. Expiry guarantee (what we claim)
 
@@ -363,6 +369,17 @@ One `docker-compose.yml` at the repository root plus `docker-compose.local.yml`,
 
 Configuration comes from a `.env` file next to the compose file (`.env.example` committed); services read it only through `${VAR}` references, never through `env_file`. Every service uses `restart: unless-stopped`. TLS and the public domain sit in front of `web` (Dokploy with Traefik, or another host proxy) and are outside the compose file.
 
+Dashboard environment:
+
+| Variable | Scope | Purpose |
+| :--- | :--- | :--- |
+| `NEXT_PUBLIC_PRIVY_APP_ID` | Web build and runtime | Privy app ID; blank disables dashboards |
+| `PRIVY_APP_SECRET` | Web runtime only | Privy verification and session HMAC |
+| `DASHBOARD_PRIVATE_KEY` | Web runtime only | Funded backend wallet, agent one on this deployment |
+| `NEXT_PUBLIC_TIRAMISU_RPC_URL` | Web build and runtime | Public browser RPC and backend transport |
+
+Secrets are never build arguments or passed to the indexer or writer. Production uses a blank expression. Filtered self hosted indexes must include the dashboard creator with `OR`; changing the expression requires a fresh data directory and full backfill.
+
 ## 15. Testing
 
 - `packages/core`: attribute decoding for all nine types, expression chunk builder.
@@ -385,7 +402,7 @@ Public MIT repository with setup in the README (wallet addresses, live URL and v
 4. Demo writer.
 5. Live sync and delta, then browser delta polling.
 6. Docker compose deploy (public URL), README, schema.md, friction.md, video.
-7. P1: verify button, browser live tail (both done). P2: saved queries (not done).
+7. P1: verify button, browser live tail (both done). Widgets and dashboards are implemented (section 11).
 
 ## 18. Open decisions
 

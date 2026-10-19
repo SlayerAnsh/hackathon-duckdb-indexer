@@ -124,3 +124,16 @@ test('submission docs cover demo identity, schema, expiry, and observed friction
   for (const path of ['apps/web/Dockerfile', 'docker-compose.yml', 'docker-compose.dokploy.yml', '.env.example', ...files('apps/web/lib'), ...files('apps/web/components')])
    expect(read(path)).not.toContain('NEXT_PUBLIC_DASHBOARD_WALLET')
  })
+
+
+test('widget dashboard docs cover schema, runtime setup and self hosting', () => {
+  const schema = read('arkiv/schema.md');
+  for (const value of ['widget', 'dashboard', 'link', 'lifetimeDays', 'arkiv-sql-indexer-dash', 'executeBatch', 'predictEntityKeys', 'patchEntity'])
+    expect(schema).toContain(value);
+  const readme = read('README.md');
+  for (const value of ['DASHBOARD_PRIVATE_KEY', 'PRIVY_APP_SECRET', 'NEXT_PUBLIC_PRIVY_APP_ID', 'GET /api/dash/config'])
+    expect(readme).toContain(value);
+  expect(readme).toMatch(/INDEX_EXPRESSION='\$creator = addr\(0x[0-9a-f]{40}\) OR \$creator = addr\(0x[0-9a-f]{40}\)'/);
+  expect(read('SPECS.md')).not.toContain('Saved queries stored as Arkiv entities (P2). Not implemented.');
+  expect(read('DEVELOPER.md')).toContain('apps/web/.env.local');
+});

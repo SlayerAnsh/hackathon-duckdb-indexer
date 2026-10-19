@@ -41,7 +41,32 @@ How data flows:
 4. Live sync applies `EntityCreated`, `EntityPatched`, `ExpiryExtended`, `OwnershipTransferred` and `EntityDeleted` straight from public logs every 5 blocks. Patches mark rows pending again for the filler.
 5. The browser imports the snapshot, polls the delta every 2 seconds, tails logs from the public RPC every 4 seconds, and reads `eth_blockNumber` as `live_head`. Public SQL views filter `expires_at > live_head`.
 
-The web app has four pages: `/` (story and live stats), `/showcase` (chart cards, each one SQL query with the clause `arkiv_query` cannot express), `/playground` (SQL editor with schema aware autocomplete, history, CSV export, Payload and Verify per row) and `/about`.
+The web app includes: `/` (story and live stats), `/showcase` (chart cards, each one SQL query with the clause `arkiv_query` cannot express), `/playground` (SQL editor with schema aware autocomplete, history, CSV export, Payload and Verify per row) and `/about`, plus `/widgets` (public explorer), `/widgets/new` (create), `/widgets/<key>` (view or edit), `/d/<key>` (public dashboard), `/d/<key>/edit` (organize) and `/me` (your dashboards, widgets and activity).
+
+## Widgets and dashboards
+
+Log in with Google, Discord, X or Telegram through Privy to save SQL as widgets, choose a chart and lifetime, and arrange your own or other people's widgets into shareable dashboards. Browse and view without logging in. Your home shows dashboards, widgets, expiry and activity over live entities. Queries run in each viewer's browser; payloads come directly from Arkiv RPC and are never stored in Parquet.
+
+Everything is public, including SQL and dashboard content. The app stores the embedded wallet address and login provider, never email addresses, social handles or Privy user IDs on chain. Do not put personal information in widget SQL, names or dashboard content. The backend wallet pays for every write; users need no tokens.
+
+The deployment owner must enable Google, Discord, X and Telegram in the Privy dashboard and enable Ethereum embedded wallets for all users. Configure these variables before building and starting the web service:
+
+| Variable | Scope | Purpose |
+| :--- | :--- | :--- |
+| `NEXT_PUBLIC_PRIVY_APP_ID` | Web build and runtime | Public Privy app ID; blank disables dashboards |
+| `PRIVY_APP_SECRET` | Web runtime only | Privy verification and session signing |
+| `DASHBOARD_PRIVATE_KEY` | Web runtime only | Funded Tiramisu backend wallet; this deployment reuses agent one |
+| `NEXT_PUBLIC_TIRAMISU_RPC_URL` | Web build and runtime | Public RPC for browser reads and backend writes; never include credentials |
+
+Secrets belong only in the web runtime environment, never build arguments, the indexer or the demo writer. `GET /api/dash/config` returns `{ wallet: string | null }`, deriving the public wallet address from the configured key at runtime. Run one web instance because nonces, rate limits and the serial wallet queue are in memory. Local environment file setup is in [DEVELOPER.md](DEVELOPER.md).
+
+Production leaves `INDEX_EXPRESSION` blank and indexes all entities. A self hosted filtered index must include the dashboard wallet with `OR`, as specified in [SPECS.md section 4](SPECS.md#4-verified-facts-sdk-arkiv-networksdk-081-source-read-18-october-2026). This Compose example includes the demo writer and agent one, the dashboard wallet, with lowercase addresses:
+
+```dotenv
+INDEX_EXPRESSION='$creator = addr(0x1f61c3cac1612c020f64739b128c5f198939c8cd) OR $creator = addr(0xb0b87eddb0bc777eb663c7a11703ba5ed4849a28)'
+```
+
+Replace the second address if using a different dashboard wallet. Keep the single quotes so Compose preserves `$creator`. Changing the expression requires a fresh data directory and full backfill; startup refuses a store built for a different expression. Dashboard reads always filter on the backend wallet's creator address and project, even when the index expression is blank.
 
 ## Run locally with Docker Compose
 
@@ -181,7 +206,7 @@ To serve only a subset, set `INDEX_EXPRESSION` in `.env` before the first start 
 | Role | Address |
 | :--- | :--- |
 | Demo wallet (creates every demo entity) | `0x1f61c3cac1612C020f64739B128C5f198939C8Cd` |
-| Agent one (receives transferred tickets) | `0xb0B87EdDB0bc777Eb663c7a11703ba5ED4849A28` |
+| Agent one (receives transferred tickets and serves as dashboard wallet) | `0xb0B87EdDB0bc777Eb663c7a11703ba5ED4849A28` |
 | Agent two (receives transferred tickets) | `0xF1BC753cF42d0157Ac34E28DBf06108F66aDB3B3` |
 
 The `$creator` filter keeps a ticket indexed after its owner changes to an agent, because `$creator` never changes. User attributes alone are not an identity boundary, since anyone can write a `project` or `type` attribute. Startup warns when the expression has no `$creator` term. This creator boundary, plus running all SQL in the visitor's browser with no server SQL endpoint and no credentials in the browser, is the Security track story.
@@ -200,7 +225,7 @@ Set `SYNC_PAUSED=true` to serve an existing store with no RPC calls at all. If t
 
 ## Roadmap
 
-Future work includes saved queries stored as Arkiv entities, Parquet expiry buckets, DataFusion, DuckLake and server side SQL. These are outside the current browser SQL design.
+Future work includes Parquet expiry buckets, DataFusion, DuckLake and server side SQL. These are outside the current browser SQL design.
 
 ## License
 
