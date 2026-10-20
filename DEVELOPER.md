@@ -49,7 +49,7 @@ bun test ./test/deployment.test.ts
 
 ## Official dashboards
 
-The coordinator seeds the four Official dashboards from the repository root with the existing dashboard wallet. Export `DASHBOARD_PRIVATE_KEY` and optionally `NEXT_PUBLIC_TIRAMISU_RPC_URL` from the root environment without printing their values. The script defaults to Tiramisu and needs no Privy variables.
+The coordinator seeds the five Official dashboards (one per showcase view) from the repository root with the existing dashboard wallet. Export `DASHBOARD_PRIVATE_KEY` and optionally `NEXT_PUBLIC_TIRAMISU_RPC_URL` from the root environment without printing their values. The script defaults to Tiramisu and needs no Privy variables.
 
 ```sh
 bun apps/web/scripts/seed-official.ts --dry-run

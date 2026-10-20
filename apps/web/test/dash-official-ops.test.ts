@@ -18,8 +18,8 @@ test('seed predicts and creates each dashboard, widgets and links in one queued 
   const predict = spyOn(f.deps.client, 'predictEntityKeys')
   const result = await seedOfficial(f.deps)
   expect(result.created.map(d => d.slug)).toEqual(OFFICIAL_DASHBOARDS.map(d => d.slug))
-  expect(queue).toHaveBeenCalledTimes(4)
-  expect(predict).toHaveBeenCalledTimes(4)
+  expect(queue).toHaveBeenCalledTimes(OFFICIAL_DASHBOARDS.length)
+  expect(predict).toHaveBeenCalledTimes(OFFICIAL_DASHBOARDS.length)
   OFFICIAL_DASHBOARDS.forEach((def, i) => {
     const n = def.widgets.length
     expect(predict.mock.calls[i][0]).toEqual({ owner: W, count: 1 + 2 * n })
@@ -122,7 +122,7 @@ test('CLI validates flags and environment, dry runs without writes, and runs kee
   const env = { DASHBOARD_PRIVATE_KEY: `0x${'01'.repeat(32)}` }
   logs.length = 0
   expect(await runSeedCli(['--dry-run'], env, io)).toBe(0)
-  expect(logs).toHaveLength(4)
+  expect(logs).toHaveLength(OFFICIAL_DASHBOARDS.length)
   logs.forEach((s, i) => { expect(s).toContain(OFFICIAL_DASHBOARDS[i].slug); expect(s).toContain('would create') })
   expect(f.calls).toHaveLength(0)
   expect(predict).not.toHaveBeenCalled()

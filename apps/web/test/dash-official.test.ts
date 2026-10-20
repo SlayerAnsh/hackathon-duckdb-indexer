@@ -20,7 +20,7 @@ test('official marker validates addresses and scopes the publisher and project',
 })
 
 test('official definitions validate without normalization', () => {
-  expect(OFFICIAL_DASHBOARDS.map(d => d.slug)).toEqual(['network-overview', 'expiry-watch', 'creators', 'attributes-activity'])
+  expect(OFFICIAL_DASHBOARDS.map(d => d.slug)).toEqual(['network-overview', 'expiry-watch', 'creators', 'attributes', 'activity'])
   const charts = new Set<string>()
   for (const d of OFFICIAL_DASHBOARDS) {
     expect(d.slug).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)

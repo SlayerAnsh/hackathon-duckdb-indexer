@@ -19,10 +19,12 @@ function counter(id: string, name: string): OfficialWidgetDef {
   const source = VIEWS.flatMap(v => v.widgets).find(w => w.id === id)!
   return widget(name, 'counter', 'xs', source.sql.replace(', count(*) AS total', ''))
 }
+// One dashboard per showcase view in lib/views.ts, in the same order.
 export const OFFICIAL_DASHBOARDS: OfficialDashboardDef[] = [
   { slug: 'network-overview', title: 'Arkiv network overview', description: 'The live dataset at a glance: volume, creators, entity types and what expires next on the Tiramisu testnet.', widgets: [
     widget('Live entities', 'counter', 'xs', FIGURE_SQL.live),
     widget('Distinct creators', 'counter', 'xs', FIGURE_SQL.creators),
+    counter('known', 'Known entities'), counter('owners-count', 'Distinct owners'),
     widget('Expiring within 1 hour', 'counter', 'xs', FIGURE_SQL.expiring),
     widget('Created in the last hour', 'counter', 'xs', FIGURE_SQL.created),
     widget('Creations per hour', 'area', 'md', bucketedSql('created_at', 43200, 1800), 'label', ['count']),
@@ -36,11 +38,14 @@ export const OFFICIAL_DASHBOARDS: OfficialDashboardDef[] = [
   { slug: 'creators', title: 'Creators', description: "Who writes the most, who owns what, and how varied each creator's data is.", widgets: [
     widget("Largest creator's entities", 'counter', 'xs', 'SELECT max(n) AS value FROM (SELECT count(*) AS n FROM entities GROUP BY creator)'),
     counter('transfers', 'Entities transferred'), counter('single-creators', 'Creators with one entity'), counter('owners-count', 'Distinct owners'),
-    view('top-creators', 'hbar', 'md'), view('creator-types', 'table', 'md'), view('transferred', 'table', 'xl'),
+    view('top-creators', 'hbar', 'md'), view('creator-types', 'table', 'md'), view('creator-filter', 'table', 'xl'), view('transferred', 'table', 'xl'),
   ] },
-  { slug: 'attributes-activity', title: 'Attributes and activity', description: 'Attribute names and values in use, and how entities change over time.', widgets: [
-    widget('Updates per 10 min', 'bar', 'md', bucketedSql('updated_at', 9000, 300), 'label', ['count']),
-    view('modified', 'donut', 'md'), view('running', 'area', 'xl'), view('status', 'hbar', 'md'), view('priority', 'hbar', 'md'),
+  { slug: 'attributes', title: 'Attributes', description: 'Attribute names and values in use, their types, and numeric statistics.', widgets: [
+    view('status', 'hbar', 'md'), view('priority', 'hbar', 'md'),
     view('attribute-usage', 'table', 'xl'), view('numeric', 'table', 'xl'),
+  ] },
+  { slug: 'activity', title: 'Activity', description: 'How entities change over time: updates, creates versus patches, and the running total.', widgets: [
+    widget('Updates per 10 min', 'bar', 'md', bucketedSql('updated_at', 9000, 300), 'label', ['count']),
+    view('modified', 'donut', 'md'), view('running', 'area', 'xl'),
   ] },
 ]
