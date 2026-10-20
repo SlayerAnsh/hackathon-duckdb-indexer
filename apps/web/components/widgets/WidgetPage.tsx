@@ -12,6 +12,7 @@ import type { WidgetEntity } from '../../lib/dash/entities'
 import { initEditor } from '../../lib/dash/editor-state'
 import { addPending, usePending } from '../../lib/dash/pending'
 import { fetchWidget } from '../../lib/dash/read'
+import { highlightSql } from '../../lib/sql-highlight'
 import { isEntityKey, type ChartType, type LifetimeDays, type WidgetPayload, type WriteResult } from '../../lib/dash/schema'
 import { checkWidgetSql } from '../../lib/dash/sql-guard'
 import { widgetUsageSql, widgetDashboardsSql, toUsedOn } from '../../lib/dash/sql'
@@ -185,7 +186,7 @@ function StoredQuery({ payload, version, run, onTiming }: { payload: WidgetPaylo
   </section>
   <section className={`card ${s.sqlCard}`} aria-label="SQL">
    <div className="card-h"><h2>SQL</h2><button type="button" className="btn btn-quiet btn-sm" onClick={() => void copyText(payload.sql, markCopied)}>{copied ? <CheckGlyph/> : null}{copied ? 'SQL copied' : 'Copy SQL'}</button><span className="sr-only" aria-live="polite">{copied ? 'SQL copied' : ''}</span></div>
-   <pre className={s.sql} tabIndex={0}><code>{payload.sql}</code></pre>
+   <pre className={s.sql} tabIndex={0}><code>{highlightSql(payload.sql).map((t, i) => t.cls ? <span key={i} className={t.cls}>{t.text}</span> : t.text)}</code></pre>
   </section>
  </div>
 }
