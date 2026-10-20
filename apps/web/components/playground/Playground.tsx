@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror'
 import { VIEWS, DEFAULT_SQL } from '../../lib/views'
 import { encodeSqlHash, readHash, writeHash } from '../../lib/hash-state'
-import type { IndexDb } from '../../lib/indexdb'
+import { IndexUnavailable, QueryCancelled, type IndexDb } from '../../lib/indexdb'
 import { ResultsGrid, type QueryResult } from '../dash/ResultsGrid'
 import { buildSnippets, matchSnippet, type Snippet } from './snippets'
 import { SnippetSidebar } from './SnippetSidebar'
@@ -24,8 +24,11 @@ export function Playground({ db, rpcUrl, head }: { db: IndexDb | null; rpcUrl: s
  const [activeId, setActiveId] = useState<string | null>('featured/default')
  const [drawer, setDrawer] = useState(false)
  const [tab, setTab] = useState<'results' | 'history'>('results')
- const [running, setRunning] = useState(false)
- const [error, setError] = useState('')
+ const [phase, setPhase] = useState<'idle' | 'waiting' | 'running'>('idle')
+ const running = phase !== 'idle'
+ const [waitedS, setWaitedS] = useState(0)
+ const [error, setError] = useState<{ title: string; text: string } | null>(null)
+ const runAbort = useRef<AbortController | null>(null)
  const [copied, setCopied] = useState(false)
  const mod = useSyncExternalStore(noSubscribe, platformMod, () => 'Ctrl')
  const [history, setHistory] = useState<HistoryEntry[]>([])
@@ -50,16 +53,40 @@ export function Playground({ db, rpcUrl, head }: { db: IndexDb | null; rpcUrl: s
   return () => document.removeEventListener('keydown', onKey)
  }, [drawer])
 
+ useEffect(() => {
+  if (phase !== 'waiting') return
+  const started = Date.now()
+  setWaitedS(0)
+  const timer = setInterval(() => setWaitedS(Math.floor((Date.now() - started) / 1000)), 1000)
+  return () => clearInterval(timer)
+ }, [phase])
+ useEffect(() => () => runAbort.current?.abort(), [])
+
  const run = useCallback(async () => {
   const query = sqlRef.current
   if (!db || running || !query.trim()) return
-  setRunning(true); setError(''); setTab('results'); writeHash(query)
+  const controller = new AbortController()
+  runAbort.current = controller
+  setPhase('running'); setError(null); setTab('results'); writeHash(query)
   try {
-   const data = await db.run(query)
+   const data = await db.run(query, undefined, { signal: controller.signal, onWaiting: () => setPhase('waiting'), onRunning: () => setPhase('running') })
    setResult(prev => ({ data, sql: query, ms: data.elapsedMs, head, id: (prev?.id ?? 0) + 1 }))
    setHistory(prev => [{ sql: query, ms: data.elapsedMs, rows: data.rows.length }, ...prev.filter(h => h.sql !== query)].slice(0, 30))
-  } catch (e) { setError(e instanceof Error ? e.message : String(e)) } finally { setRunning(false) }
+  } catch (e) {
+   const text = e instanceof Error ? e.message : String(e)
+   if (e instanceof QueryCancelled) setError(null)
+   else if (e instanceof IndexUnavailable) setError({ title: 'Index not loaded', text: text + '\nPress Run to try again.' })
+   else setError({ title: 'Query failed', text })
+  } finally {
+   if (runAbort.current === controller) runAbort.current = null
+   setPhase('idle')
+  }
  }, [db, running, head])
+ const cancel = useCallback(() => {
+  const waiting = phase === 'waiting'
+  runAbort.current?.abort()
+  if (!waiting) void db?.cancel().catch(e => setError({ title: 'Cancel failed', text: String(e) }))
+ }, [db, phase])
  const { schema, extensions } = useSqlEditor(db, () => void run())
  const theme = useDocumentTheme()
 
@@ -99,8 +126,8 @@ export function Playground({ db, rpcUrl, head }: { db: IndexDb | null; rpcUrl: s
      <div className={s.runActions}>
       <span className={s.hint} aria-hidden="true"><kbd>{mod}</kbd><kbd>Enter</kbd></span>
       <button type="button" className={cx('btn', 'btn-quiet', s.copyBtn)} onClick={() => void copyLink()} aria-live="polite">{copied ? <><CheckIcon/>Link copied</> : <><LinkIcon/>Copy link</>}</button>
-      {running && <button type="button" className="btn btn-outline" disabled={!db} onClick={() => void db?.cancel().catch(e => setError(String(e)))}><StopIcon/>Cancel</button>}
-      <button type="button" className={cx('btn', 'btn-primary', s.runBtn)} disabled={!db || running || !sql.trim()} aria-busy={running || !db || undefined} aria-keyshortcuts="Control+Enter Meta+Enter" onClick={() => void run()}>{running ? <><span className="spinner" aria-hidden="true"/>Running…</> : db ? <><PlayIcon/>Run</> : <><span className="spinner" aria-hidden="true"/>Loading index…</>}</button>
+      {running && <button type="button" className="btn btn-outline" disabled={!db} onClick={cancel}><StopIcon/>Cancel</button>}
+      <button type="button" className={cx('btn', 'btn-primary', s.runBtn)} disabled={!db || running || !sql.trim()} aria-busy={running || !db || undefined} aria-keyshortcuts="Control+Enter Meta+Enter" onClick={() => void run()}>{phase === 'waiting' ? <><span className="spinner" aria-hidden="true"/>Waiting for index… {waitedS}s</> : running ? <><span className="spinner" aria-hidden="true"/>Running…</> : db ? <><PlayIcon/>Run</> : <><span className="spinner" aria-hidden="true"/>Loading index…</>}</button>
      </div>
     </div>
     <div className={s.editor}>
@@ -112,14 +139,14 @@ export function Playground({ db, rpcUrl, head }: { db: IndexDb | null; rpcUrl: s
     <div className={s.tabs} role="tablist" aria-label="Query output">
      <button type="button" role="tab" id="pg-tab-results" aria-controls="pg-panel" aria-selected={tab === 'results'} onClick={() => setTab('results')}>Results{result && <span className={s.tabCount}>{result.data.rows.length.toLocaleString('en-US')}{result.data.truncated ? '+' : ''}</span>}</button>
      <button type="button" role="tab" id="pg-tab-history" aria-controls="pg-panel" aria-selected={tab === 'history'} onClick={() => setTab('history')}>History<span className={s.tabCount}>{history.length}</span></button>
-     {running && <span className={s.busy} role="status"><span className="spinner" aria-hidden="true"/>Running query</span>}
+     {running && <span className={s.busy} role="status"><span className="spinner" aria-hidden="true"/>{phase === 'waiting' ? `Waiting for the index to load (${waitedS}s)` : 'Running query'}</span>}
      {running && <span className={s.progress} aria-hidden="true"/>}
     </div>
     <div className={s.panel} id="pg-panel" role="tabpanel" aria-labelledby={tab === 'results' ? 'pg-tab-results' : 'pg-tab-history'} data-running={running || undefined}>
      {tab === 'history'
       ? <HistoryList entries={history} onSelect={next => { load(next, matchSnippet(GROUPS, next)); editor.current?.view?.focus() }}/>
       : <>
-       {error && <div className={cx('notice', 'notice-bad', s.error)} role="alert"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 4.75v3.75M8 11h.01"/></svg><div><p className="notice-title">Query failed</p><pre className={s.errorText}>{error}</pre></div></div>}
+       {error && <div className={cx('notice', 'notice-bad', s.error)} role="alert"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 4.75v3.75M8 11h.01"/></svg><div><p className="notice-title">{error.title}</p><pre className={s.errorText}>{error.text}</pre></div></div>}
        {db && result ? <div className={s.result}><ResultsGrid key={result.id} result={result.data} db={db} sql={result.sql} rpcUrl={rpcUrl} ms={result.ms} head={result.head}/></div>
         : !error && (db
          ? <div className={s.empty}><p className={s.emptyTitle}>No results yet</p><p>Pick a snippet or write your own SQL, then press <b>Run</b> or <kbd>{mod}</kbd> <kbd>Enter</kbd>.</p></div>

@@ -57,7 +57,7 @@ test('run excludes queued wait and measures send through last batch', async () =
   async cancel() { now += 100 },
  }
  const db = Object.assign(Object.create(IndexDb.prototype), {
-  queue, queries: { async send() { now += 1; return reader } },
+  queue, gate: { ready: true }, queries: { async send() { now += 1; return reader } },
  }) as import('../lib/indexdb').IndexDb
  try {
   const pending = db.run('SELECT 42')
@@ -90,8 +90,9 @@ test('snapshot rollover clears live rows and refreshes within its transaction', 
   const original = globalThis.fetch
   const nextManifest = { ...manifest, version: 2, snapshotBlock: 10, expression: '', files: { entities: 'snap/v2/entities.parquet', attributes: 'snap/v2/attributes.parquet' } }
   const db = Object.assign(Object.create(IndexDb.prototype), {
-    origin: 'http://fake', state: { manifest: { ...nextManifest, version: 1 } }, manifestAt: 0,
+    origin: 'http://fake', state: { manifest: { ...nextManifest, version: 1 } }, manifestAt: 0, loadedAt: 0, now: () => 60_000, queue: Promise.resolve(),
     rpc: { chainId: async () => 2, genesisHash: async () => '0xabc', blockNumber: async () => 12 },
+    duck: { registerFileBuffer: async () => {}, dropFile: async () => null },
     connection: { query: async (sql: string) => {
       statements.push(sql)
       // Substitute fixture tables for remote Parquet, preserving the production transaction flow.
@@ -108,9 +109,9 @@ test('snapshot rollover clears live rows and refreshes within its transaction', 
       "INSERT INTO fixture_entities VALUES ('snapshot','o','c',1,2,100,NULL,0,false)",
       'CREATE TABLE fixture_attributes AS SELECT * FROM base_attributes', ...MATERIALIZE_SQL,
     ]) await conn.run(sql)
-    globalThis.fetch = (async (url: unknown) => String(url).endsWith('manifest.json')
-      ? Response.json(nextManifest) : new Response(null, { status: 304 })) as typeof fetch
-    await db.poll()
+    globalThis.fetch = (async (url: unknown) => String(url).endsWith('manifest.json') ? Response.json(nextManifest)
+      : String(url).endsWith('.parquet') ? new Response(new Uint8Array([1, 2, 3])) : new Response(null, { status: 304 })) as typeof fetch
+    await db.poll(() => true)
     expect((await conn.runAndReadAll('SELECT key FROM entities')).getRowObjects()).toEqual([{ key: 'snapshot' }])
     expect((await conn.runAndReadAll('SELECT * FROM live_entities')).getRowObjects()).toEqual([])
     expect((await conn.runAndReadAll('SELECT * FROM attributes')).getRowObjects()).toEqual([])

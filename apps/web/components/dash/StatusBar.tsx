@@ -12,7 +12,7 @@ type BarState = IndexState & { source?: 'indexer' | 'disk' }
 
 export function indexStatus(state: BarState, oldest?: number) {
  const h = describeHeights({oldest,chain:state.liveHead,stored:state.deltaTo??state.manifest?.headBlock,snapshot:state.manifest?.snapshotBlock,serving:state.liveTail?.block,source:state.source})
- const status = state.source==='disk' ? 'disk' : state.status==='error' ? 'stale' : h.state
+ const status = state.source==='disk' ? 'disk' : state.status==='error' ? 'stale' : state.status==='loading' && h.state==='unknown' ? 'loading' : h.state
  return { h, status, label: state.source==='disk' ? 'served from disk' : undefined }
 }
 
