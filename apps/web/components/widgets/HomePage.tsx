@@ -9,7 +9,7 @@ import { useTimedQuery } from '../../lib/use-query'
 import { activityCountsSql, expiringSoonSql, myDashboardsSql, myWidgetsSql, recentSql } from '../../lib/dash/sql'
 import { addPending, usePending, useSynced, type PendingWrite } from '../../lib/dash/pending'
 import { homeWidgetItems, mergeDashboards, type HomeDashboard } from '../../lib/dash/home'
-import { useWidgetEntities, entityRev } from '../../lib/dash/entity-cache'
+import { useWidgetEntities, useDashboardEntities, entityRev } from '../../lib/dash/entity-cache'
 import { dashApi } from '../../lib/dash/api'
 import { saveErrorMessage, withSession } from '../../lib/dash/auth-client'
 import { shortHex } from '../../lib/format'
@@ -41,13 +41,17 @@ export function RetryNotice({ error, onRetry }: { error?: string; onRetry?(): vo
 }
 export function HomeCollections({ dashboards, widgets, address, head, version = 0, payloads, onCreate, loading = false, failed = false, payloadError, onRetry, renderExtend, renderDelete }: { dashboards: HomeDashboard[]; widgets: WidgetListItem[]; address: string; head?: number; version?: number; payloads?: Map<string, WidgetEntity | null>; onCreate(): void; loading?: boolean; failed?: boolean; payloadError?: string; onRetry?(): void; renderExtend?(key: string): ReactNode; renderDelete?(key: string): ReactNode }) {
  const covers = useCoverPayloads(dashboards)
+ const wallet = useDashAuth().config?.wallet ?? ''
+ const indexed = dashboards.filter(item => item.updatedAt !== null && item.expiresAt !== undefined)
+ const entities = useDashboardEntities(indexed.map(item => item.key), new Map(indexed.map(item => [item.key, entityRev({ updatedAt: item.updatedAt!, expiresAt: item.expiresAt!, owner: wallet })])))
+ const descriptions = entities.data ? new Map([...entities.data].flatMap(([key, value]) => value ? [[key, value.dashboard.description] as const] : [])) : undefined
  const settled = !loading && !failed
  return <>
   <section className={h.section} aria-labelledby="home-dashboards">
    <SectionHead id="home-dashboards" title="My dashboards" count={settled ? dashboards.length : undefined} sub="Public pages of live charts. Anyone with the link can open them."
     actions={<button type="button" className="btn btn-primary" onClick={onCreate}><PlusIcon/>New dashboard</button>}/>
    {settled && !dashboards.length ? <EmptyState icon="dashboard" title="Create your first dashboard" body="A dashboard is a public page of live charts. Create one, then add your widgets or any public widget to it." actions={<button type="button" className="btn btn-primary" onClick={onCreate}><PlusIcon/>New dashboard</button>}/>
-    : <div className={e.grid}>{dashboards.map(item => <DashboardCard key={item.key} item={item} user={address} head={head} coverPayload={covers ? covers.get(item.cover ?? "") ?? null : undefined}/>)}{loading && !failed && !dashboards.length && <SkeletonCards count={3} label="Loading your dashboards…"/>}</div>}
+    : <div className={e.grid}>{dashboards.map(item => <DashboardCard key={item.key} item={item} user={address} head={head} description={item.syncing ? null : descriptions ? descriptions.get(item.key) ?? null : undefined} coverPayload={covers ? covers.get(item.cover ?? "") ?? null : undefined}/>)}{loading && !failed && !dashboards.length && <SkeletonCards count={3} label="Loading your dashboards…"/>}</div>}
   </section>
   <section className={h.section} aria-labelledby="home-widgets">
    <SectionHead id="home-widgets" title="My widgets" count={settled ? widgets.length : undefined} sub="Saved SQL queries with a chart. Extend them before they expire."
