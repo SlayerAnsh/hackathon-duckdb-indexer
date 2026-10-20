@@ -4,7 +4,8 @@ import { DuckDBInstance } from '../../../packages/core/node_modules/@duckdb/node
 import { RAW_TABLES_SQL, MERGE_VIEWS_SQL, MATERIALIZE_SQL, setHeadSql } from '@asi/core'
 import { FIGURE_SQL, averageMs, readFigure } from '../components/landing/stats'
 import { NAV_ITEMS, isActiveRoute, PageNav } from '../components/dash/TopBar'
-import { HeroFigures, Pipeline } from '../components/dash/Hero'
+import { HeroFigures } from '../components/dash/Hero'
+import { Closing, Story } from '../components/landing/Story'
 
 test('each landing figure has its own query over the merged views', async () => {
  const instance = await DuckDBInstance.create(':memory:'); const db = await instance.connect()
@@ -40,8 +41,8 @@ test('average query time ignores figures that have not been measured yet', () =>
 test('nav marks exactly the active route', () => {
  expect(NAV_ITEMS.map(i => i.href)).toEqual(['/', '/explore', '/playground', '/about'])
  const explore = NAV_ITEMS[1]
- for (const path of ['/explore', '/d/0xabc', '/widgets/0xabc', '/widgets/new']) expect(isActiveRoute(path, explore)).toBe(true)
- for (const path of ['/', '/me', '/explorer']) expect(isActiveRoute(path, explore)).toBe(false)
+ for (const path of ['/explore', '/widgets/0xabc', '/widgets/new']) expect(isActiveRoute(path, explore)).toBe(true)
+ for (const path of ['/', '/me', '/explorer', '/d/0xabc', '/d/0xabc/edit']) expect(isActiveRoute(path, explore)).toBe(false)
  expect(isActiveRoute('/', NAV_ITEMS[0])).toBe(true)
  expect(isActiveRoute('/me', NAV_ITEMS[0])).toBe(false)
  expect(isActiveRoute(null, NAV_ITEMS[0])).toBe(false)
@@ -50,17 +51,24 @@ test('nav marks exactly the active route', () => {
  expect(html).toContain('Home'); expect(html).toContain('Explore')
 })
 
-test('hero figures show placeholders while loading and the pipeline shows the measured time', () => {
+test('hero figures show placeholders while loading and the measured time once ready', () => {
  const loading = renderToStaticMarkup(<HeroFigures/>)
  expect(loading).toContain('Live entities'); expect(loading).toContain('Loading'); expect(loading).toContain('Measuring query time')
  const ready = renderToStaticMarkup(<HeroFigures stats={{ live: 30700, creators: 12, expiring: 0, created: 1500 }} times={{ live: 2.04, creators: 4.4, expiring: 2.6, created: 3.1 }}/>)
  expect(ready).toContain('30.7k'); expect(ready).toContain('12'); expect(ready).toContain('1.5k'); expect(ready).not.toContain('Loading')
  expect(ready).toContain('2.0 ms'); expect(ready).toContain('4.4 ms')
  expect(ready).toContain('avg 3.0 ms')
- const pipe = renderToStaticMarkup(<Pipeline ms={3.24}/>)
- for (const step of ['Arkiv chain', 'Public logs', 'Indexer', 'Parquet', 'DuckDB']) expect(pipe).toContain(step)
- expect(pipe).toContain('avg 3.2 ms')
- expect(renderToStaticMarkup(<Pipeline/>)).not.toContain('avg')
+})
+
+test('landing story explains how it works, what you can build and how to run your own indexer', () => {
+ const html = renderToStaticMarkup(<><Story/><Closing/></>)
+ const text = html.replace(/<[^>]+>/g, ' ')
+ for (const h of ['How it works', 'What you can build', 'Check it yourself', 'Run your own indexer']) expect(text).toContain(h)
+ for (const step of ['Arkiv chain', 'Indexer', 'Your browser', 'Your dashboards']) expect(text).toContain(step)
+ for (const stage of ['Save', 'Transferred to you', 'Extend, transfer or delete', 'Expires']) expect(text).toContain(stage)
+ for (const href of ['/widgets/new', '/explore', '/playground', '/about', 'https://github.com/']) expect(html).toContain(`href="${href}`)
+ expect(html.indexOf('how-h')).toBeLessThan(html.indexOf('build-h'))
+ expect(text).not.toMatch(/[—–]| - /)
 })
 
 
@@ -89,11 +97,13 @@ test('landing hero and Home use the official reports band', async () => {
  const { readFileSync } = await import('node:fs')
  const defaults = { status: 'anonymous', config: { enabled: true, wallet: '0x'+'a'.repeat(40), rpcUrl: '', privyAppId: 'test' }, requestLogin: async () => false }
  const { AppRouterContext } = await import('next/dist/shared/lib/app-router-context.shared-runtime')
- const html = renderToStaticMarkup(<AppRouterContext.Provider value={{} as any}><DashAuthContext.Provider value={defaults as any}><Home>Story marker</Home></DashAuthContext.Provider></AppRouterContext.Provider>)
+ const html = renderToStaticMarkup(<AppRouterContext.Provider value={{} as any}><DashAuthContext.Provider value={defaults as any}><Home closing="Closing marker">Story marker</Home></DashAuthContext.Provider></AppRouterContext.Provider>)
  for (const text of ['Explore live Arkiv data, in SQL.','Explore dashboards','href="/explore"','Open playground','href="/playground"']) expect(html).toContain(text)
  expect(html).not.toContain('/showcase')
  expect(html.indexOf('hero-h')).toBeLessThan(html.indexOf('Featured dashboards'))
- expect(html.indexOf('Featured dashboards')).toBeLessThan(html.indexOf('The most recent creates'))
+ expect(html.indexOf('Featured dashboards')).toBeLessThan(html.indexOf('Story marker'))
+ expect(html.indexOf('Story marker')).toBeLessThan(html.indexOf('Creates, updates and deletions'))
+ expect(html.indexOf('Creates, updates and deletions')).toBeLessThan(html.indexOf('Closing marker'))
  const source = readFileSync(new URL('../components/landing/Home.tsx', import.meta.url),'utf8')
  expect(source).not.toContain('PreviewCards')
  expect(source).toContain('OfficialDashboards')

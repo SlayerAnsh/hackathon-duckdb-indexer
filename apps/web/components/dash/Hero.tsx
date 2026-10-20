@@ -36,23 +36,6 @@ export function HeroFigures({ stats, times, manifest }: { stats?: Partial4<numbe
  <FillProgress manifest={manifest}/></div>
 }
 
-const STEPS = [
- { name: 'Arkiv chain', note: 'Tiramisu testnet' },
- { name: 'Public logs', note: 'Replayed with no API key' },
- { name: 'Indexer', note: 'Self hosted, read only' },
- { name: 'Parquet snapshot + delta', note: 'Versioned files' },
-]
-
-export function Pipeline({ ms }: { ms?: number }) {
- return <figure className={s.pipe}>
-  <figcaption className={s.pipeCap}>How a row reaches this tab</figcaption>
-  <ol className={s.steps}>
-   {STEPS.map((step, i) => <li key={step.name} className={s.step}><span className={s.stepN}>{i + 1}</span><span className={s.stepText}><b>{step.name}</b><span>{step.note}</span></span></li>)}
-   <li className={`${s.step} ${s.stepLast}`}><span className={s.stepN}>5</span><span className={s.stepText}><b>DuckDB in your browser</b><span>{ms === undefined ? 'Runs every query above' : <><span className={s.ms}>avg {formatMs(ms)}</span> per query above</>}</span></span></li>
-  </ol>
- </figure>
-}
-
 export function Hero({version,manifest}:{version:number;manifest?:Manifest}) {
  const live = useTimedQuery(FIGURE_SQL.live, version), creators = useTimedQuery(FIGURE_SQL.creators, version)
  const expiring = useTimedQuery(FIGURE_SQL.expiring, version), created = useTimedQuery(FIGURE_SQL.created, version)
@@ -63,14 +46,13 @@ export function Hero({version,manifest}:{version:number;manifest?:Manifest}) {
  return <section className={s.hero} aria-labelledby="hero-h">
   <div className={s.heroGrid}>
    <div className={s.intro}>
-    <p className={s.eyebrow}>Read only SQL index for Arkiv</p>
+    <p className={s.eyebrow}>Open source SQL indexer for Arkiv</p>
     <h1 id="hero-h" className={s.title}>Explore live Arkiv data, in SQL.</h1>
-    <p className={s.pitch}>Browse dashboards the community builds on Arkiv, open any chart to see its SQL, or write your own. Every query runs in DuckDB in this tab.</p>
+    <p className={s.pitch}>A hosted index of every live entity on the Tiramisu testnet, loaded into DuckDB in your browser. Join, group and sort by attributes, which <code>arkiv_query</code> cannot do, then save the answers as charts and dashboards.</p>
     <div className={s.ctas}><Link className="btn btn-primary btn-lg" href="/explore">Explore dashboards <span aria-hidden="true">→</span></Link><Link className="btn btn-lg" href="/playground">Open playground</Link></div>
    </div>
    <HeroFigures stats={stats} times={times} manifest={manifest}/>
   </div>
   {error && <p role="alert" className={`notice notice-bad ${s.error}`}>{error}</p>}
-  <Pipeline ms={averageMs(Object.values(times))}/>
  </section>
 }

@@ -1,59 +1,63 @@
 import Link from 'next/link'
-import { ArchitectureFigure } from '../about/ArchitectureFigure'
-import { FEATURES, IDS, RELIES, Src } from '../about/content'
-import { addressUrl } from '../../lib/explorer'
+import { Lifecycle, Points, StepFlow } from '../about/Flow'
+import { PIPELINE, REPO_URL, TRUST, WIDGET_LIFE } from '../about/content'
 import s from './landing.module.css'
 
-// The project story under the live demo: condensed /about sections, each ending in a link to the full version.
-function Chapter({ id, title, lead, more, children }: { id: string; title: string; lead: React.ReactNode; more: React.ReactNode; children: React.ReactNode }) {
- return <section className={s.chapter} id={id} aria-labelledby={`${id}-h`}>
-  <div className={s.chapterLead}>
-   <h2 id={`${id}-h`}>{title}</h2>
-   <p>{lead}</p>
-   <p className={s.more}>{more}</p>
-  </div>
-  <div className={s.chapterBody}>{children}</div>
- </section>
+// The static part of the home page, rendered on the server: how it works, what you can build, and the closing actions.
+export function SectionHead({ id, title, text, link }: { id: string; title: string; text: string; link?: React.ReactNode }) {
+ return <div className={s.sectionHead}>
+  <div><h2 id={id}>{title}</h2><p>{text}</p></div>
+  {link}
+ </div>
 }
 
 export function Story() {
  return <>
-  <Chapter id="problem" title="Filters you can forge, queries you cannot write" lead="Arkiv attributes are written by whoever creates the entity, and arkiv_query only filters and pages." more={<Link href="/about#who">Who this protects</Link>}>
-   <div className={s.prose}>
-    <p>Anyone can create an entity with <code>project = arkiv-sql-indexer-dash</code>, so a dashboard that trusts that attribute counts forged rows as its own. <code>$creator</code> is set by the chain. Scope the index with <code>$creator = addr(…)</code> and look alikes never get in.</p>
-    <p><code>arkiv_query</code> returns at most 200 results per page, with no JOIN, GROUP BY or ORDER BY on attributes. Here the same data sits in DuckDB in your tab, so those queries just work.</p>
-    <Src files={['README.md', 'SPECS.md', 'packages/core/src/query.ts']}/>
+  <section className={s.section} id="how" aria-labelledby="how-h">
+   <SectionHead id="how-h" title="How it works" text="A hosted indexer keeps a copy of every live entity on Tiramisu. Your browser loads it and runs the SQL itself." link={<Link className={s.headLink} href="/about#architecture">Architecture <span aria-hidden="true">→</span></Link>}/>
+   <StepFlow label="How a row gets from Arkiv to your dashboard" steps={PIPELINE}/>
+   <div className={s.trust}><Points items={TRUST}/></div>
+  </section>
+
+  <section className={s.section} id="build" aria-labelledby="build-h">
+   <SectionHead id="build-h" title="What you can build" text="Log in with Google, Discord, X or Telegram. Saving is free, and everything you publish is public."/>
+   <div className={s.build}>
+    <article className={s.tile}>
+     <h3>Widgets</h3>
+     <p>One SQL query and a chart, from tables and counters to bars, lines, donuts and histograms. Choose a lifetime of 1, 7, 30 or 90 days.</p>
+    </article>
+    <article className={s.tile}>
+     <h3>Dashboards</h3>
+     <p>Arrange your own widgets, or anyone else&apos;s, into a public report with a link to share. No login needed to view it.</p>
+    </article>
+    <article className={s.tile}>
+     <h3>Ad hoc queries</h3>
+     <p>Write SQL in the playground with schema aware autocomplete, export CSV, and verify any row against the chain.</p>
+    </article>
    </div>
-  </Chapter>
-
-  <Chapter id="pipeline" title="From the chain to your tab" lead="A self hosted indexer prepares files. Your browser runs the SQL and talks to Arkiv directly." more={<Link href="/about#how">How it works</Link>}>
-   <div className={s.pipeSplit}>
-    <figure className={s.archFig}><ArchitectureFigure/></figure>
-    <div className={s.prose}>
-     <p>A Bun indexer replays public <code>eth_getLogs</code>, fills attributes in pinned batches of at most 50 keys, and publishes versioned Parquet snapshots plus a JSON delta.</p>
-     <p>A Next.js proxy serves those files. DuckDB WASM loads them, and the tab polls the public RPC for new logs and goes to it directly for payloads and verify, without an API key.</p>
-     <Src files={['apps/indexer/src/fill.ts', 'apps/indexer/src/snapshot.ts', 'apps/web/lib/proxy.ts', 'apps/web/lib/live-tail.ts']}/>
-    </div>
+   <div className={s.life}>
+    <h3 className={s.lifeTitle}>Every widget is an Arkiv entity in your wallet</h3>
+    <Lifecycle label="Widget lifecycle" steps={WIDGET_LIFE}/>
    </div>
-  </Chapter>
-
-  <Chapter id="arkiv" title="Why it has to be Arkiv" lead="The index leans on properties the chain guarantees, and keeps the rest off chain on purpose." more={<Link href="/about#why">Why Arkiv</Link>}>
-   <ul className={s.relies}>{RELIES.map((r, i) => <li key={i}><b>{r.b}</b> {r.t}</li>)}</ul>
-   <p className={s.offLine}>Off Arkiv on purpose: the Parquet snapshots, the DuckDB checkpoint and SQL execution. Payloads stay on chain and load on demand.</p>
-   <Src files={['SPECS.md', 'arkiv/schema.md', 'apps/indexer/src/store.ts']}/>
-  </Chapter>
-
-  <Chapter id="features" title="Arkiv features you can see" lead="Each one is in the code, and each one shows up somewhere in this app." more={<><Link href="/about#use">Feature details</Link> or <Link href="/explore">explore dashboards</Link></>}>
-   <ul className={s.featureList}>{FEATURES.map(f => <li key={f.title}><b>{f.title}</b><span>{f.see}</span><Src files={f.src}/></li>)}</ul>
-  </Chapter>
-
-  <Chapter id="check" title="Check it yourself" lead="Nothing here asks for trust you cannot test from a browser." more={<><Link href="/about#reproduce">Step by step</Link> or <Link href="/playground">open the playground</Link></>}>
-   <ul className={s.relies}>
-    <li><b>Verify any row.</b> In the playground, Verify page re-reads each row from the public RPC and labels it ok, stale, extended, expired or deleted. It is a consistency check, not a cryptographic proof.<Src files={['apps/web/lib/verify.ts', 'apps/web/components/dash/ResultsGrid.tsx']}/></li>
-    <li><b>Expiry at the live head.</b> SQL views hide every entity whose expiry block is at or below the head your tab read from the RPC.<Src files={['packages/core/src/views.ts']}/></li>
-    <li><b>The dashboard wallet is public.</b> Read its address from GET /api/dash/config and look it up on the Tiramisu explorer.<Src files={['README.md', 'apps/web/lib/explorer.ts']}/></li>
-   </ul>
-   <dl className={s.ids}>{IDS.map(i => { const url = addressUrl(i.addr); return <div key={i.addr}><dt>{i.role}</dt><dd>{url ? <a href={url} target="_blank" rel="noreferrer">{i.addr}</a> : i.addr}</dd></div> })}</dl>
-  </Chapter>
+   <div className={`${s.ctas} ${s.buildCtas}`}>
+    <Link className="btn btn-primary" href="/widgets/new">Build a widget</Link>
+    <Link className="btn" href="/explore">See what others built</Link>
+   </div>
+  </section>
  </>
+}
+
+export function Closing() {
+ return <section className={s.closing} aria-label="Next steps">
+  <div className={s.panel}>
+   <h2>Check it yourself</h2>
+   <p>Run a query in the playground, then press Verify page. Each row is read again from the chain and marked ok, stale, extended, expired or deleted.</p>
+   <div className={s.panelActions}><Link className="btn btn-primary" href="/playground">Open playground</Link><Link className="btn btn-quiet" href="/about">How it works in depth</Link></div>
+  </div>
+  <div className={s.panel}>
+   <h2>Run your own indexer</h2>
+   <p>The indexer is open source under MIT. Start it with Docker Compose or Bun, index all of Arkiv or a subset, and read its Parquet snapshots from any app.</p>
+   <div className={s.panelActions}><a className="btn" href={REPO_URL} target="_blank" rel="noreferrer">Source on GitHub</a><Link className="btn btn-quiet" href="/about#self-host">Self hosting</Link></div>
+  </div>
+ </section>
 }

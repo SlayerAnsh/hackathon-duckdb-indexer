@@ -1,6 +1,6 @@
 import { Home } from '../components/landing/Home'
-import { Story } from '../components/landing/Story'
+import { Closing, Story } from '../components/landing/Story'
 
 export default function Page() {
- return <Home><Story/></Home>
+ return <Home closing={<Closing/>}><Story/></Home>
 }

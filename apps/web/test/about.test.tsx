@@ -1,16 +1,19 @@
 import { test, expect } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import AboutPage from '../app/about/page'
-import { Story } from '../components/landing/Story'
+import { Story, Closing } from '../components/landing/Story'
 import { Footer } from '../components/dash/Footer'
 
 const html = renderToStaticMarkup(<AboutPage/>)
 const text = html.replace(/<[^>]+>/g, ' ')
 
-test('about page renders every section and both infographics', () => {
- for (const h of ['Who this protects', 'How it works', 'Why Arkiv', 'How we use Arkiv', 'Expiry, end to end', 'Friction we measured', 'Reproduce it']) expect(text).toContain(h)
- expect(html.match(/role="img"/g)).toHaveLength(2)
- expect(html).toContain('<title id="arch-t">'); expect(html).toContain('<title id="exp-t">')
+test('about page renders every section with a table of contents and both infographics', () => {
+ for (const h of ['Why SQL over Arkiv', 'Architecture', 'Run your own indexer', 'Entity model', 'Who owns what', 'Expiry and lifetimes', 'Verify a row', 'Reproduce it', 'Limits and trust', 'Friction we measured']) expect(text).toContain(h)
+ const toc = [...html.matchAll(/href="#([\w-]+)"/g)].map(m => m[1])
+ expect(toc.length).toBeGreaterThanOrEqual(9)
+ for (const id of toc) expect(html).toContain(`id="${id}"`)
+ expect(html).toContain('aria-label="Architecture from the Arkiv RPC to DuckDB in the browser"')
+ expect(html).toContain('aria-label="Widget lifecycle"')
  expect(html).toContain('href="/explore"'); expect(html).toContain('href="/playground"')
 })
 
@@ -19,22 +22,18 @@ test('about copy uses no dash punctuation and no unverified live tail API', () =
  expect(html).not.toContain('watchEntityEvents')
 })
 
-test('expiry infographic describes widget and dashboard lifetimes', () => {
- for (const label of ['1, 7, 30 or 90 days', 'dashboard', 'link', 'Extend']) expect(text).toContain(label)
+test('about covers the entity model, ownership, lifetimes and the read proxy', () => {
+ for (const label of ['widget', 'dashboard', 'link', '1, 7, 30 or 90 days', 'Extend', 'Transferred to you', '/api/rpc', '/data', 'INDEX_EXPRESSION', 'eth_getProof']) expect(text).toContain(label)
+ for (const status of ['ok', 'stale', 'extended', 'expired', 'deleted']) expect(html).toContain(`>${status}</span>`)
  expect(text.toLowerCase()).not.toMatch(/heartbeat|ticket|demo writer/)
 })
 
-test('home story renders its chapters and every /about link lands on a section id', () => {
- const story = renderToStaticMarkup(<Story/>)
- const storyText = story.replace(/<[^>]+>/g, ' ')
- for (const h of ['Filters you can forge, queries you cannot write', 'From the chain to your tab', 'Why it has to be Arkiv', 'Arkiv features you can see', 'Check it yourself']) expect(storyText).toContain(h)
- expect(storyText).not.toMatch(/[—–]| - /)
- expect(story).not.toContain('watchEntityEvents')
+test('every /about link on the home page lands on a section id', () => {
+ const story = renderToStaticMarkup(<><Story/><Closing/></>)
  expect(story).not.toContain('href="#"')
  const anchors = [...story.matchAll(/href="\/about#([\w-]+)"/g)].map(m => m[1])
- expect(anchors.length).toBeGreaterThanOrEqual(5)
+ expect(anchors.length).toBeGreaterThanOrEqual(2)
  for (const id of anchors) expect(html).toContain(`id="${id}"`)
- expect(story).toContain('href="/explore"'); expect(story).toContain('href="/playground"')
 })
 
 test('footer links to the about page', () => {
