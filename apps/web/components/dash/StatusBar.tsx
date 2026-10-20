@@ -5,6 +5,8 @@ import { compact } from '../../lib/format'
 import { useIndex } from '../../lib/use-index'
 import { useTimedQuery } from '../../lib/use-query'
 import { StateChip } from './StateChip'
+import c from './chrome.module.css'
+import { cx } from './cx'
 
 type BarState = IndexState & { source?: 'indexer' | 'disk' }
 
@@ -22,20 +24,23 @@ export function StatusBarView({state,oldest}:{state:BarState;oldest?:number}) {
  const m = state.manifest
  const expr = m?.expression || ''
  const exprText = !expr ? 'all entities' : expr.length>EXPR_MAX ? expr.slice(0,EXPR_MAX-1)+'…' : expr
- return <div className="sbar" role="region" aria-label="Index status"><div className="sbar-in">
-  <div className="hts sbar-hts">
-   <button type="button" className="sbar-btn" aria-describedby="height-details">
+ const cls: Record<string, string> = { [OLDEST_LABEL]: c.hFrom, stored: c.hStored, serving: c.hServing }
+ return <div className={cx('sbar', c.bar)} role="region" aria-label="Index status"><div className={c.in}>
+  <div className={c.hts}>
+   <button type="button" className={c.btn} aria-describedby="height-details">
     <StateChip state={status} label={label}/>
-    <span className="sbar-it sbar-chain">Tiramisu <span className="mono">{m?.chainId ?? '…'}</span></span>
-    {h.items.map(i=><span key={i.label} className={'sbar-it sbar-h sbar-h-'+(i.label===OLDEST_LABEL?'from':i.label)}><span className="sbar-k">{i.label}</span> <span className="mono">{heightText(i)}</span></span>)}
-    {h.lagText&&<span className="sbar-it sbar-lag">{h.lagText}</span>}
+    <span className={cx(c.it, c.chain)}><span className={c.k}>Tiramisu</span> <span className={c.v}>{m?.chainId ?? '…'}</span></span>
+    {h.items.map(i=><span key={i.label} className={cx(c.it, cls[i.label] ?? '')}><span className={c.k}>{i.label}</span> <span className={c.v}>{heightText(i)}</span></span>)}
+    {h.lagText&&<span className={cx(c.it, c.lag)}>{h.lagText}</span>}
    </button>
-   <div className="hts-pop" id="height-details" role="tooltip"><h4>Index freshness</h4><p className="sub">Rows past their expiry block are already gone.</p><dl className="hrows">{h.items.map(i=><div key={i.label} style={{display:'contents'}}><dt>{i.label}</dt><dd>{heightText(i)}</dd><dd className="m">{i.label===OLDEST_LABEL?(i.block===0?'Every live entity has its attributes':'Every live entity is indexed. Entities changed before this block are still loading attributes, newest first'):NOTE[i.label]}</dd></div>)}</dl><p>{h.lagText??'Waiting for chain and index heights'}</p>{state.error&&<p className="error">{state.error}</p>}{state.liveTail&&<p className="sub">{state.liveTail.pending.toLocaleString('en-US')} pending attribute fetches · RPC budget {state.liveTail.budget}</p>}<div className="hts-sec">Indexed expression<code className="expr-full">{expr||'all entities'}</code></div></div>
+   <div className={c.pop} id="height-details" role="tooltip"><h4>Index freshness</h4><p className={c.sub}>Rows past their expiry block are already gone.</p><dl className={c.rows}>{h.items.map(i=><div key={i.label} style={{display:'contents'}}><dt>{i.label}</dt><dd>{heightText(i)}</dd><dd className={c.note}>{i.label===OLDEST_LABEL?(i.block===0?'Every live entity has its attributes':'Every live entity is indexed. Entities changed before this block are still loading attributes, newest first'):NOTE[i.label]}</dd></div>)}</dl><p className={c.lagLine}>{h.lagText??'Waiting for chain and index heights'}</p>{state.error&&<p className={c.popError}>{state.error}</p>}{state.liveTail&&<p className={c.sub}>{state.liveTail.pending.toLocaleString('en-US')} pending attribute fetches · RPC budget {state.liveTail.budget}</p>}<div className={c.sec}>Indexed expression<code className={c.exprFull}>{expr||'all entities'}</code></div></div>
   </div>
-  <span className="sbar-sp"/>
-  {m?.pending ? <span className="sbar-it sbar-opt" title={`${m.pending.toLocaleString('en-US')} entities still waiting for attributes`}>attributes {compact(m.pending)} pending</span> : null}
-  {m&&<span className="sbar-it sbar-opt">snapshot <span className="mono">v{m.version}</span></span>}
-  <span className="sbar-it sbar-opt sbar-expr mono" title={expr||'all entities'}>{exprText}</span>
+  <span className={c.sp}/>
+  <div className={c.right}>
+   {m?.pending ? <span className={cx(c.it, c.opt)} title={`${m.pending.toLocaleString('en-US')} entities still waiting for attributes`}>attributes {compact(m.pending)} pending</span> : null}
+   {m&&<span className={cx(c.it, c.opt)}><span className={c.k}>snapshot</span> <span className={c.v}>v{m.version}</span></span>}
+   <span className={cx(c.it, c.opt, c.expr)} title={expr||'all entities'}>{exprText}</span>
+  </div>
  </div></div>
 }
 
@@ -48,5 +53,5 @@ export function StatusBar({state}:{state:BarState}) {
 
 export function TopStateChip({state}:{state:BarState}) {
  const {status,label} = indexStatus(state)
- return <span className="top-state" title="Index status, details in the status bar below"><StateChip state={status} label={label}/></span>
+ return <span className={cx('top-state', c.topState)} title="Index status, details in the status bar below"><StateChip state={status} label={label}/></span>
 }

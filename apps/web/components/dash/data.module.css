@@ -1,0 +1,81 @@
+/* Result tables, run badges, row actions and the small cell level atoms.
+   Global marker classes (tbl, tbl-wrap, results, sqlpane, stat-value) stay on the markup
+   for container overrides; the visual rules live here. Colors are tokens only. */
+
+/* ---------- table */
+.wrap{overflow:auto;max-width:100%;border:1px solid var(--border);border-radius:var(--r-md);background:var(--card);scrollbar-width:thin}
+.wrap .table{width:100%;border-collapse:separate;border-spacing:0;font-size:var(--fs-sm)}
+.wrap .table th{position:sticky;top:0;z-index:1;height:32px;padding:0 12px;background:var(--card-2);text-align:left;vertical-align:middle;font:500 11.5px/1.2 var(--font-mono);letter-spacing:0;color:var(--text-2);white-space:nowrap;border-bottom:1px solid var(--border-strong);border-right:1px solid var(--border)}
+.wrap .table td{height:34px;padding:0 12px;border-bottom:1px solid var(--border);border-right:1px solid var(--border-faint);white-space:nowrap;max-width:360px;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;color:var(--text)}
+.wrap .table th:last-child,.wrap .table td:last-child{border-right:0}
+.wrap .table tbody tr:last-child td{border-bottom:0}
+.wrap .table tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--text) 1.5%,transparent)}
+.wrap .table tbody tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.wrap .table :global(.num){text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.wrap .table :global(.mono){font-family:var(--font-mono);font-size:12px}
+.wrap .table th:global(.num){text-align:right}
+.wrap .table .idx{width:1%;padding:0 10px;text-align:right;color:var(--text-3);font:11px var(--font-mono);user-select:none}
+.wrap .null{color:var(--text-3);font:italic 11.5px var(--font-mono)}
+.wrap .table .actionsCol{width:1%;max-width:none;overflow:visible}
+
+/* ---------- empty and error inside a result surface */
+.empty{margin:0;padding:24px 16px;text-align:center;color:var(--text-3b);font-size:13px}
+.error{display:block;margin:0;padding:10px 12px;border:1px solid color-mix(in srgb,var(--bad) 35%,transparent);border-radius:var(--r-md);background:var(--bad-soft);color:var(--bad);font:12px/1.5 var(--font-mono);white-space:pre-wrap;overflow-wrap:anywhere}
+.loading{display:grid;gap:10px;min-height:160px;padding:8px 0;align-content:center}
+.caption{display:block;font-size:12px;color:var(--text-3b)}
+.loadBlock{height:120px;border-radius:var(--r-md)}
+
+/* ---------- result meta bar above a grid */
+.meta{flex:none;display:flex;align-items:center;gap:8px 16px;flex-wrap:wrap;min-height:44px;padding:6px 8px 6px 16px;border-bottom:1px solid var(--border);font-size:var(--fs-sm);color:var(--text-2)}
+.where{min-width:0;color:var(--text-3b);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.where b{font:500 12px var(--font-mono);color:var(--text-2)}
+.spacer{flex:1}
+.tools{display:flex;align-items:center;gap:4px}
+.tools svg{flex:none}
+.grid{max-height:340px;border:0;border-radius:0}
+.foot{flex:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:36px;padding:8px 16px;border-top:1px solid var(--border);font-size:12px;color:var(--text-3b)}
+.foot b{font-weight:500;color:var(--text-2);font-variant-numeric:tabular-nums}
+.metaError{margin:8px 16px}
+
+/* ---------- run badge */
+.run{display:inline-flex;align-items:center;gap:6px;font:12px var(--font-mono);font-variant-numeric:tabular-nums;color:var(--text-2);white-space:nowrap;cursor:help}
+.run svg{flex:none;color:var(--accent)}
+.run b{font-weight:600;color:var(--text)}
+.runRows{display:inline-flex;align-items:center;gap:6px;color:var(--text-3b)}
+.runRows::before{content:"";width:3px;height:3px;border-radius:50%;background:currentColor;opacity:.7}
+
+/* ---------- row actions */
+.acts{display:grid;grid-template-columns:repeat(3,auto);justify-content:start;align-items:center;gap:6px}
+.mini{display:inline-flex;align-items:center;justify-content:center;gap:4px;height:24px;padding:0 8px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--card);color:var(--text-2);font:500 12px/1 var(--font-ui);cursor:pointer;white-space:nowrap;transition:color var(--dur-fast),border-color var(--dur-fast),background-color var(--dur-fast)}
+.mini:hover:not(:disabled){color:var(--text);border-color:var(--border-strong);background:var(--card-2)}
+.mini[aria-expanded="true"]{color:var(--text);border-color:var(--accent);background:var(--accent-soft)}
+.payload{position:relative;grid-column:1/-1;width:min(420px,70vw);margin:2px 0 6px;max-width:420px;white-space:normal;border:1px solid var(--border);border-radius:var(--r-md);background:var(--inset)}
+.payloadHead{display:flex;align-items:center;gap:8px;min-height:28px;padding:2px 2px 2px 10px;border-bottom:1px solid var(--border);font:500 11.5px var(--font-mono);color:var(--text-3b)}
+.payloadHead span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.payload pre{margin:0;padding:8px 10px;max-height:200px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:11.5px/1.5 var(--font-mono);color:var(--text)}
+
+/* ---------- verify chip */
+.vchip{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 7px;border-radius:var(--r-sm);font:500 11.5px var(--font-mono);white-space:nowrap;cursor:help}
+.vchip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.vOk{color:var(--ok);background:var(--ok-soft)}
+.vStale{color:var(--warn);background:var(--warn-soft)}
+.vBad{color:var(--bad);background:var(--bad-soft)}
+.vNone{color:var(--text-3);padding:0}
+.vNone::before{background:transparent;box-shadow:inset 0 0 0 1px currentColor}
+
+/* ---------- cell atoms */
+.tt{display:inline-flex;align-items:center;gap:6px;max-width:100%;min-width:0;color:var(--text-2);vertical-align:middle}
+.tt i{flex:none;width:8px;height:8px;border-radius:2px}
+.ttText{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.addr{display:inline-flex;align-items:center;gap:4px;color:var(--accent);font-family:var(--font-mono);text-decoration:none;white-space:nowrap;border-radius:2px}
+.addr:hover{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+.addr svg{flex:none;opacity:.7}
+.cant{display:inline-flex;align-items:center;height:20px;padding:0 6px;border-radius:var(--r-sm);font:500 11px var(--font-mono);letter-spacing:0;color:var(--accent);background:var(--accent-soft);white-space:nowrap;cursor:help}
+
+/* ---------- SQL block */
+.sql{position:relative;margin:6px 0 4px;border-radius:var(--r-md);background:var(--inset);border:1px solid var(--border)}
+div.sql pre{margin:0;padding:12px 88px 12px 14px;overflow:auto;font:12px/1.65 var(--font-mono);color:var(--text);white-space:pre;max-height:300px;scrollbar-width:thin}
+.copy{position:absolute;right:6px;top:6px;background:var(--card)}
+
+@media (hover:none){.mini{height:32px;padding:0 10px}}
+@media (prefers-reduced-motion:reduce){.mini{transition:none}}

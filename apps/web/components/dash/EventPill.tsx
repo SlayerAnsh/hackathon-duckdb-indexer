@@ -1,1 +1,4 @@
-export function EventPill({kind}:{kind:string}) {return <span className={'pill pill-'+kind.toLowerCase()}>{kind==='Created'?'+':kind==='Deleted'?'×':kind==='Extended'?'◷':kind==='Transferred'?'⇄':'✎'} {kind}</span>}
+import c from './chrome.module.css'
+import { cx } from './cx'
+const TONE: Record<string, string | undefined> = { Created: c.created, Patched: c.patched, Extended: c.extended, Transferred: c.transferred, Deleted: c.deleted }
+export function EventPill({kind}:{kind:string}) {return <span className={cx(c.pill, TONE[kind] ?? c.patched)}>{kind}</span>}
