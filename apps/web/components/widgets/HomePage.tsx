@@ -8,12 +8,13 @@ import { useIndex } from '../../lib/use-index'
 import { useTimedQuery } from '../../lib/use-query'
 import { activityCountsSql, expiringSoonSql, myDashboardsSql, myWidgetsSql, recentSql } from '../../lib/dash/sql'
 import { addPending, usePending, useSynced, type PendingWrite } from '../../lib/dash/pending'
-import { mergeDashboards, type HomeDashboard } from '../../lib/dash/home'
+import { homeWidgetItems, mergeDashboards, type HomeDashboard } from '../../lib/dash/home'
 import { useWidgetEntities, entityRev } from '../../lib/dash/entity-cache'
 import { dashApi } from '../../lib/dash/api'
 import { saveErrorMessage, withSession } from '../../lib/dash/auth-client'
 import { shortHex } from '../../lib/format'
-import { CHART_TYPES, type ChartType } from '../../lib/dash/schema'
+import type { WidgetEntity } from '../../lib/dash/entities'
+import type { WidgetListItem } from '../../lib/dash/sql'
 import { useCoverPayloads } from '../../lib/dash/use-cover-payloads'
 import { DashboardCard } from './DashboardCard'
 import { ActivityPanel } from './ActivityPanel'
@@ -24,14 +25,13 @@ import { useWalletBalance } from '../../lib/dash/use-balance'
 import type { BalanceLevel } from '../../lib/dash/wallet'
 import { canExtendWidget } from '../../lib/dash/widget-actions'
 import { ExtendButton } from './ExtendButton'
-import { TimeLeft } from './TimeLeft'
-import { ChartIcon } from './ChartIcon'
+import { WidgetBrowseCard, WidgetOwnerFoot } from './WidgetBrowseCard'
 import { EmptyState, PlusIcon, SkeletonCards } from './EmptyState'
 import { Dialog } from '../ui/Dialog'
 import { Field } from '../ui/Field'
 import h from './home.module.css'
+import e from '../explore/explore.module.css'
 
-const CHART_NAMES: Record<ChartType, string> = { table: 'Table', counter: 'Counter', bar: 'Bar chart', 'stacked-bar': 'Stacked bar chart', histogram: 'Histogram', hbar: 'Horizontal bar chart', line: 'Line chart', area: 'Area chart', donut: 'Donut chart' }
 export function SectionHead({ id, title, count, sub, actions }: { id: string; title: string; count?: number; sub?: ReactNode; actions?: ReactNode }) {
  return <header className={h.head}><div className={h.headText}><h2 id={id}>{title}{count !== undefined && count > 0 && <span className="badge">{count}</span>}</h2>{sub && <p>{sub}</p>}</div>{actions && <div className={h.headActions}>{actions}</div>}</header>
 }
@@ -39,7 +39,7 @@ export function RetryNotice({ error, onRetry }: { error?: string; onRetry?(): vo
  if (!error) return null
  return <div className={`notice notice-bad ${h.retry}`} role="alert"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 4.75v3.75M8 11h.01"/></svg><div><span>{error}</span>{onRetry && <button type="button" className="btn btn-sm" onClick={onRetry}>Try again</button>}</div></div>
 }
-export function HomeCollections({ dashboards, widgets, head, onCreate, loading = false, failed = false, payloadError, onRetry, renderExtend, renderDelete }: { dashboards: HomeDashboard[]; widgets: unknown[][]; head?: number; onCreate(): void; loading?: boolean; failed?: boolean; payloadError?: string; onRetry?(): void; renderExtend?(key: string): ReactNode; renderDelete?(key: string): ReactNode }) {
+export function HomeCollections({ dashboards, widgets, address, head, version = 0, payloads, onCreate, loading = false, failed = false, payloadError, onRetry, renderExtend, renderDelete }: { dashboards: HomeDashboard[]; widgets: WidgetListItem[]; address: string; head?: number; version?: number; payloads?: Map<string, WidgetEntity | null>; onCreate(): void; loading?: boolean; failed?: boolean; payloadError?: string; onRetry?(): void; renderExtend?(key: string): ReactNode; renderDelete?(key: string): ReactNode }) {
  const covers = useCoverPayloads(dashboards)
  const settled = !loading && !failed
  return <>
@@ -47,22 +47,14 @@ export function HomeCollections({ dashboards, widgets, head, onCreate, loading =
    <SectionHead id="home-dashboards" title="My dashboards" count={settled ? dashboards.length : undefined} sub="Public pages of live charts. Anyone with the link can open them."
     actions={<button type="button" className="btn btn-primary" onClick={onCreate}><PlusIcon/>New dashboard</button>}/>
    {settled && !dashboards.length ? <EmptyState icon="dashboard" title="Create your first dashboard" body="A dashboard is a public page of live charts. Create one, then add your widgets or any public widget to it." actions={<button type="button" className="btn btn-primary" onClick={onCreate}><PlusIcon/>New dashboard</button>}/>
-    : <div className={h.dashGrid}>{dashboards.map(item => <DashboardCard key={item.key} item={item} head={head} coverPayload={covers ? covers.get(item.cover ?? "") ?? null : undefined}/>)}{loading && !failed && !dashboards.length && <SkeletonCards count={3} label="Loading your dashboards…"/>}</div>}
+    : <div className={e.grid}>{dashboards.map(item => <DashboardCard key={item.key} item={item} user={address} head={head} coverPayload={covers ? covers.get(item.cover ?? "") ?? null : undefined}/>)}{loading && !failed && !dashboards.length && <SkeletonCards count={3} label="Loading your dashboards…"/>}</div>}
   </section>
   <section className={h.section} aria-labelledby="home-widgets">
    <SectionHead id="home-widgets" title="My widgets" count={settled ? widgets.length : undefined} sub="Saved SQL queries with a chart. Extend them before they expire."
     actions={<Link className="btn btn-outline" href="/widgets/new"><PlusIcon/>New widget</Link>}/>
    <RetryNotice error={payloadError} onRetry={onRetry}/>
-   {(widgets.length > 0 || (loading && !failed)) && <div className={h.widgetGrid}>{widgets.map(([key, name, chart, expiry]) => {
-    const type = CHART_TYPES.includes(chart as ChartType) ? chart as ChartType : null
-    return <article className={h.widget} key={String(key)} aria-label={String(name)}>
-     <div className={h.widgetMain}>
-      <span className={h.widgetIcon} aria-hidden="true">{type ? <ChartIcon type={type} size={18}/> : null}</span>
-      <div className={h.widgetText}><strong className={h.widgetName} title={String(name)}>{String(name)}</strong><span className={h.widgetMeta}>{type ? CHART_NAMES[type] : 'Widget'}</span></div>
-     </div>
-     <div className={h.widgetFoot}><TimeLeft expiresAt={Number(expiry)} head={head}/><div className={h.widgetActions}>{renderExtend?.(String(key))}{renderDelete?.(String(key))}<Link className="btn btn-outline" href={`/widgets/${String(key)}`}>Open</Link></div></div>
-    </article>
-   })}{loading && !failed && !widgets.length && <SkeletonCards count={2} label="Loading your widgets…"/>}</div>}
+   {(widgets.length > 0 || (loading && !failed)) && <div className={e.widgetGrid}>{widgets.map(item => <WidgetBrowseCard key={item.key} item={item} payload={payloads ? payloads.get(item.key) ?? null : undefined} head={head} version={version} variant="explorer"
+    foot={<WidgetOwnerFoot href={`/widgets/${item.key}`}>{renderExtend?.(item.key)}{renderDelete?.(item.key)}</WidgetOwnerFoot>}/>)}{loading && !failed && !widgets.length && <SkeletonCards count={3} tall label="Loading your widgets…"/>}</div>}
    {settled && !widgets.length && <EmptyState icon="widget" title="No widgets yet" body="A widget is one SQL query with a chart. Write one in a minute and save it; it runs on the live index in your browser." actions={<Link className="btn btn-primary" href="/widgets/new"><PlusIcon/>New widget</Link>}/>}
   </section>
  </>
@@ -134,7 +126,8 @@ function AuthenticatedHome() {
   window.history.replaceState(null, '', window.location.pathname + (query ? '?' + query : '') + window.location.hash)
  }, [])
  const widgetRows = visibleWidgetRows(widgets.data?.rows ?? [], pending, address)
- const entities = useWidgetEntities(widgetRows.map(row => String(row[0])), new Map(widgetRows.filter(row => row[4] !== null && row[4] !== undefined).map(row => [String(row[0]),entityRev({updatedAt:Number(row[4]),expiresAt:Number(row[3]),owner:address})])))
+ const widgetItems = homeWidgetItems(widgetRows, address)
+ const entities = useWidgetEntities(widgetItems.map(item => item.key), new Map(widgetItems.map(item => [item.key, entityRev(item)])))
  const payloadError = entities.error
  function extend(key: string) {
   const widget = entities.data?.get(key)
@@ -157,7 +150,7 @@ function AuthenticatedHome() {
   <div className={h.top}><HomeHeader address={address} balance={balance}/>
    {error && <div className="notice notice-bad" role="alert"><div><p className="notice-title">The index could not load your items</p><p>{error}</p></div></div>}
   </div>
-  <HomeCollections dashboards={mergeDashboards(dashboards.data?.rows ?? [], pending)} widgets={widgetRows} head={state.liveHead} onCreate={() => setCreating(true)} payloadError={payloadError} onRetry={entities.refetch} loading={loading} failed={!!error} renderExtend={extend} renderDelete={renderDelete}/>
+  <HomeCollections dashboards={mergeDashboards(dashboards.data?.rows ?? [], pending)} widgets={widgetItems} address={address} head={state.liveHead} version={version} payloads={entities.data} onCreate={() => setCreating(true)} payloadError={payloadError} onRetry={entities.refetch} loading={loading} failed={!!error} renderExtend={extend} renderDelete={renderDelete}/>
   <ActivityPanel counts={activityCounts} expiring={expiring.data?.rows ?? []} recent={recent.data?.rows ?? []} head={state.liveHead} renderExtend={extend}/>
   <CreateDashboardDialog open={creating} onClose={() => setCreating(false)}/>
  </div>

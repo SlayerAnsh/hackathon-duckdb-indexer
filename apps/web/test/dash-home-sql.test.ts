@@ -41,11 +41,11 @@ test('home SQL scopes live lists, placements and distinct creation and update da
       live_widgets: BigInt(2), live_dashboards: BigInt(1), placements: BigInt(2), active_days: BigInt(3),
     }])
     expect((await query(myDashboardsSql(W, U))).map(({ cover, charts, ...row }) => { expect(cover).toBeNull(); expect(charts).toBeDefined(); return row })).toEqual([
-      { key: key(3), title: 'Overview', widgets: BigInt(2), updated_at: BigInt(90000) },
+      { key: key(3), title: 'Overview', widgets: BigInt(2), updated_at: BigInt(90000), expires_at: BigInt(143201) },
     ])
     expect(await query(myWidgetsSql(W, U))).toEqual([
-      { key: key(1), name: 'Same day', chart: 'table', expires_at: BigInt(100001), updated_at: BigInt(43202) },
-      { key: key(2), name: 'Two days later', chart: 'bar', expires_at: BigInt(143200), updated_at: BigInt(86401) },
+      { key: key(1), name: 'Same day', chart: 'table', expires_at: BigInt(100001), updated_at: BigInt(43202), usr: U, created_at: BigInt(43201), owner: U, uses: BigInt(1) },
+      { key: key(2), name: 'Two days later', chart: 'bar', expires_at: BigInt(143200), updated_at: BigInt(86401), usr: U, created_at: BigInt(100), owner: U, uses: BigInt(1) },
     ])
     expect(await query(expiringSoonSql(W, U))).toEqual([
       { key: key(1), type: 'widget', label: 'Same day', expires_at: BigInt(100001) },

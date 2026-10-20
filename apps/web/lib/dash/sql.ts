@@ -104,19 +104,22 @@ export function myDashboardsSql(wallet: string, user: string): string {
   return `${dashCte(wallet)}
  SELECT d.key, d.title, count(l.key) AS widgets, d.updated_at,
  max(CASE WHEN l.usr = d.usr AND w.key = d.cover THEN w.key END) AS cover,
- list(DISTINCT w.chart ORDER BY w.chart) FILTER (WHERE w.chart IS NOT NULL) AS charts
+ list(DISTINCT w.chart ORDER BY w.chart) FILTER (WHERE w.chart IS NOT NULL) AS charts, d.expires_at
  FROM dash d LEFT JOIN dash l ON l.type = 'link' AND l.dashboard = d.key
  LEFT JOIN dash w ON w.type = 'widget' AND w.key = l.widget
  WHERE d.type = 'dashboard' AND d.usr = ${address(user)}
- GROUP BY d.key, d.title, d.updated_at
+ GROUP BY d.key, d.title, d.updated_at, d.expires_at
  ORDER BY d.updated_at DESC, d.key`
 }
 
+/** Columns 0..4 (key, name, chart, expires_at, updated_at) are read by index; the rest feed the shared Explore card. */
 export function myWidgetsSql(wallet: string, user: string): string {
   return `${dashCte(wallet)}
- SELECT key, name, chart, expires_at, updated_at FROM dash
- WHERE type = 'widget' AND ${mineSql('dash', user)}
- ORDER BY expires_at, key`
+ SELECT w.key, w.name, w.chart, w.expires_at, w.updated_at, w.usr, w.created_at, w.owner, count(DISTINCT l.dashboard) AS uses
+ FROM dash w LEFT JOIN dash l ON l.type = 'link' AND l.widget = w.key
+ WHERE w.type = 'widget' AND ${mineSql('w', user)}
+ GROUP BY w.key, w.name, w.chart, w.expires_at, w.updated_at, w.usr, w.created_at, w.owner
+ ORDER BY w.expires_at, w.key`
 }
 
 export function activityCountsSql(wallet: string, user: string): string {

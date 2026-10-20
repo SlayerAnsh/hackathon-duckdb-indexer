@@ -27,14 +27,18 @@ export function WidgetCardBody({ item, official, href, lifetime, children }: { i
   <div className={s.meta}><span className={s.metaFacts}><ChartIcon type={item.chart}/>{CHART_LABELS[item.chart]}<span className={s.sep} aria-hidden="true">·</span>on {item.uses} {item.uses === 1 ? 'dashboard' : 'dashboards'}</span>{lifetime}</div>
  </div>
 }
+/** Owner footer (/me): open the widget page, with the owner actions (Extend, Delete) on the right. */
+export function WidgetOwnerFoot({ href, children }: { href: string; children?: ReactNode }) {
+ return <footer className={s.foot}><Link className="btn btn-quiet btn-sm" href={href}>Open</Link><span className={s.footActions}>{children}</span></footer>
+}
 /** Explorer footer: open the widget page or add it to a dashboard. */
 export function WidgetCardFoot({ href, onAdd }: { href: string; onAdd?(): void }) {
  return <footer className={s.foot}><Link className="btn btn-quiet btn-sm" href={href}>Open</Link><button type="button" className="btn btn-outline btn-sm" onClick={onAdd}><PlusIcon/>Add to dashboard</button></footer>
 }
 
-export function WidgetBrowseCard({ item, payload, head, version, variant, selected = false, disabled = false, onToggle, onAdd, visibleOverride, query, official = false }: {
+export function WidgetBrowseCard({ item, payload, head, version, variant, selected = false, disabled = false, onToggle, onAdd, visibleOverride, query, official = false, foot }: {
  item: WidgetListItem; payload: WidgetEntity | null | undefined; head?: number; version: number; variant: 'explorer' | 'pick';
- official?: boolean; selected?: boolean; disabled?: boolean; onToggle?(): void; onAdd?(): void; visibleOverride?: boolean; query?: TimedResult
+ official?: boolean; foot?: ReactNode; selected?: boolean; disabled?: boolean; onToggle?(): void; onAdd?(): void; visibleOverride?: boolean; query?: TimedResult
 }) {
  const [ref, seen] = useInView<HTMLElement>()
  const visible = visibleOverride ?? seen
@@ -56,6 +60,6 @@ export function WidgetBrowseCard({ item, payload, head, version, variant, select
   <WidgetCardBody item={item} official={official} href={pick ? undefined : href} lifetime={official ? <KeptLive/> : <TimeLeft expiresAt={item.expiresAt} head={head}/>}>
    {disabled && <span className={s.note}>Already on this dashboard</span>}
   </WidgetCardBody>
-  {!pick && <WidgetCardFoot href={href} onAdd={onAdd}/>}
+  {!pick && (foot ?? <WidgetCardFoot href={href} onAdd={onAdd}/>)}
  </article>
 }

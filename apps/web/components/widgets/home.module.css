@@ -1,5 +1,5 @@
 /* My home (/me): page heading, collections, activity and the login gate.
-   Sections share one heading pattern (.head) and one 12px card grid gap. */
+   Sections share one heading pattern (.head); card grids come from explore.module.css. */
 
 .page{display:grid;gap:var(--sp-12);padding:var(--sp-8) 0 var(--sp-12)}
 .top{display:grid;gap:var(--sp-4)}
@@ -17,26 +17,6 @@
 .head h2{display:flex;align-items:center;gap:var(--sp-2);margin:0;font-size:var(--fs-xl);font-weight:600;letter-spacing:-.015em;line-height:1.3}
 .head p{margin:0;font-size:var(--fs-sm);color:var(--text-2);max-width:62ch}
 .headActions{display:flex;gap:var(--sp-2);flex-wrap:wrap}
-
-/* Card grids */
-.dashGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-3)}
-.widgetGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-3)}
-.widgetGrid :global(.skel-card){min-height:112px;justify-content:center;gap:10px;padding:var(--sp-4)}
-.widgetGrid :global(.skel-block){display:none}
-@media(max-width:1100px){.dashGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:760px){.dashGrid,.widgetGrid{grid-template-columns:minmax(0,1fr)}}
-
-/* Saved widget card */
-.widget{display:flex;flex-direction:column;min-width:0;background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);transition:border-color var(--dur-fast)}
-.widget:hover{border-color:var(--border-strong)}
-.widgetMain{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-4);min-width:0}
-.widgetIcon{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:var(--r-md);background:var(--card-2);border:1px solid var(--border-faint);color:var(--text-2)}
-.widgetText{display:grid;gap:2px;min-width:0;flex:1}
-.widgetName{font-size:var(--fs-md);font-weight:600;line-height:1.35;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.widgetMeta{font-size:var(--fs-sm);color:var(--text-3b)}
-.widgetFoot{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-2);flex-wrap:wrap;margin-top:auto;padding:10px var(--sp-3) 10px var(--sp-4);border-top:1px solid var(--border)}
-.widgetActions{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-left:auto}
-.widgetActions :global(.btn){min-height:var(--h-sm);padding:0 10px;font-size:var(--fs-sm)}
 
 /* Inline error with a retry action */
 .retry{align-items:center}

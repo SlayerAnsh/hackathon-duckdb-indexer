@@ -93,10 +93,7 @@
 .metaFacts svg{flex:none;color:var(--text-3b)}
 .sep{color:var(--text-3)}
 
-/* ---------- home "your dashboards" card */
-.simple{text-decoration:none;color:inherit}
-.simple .body{gap:6px}
-.simpleMeta{color:var(--text-2);font-size:var(--fs-sm);font-variant-numeric:tabular-nums}
+/* ---------- /me Syncing note on a just written dashboard */
 .syncNote{display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;margin-top:var(--sp-1);color:var(--text-3b);font-size:var(--fs-sm);line-height:1.45}
 
 /* ---------- widget card (Explore grid, import picker) */
@@ -127,6 +124,9 @@
 .note{font-size:var(--fs-sm);color:var(--text-3b)}
 .foot{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-2);padding:var(--sp-2) var(--sp-3);border-top:1px solid var(--border);background:color-mix(in srgb,var(--card-2) 55%,var(--card))}
 .foot :global(.btn){position:relative}
+/* /me owner actions (Extend, Delete) sized like the footer's small buttons */
+.footActions{display:flex;align-items:center;gap:4px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto}
+.footActions :global(.btn){min-height:var(--h-sm);padding:0 10px;gap:6px;font-size:12.5px}
 .syncRow{display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;color:var(--text-3b);font-size:var(--fs-sm);line-height:1.45}
 @media(max-width:1100px){.widget{grid-column:span var(--md,6)}}
 @media(max-width:700px){.widget{grid-column:span var(--sm,12)}}
