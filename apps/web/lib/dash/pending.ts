@@ -1,9 +1,12 @@
 'use client'
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { useTimedQuery } from '../use-query'
+import type { WidgetPayload } from './schema'
 import { syncedSql } from './sql'
 
-export type PendingWrite = { key: string; kind: 'widget' | 'dashboard' | 'link'; op: 'upsert' | 'delete'; afterBlock: number; at: number; txHash?: string; fields?: Record<string, string | number> }
+export type PendingWrite = { key: string; kind: 'widget' | 'dashboard' | 'link'; op: 'upsert' | 'delete'; afterBlock: number; at: number; txHash?: string; widgetPayload?: WidgetPayload; fields?: Record<string, string | number> }
+const writeListeners = new Set<(write: Omit<PendingWrite, 'at'>) => void>()
+export function onPendingWrite(listener: (write: Omit<PendingWrite, 'at'>) => void) { writeListeners.add(listener); return () => { writeListeners.delete(listener) } }
 const TTL = 5 * 60 * 1000
 const empty: PendingWrite[] = []
 let writes: PendingWrite[] = empty
@@ -16,6 +19,7 @@ function subscribe(listener: () => void) {
 }
 
 export function addPending(w: Omit<PendingWrite, 'at'>, now = Date.now()): void {
+  for (const listener of writeListeners) listener(w)
   writes = [...writes.filter(entry => entry.key !== w.key && now - entry.at <= TTL), { ...w, at: now }]
   emit()
 }

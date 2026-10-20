@@ -11,12 +11,12 @@ import { useDashAuth } from '../auth/DashAuthProvider'
 import type { WidgetEntity } from '../../lib/dash/entities'
 import { initEditor } from '../../lib/dash/editor-state'
 import { addPending, usePending } from '../../lib/dash/pending'
-import { fetchWidget } from '../../lib/dash/read'
+import { useWidgetEntity, patchCachedWidget, invalidateEntity } from '../../lib/dash/entity-cache'
+import { useQueryClient } from '@tanstack/react-query'
 import { highlightSql } from '../../lib/sql-highlight'
 import { isEntityKey, type ChartType, type LifetimeDays, type WidgetPayload, type WriteResult } from '../../lib/dash/schema'
 import { checkWidgetSql } from '../../lib/dash/sql-guard'
 import { widgetUsageSql, widgetDashboardsSql, toUsedOn } from '../../lib/dash/sql'
-import { createBrowserRpc } from '../../lib/rpc-browser'
 import { useIndex } from '../../lib/use-index'
 import { useTimedQuery, type TimedResult } from '../../lib/use-query'
 import { AddressLink } from '../dash/AddressLink'
@@ -210,14 +210,8 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
   setReplaced(value && isEntityKey(value) && value.toLowerCase() !== key ? value.toLowerCase() : null)
   setOldWidget(null); setDeleteError(null)
  }, [key])
- useEffect(() => {
-  let active = true
-  setOldWidget(null)
-  if (replaced && config?.enabled && auth.address) void fetchWidget(createBrowserRpc(config.rpcUrl), config.wallet, replaced).then(result => {
-   if (active && result.widget && result.widget.expiresAt > result.head && result.widget.owner === auth.address?.toLowerCase()) setOldWidget(result.widget)
-  }).catch(() => {})
-  return () => { active = false }
- }, [replaced, config?.enabled, config?.wallet, config?.rpcUrl, auth.address])
+ const oldEntity = useWidgetEntity(replaced)
+ useEffect(() => { setOldWidget(oldEntity.data?.owner === auth.address?.toLowerCase() ? oldEntity.data ?? null : null) }, [oldEntity.data, auth.address])
  async function deleteOld() {
   if (signDisabledReason(balance.level) || !oldWidget || deleteBusy.current || oldWidget.owner !== auth.address?.toLowerCase()) return
   deleteBusy.current = true; setDeletingOld(true); setDeleteError(null)
@@ -229,16 +223,18 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
   finally { deleteBusy.current = false; setDeletingOld(false); balance.refresh() }
  }
 
- const [record, setRecord] = useState<{ key: string; widget: WidgetEntity | null; head: number } | null>(null)
- const [loadError, setLoadError] = useState<WidgetLoadError | null>(null)
- const [refresh, setRefresh] = useState(0), [editorRevision, setEditorRevision] = useState(0)
+ const client = useQueryClient()
+ const [editorRevision, setEditorRevision] = useState(0)
  const [attemptState, setAttemptState] = useState({ key, count: 0 })
  const attempts = attemptState.key === key ? attemptState.count : 0
+ const syncing = useRef(false)
+ const entity = useWidgetEntity(key, () => syncing.current ? 2000 : false)
+ const record = entity.data !== undefined ? {key, widget:entity.data, head:0} : null
+ const loadError = entity.error ? {message:entity.error,limited:entity.limited} : null
+ useEffect(() => { if(entity.attempts) setAttemptState(previous => ({key,count:previous.key === key ? previous.count + 1 : 1})) }, [key,entity.attempts])
  const [ms, setMs] = useState<number | undefined>(undefined)
  const [picker, setPicker] = useState(false)
  const closePicker = useCallback(() => setPicker(false), [])
- const latestLocal = useRef<{ key: string; txHash: string; afterBlock: number; updatedAt?: number } | null>(null)
- const sequence = useRef(0)
  const pending = usePending()
  const write = pending.find(p => p.key === key && p.kind === 'widget' && p.op === 'upsert')
  const storedWidget = record?.key === key ? record.widget : null
@@ -246,43 +242,12 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
  const loadState = widgetLoadState({ authStatus: auth.status, widget, pending: !!write, attempts, loadError: !!loadError, limited: !!loadError?.limited })
  const usage = useTimedQuery(config?.enabled && isEntityKey(key) ? widgetUsageSql(config.wallet, key, auth.address ?? null) : 'SELECT 0, false', version)
  const usedOn = useTimedQuery(config?.enabled && isEntityKey(key) ? widgetDashboardsSql(config.wallet, key, Number.MAX_SAFE_INTEGER) : 'SELECT NULL WHERE false', version)
- useEffect(() => {
-  const current = ++sequence.current
-  setLoadError(null)
-  if (!config?.enabled) return
-  if (!isEntityKey(key)) { setRecord({ key, widget: null, head: 0 }); return }
-  void fetchWidget(createBrowserRpc(config.rpcUrl), config.wallet, key).then(result => {
-   if (sequence.current !== current) return
-   setRecord(previous => {
-    // An RPC replica may lag behind a successful local write.
-    localTxSeen(result.widget)
-    const local = latestLocal.current
-    if (previous?.key === key && previous.widget && local?.key === key && (!result.widget || result.widget.updatedAt <= local.afterBlock)) return previous
-    if (previous?.key === key && previous.widget && result.widget && result.widget.updatedAt < previous.widget.updatedAt) return previous
-    return { key, ...result }
-   })
-  }).catch(error => { if (sequence.current === current) setLoadError(widgetLoadError(error)) })
-  return () => { sequence.current++ }
- }, [key, config?.enabled, config?.wallet, config?.rpcUrl, refresh])
- useEffect(() => {
-  if (loadState !== 'syncing' || !config?.enabled) return
-  const timer = setTimeout(() => {
-   setAttemptState(previous => ({ key, count: (previous.key === key ? previous.count : 0) + 1 }))
-   setRefresh(n => n + 1)
-  }, 2000)
-  return () => clearTimeout(timer)
- }, [loadState, key, config?.enabled, refresh])
- function localTxSeen(value: WidgetEntity | null) {
-  const local = latestLocal.current
-  if (local?.key === key && local.updatedAt === undefined && value && value.updatedAt > local.afterBlock) local.updatedAt = value.updatedAt
- }
+ syncing.current = loadState === 'syncing' && !entity.limited
  function written(result: WriteResult, payload?: WidgetPayload) {
   if (result.key && result.key !== key && isEntityKey(result.key)) { router.push('/widgets/' + result.key + '?replaced=' + key); return }
-  sequence.current++
-  latestLocal.current = { key, txHash: result.txHash, afterBlock: result.afterBlock }
-  setRecord(previous => previous?.key === key && previous.widget ? { ...previous, widget: { ...previous.widget, ...(payload ? { widget: payload, name: payload.name, chart: payload.chart } : {}), expiresAt: result.expiresAt ?? previous.widget.expiresAt } } : previous)
+  if (config) { patchCachedWidget(client, config.wallet, key, { ...(payload ? {widget:payload, payload, name:payload.name, chart:payload.chart} : {}), ...(result.expiresAt !== undefined ? {expiresAt:result.expiresAt} : {}) }); void invalidateEntity(client,config.wallet,'widget',key) }
   if (payload) setEditorRevision(n => n + 1)
-  setRefresh(n => n + 1)
+  entity.refetch()
  }
  function deleted(result: DirectResult) {
   addPending({ key, kind: 'widget', op: 'delete', afterBlock: result.afterBlock, txHash: result.txHash })
@@ -292,11 +257,11 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
   const owner = to.toLowerCase()
   addPending({ key, kind: 'widget', op: 'upsert', afterBlock: result.afterBlock, txHash: result.txHash, fields: { owner } })
   written(result)
-  setRecord(previous => previous?.key === key && previous.widget ? { ...previous, widget: { ...previous.widget, owner } } : previous)
+  if (config) patchCachedWidget(client,config.wallet,key,{owner})
  }
  function retry() {
   setAttemptState({ key, count: 0 })
-  setRefresh(n => n + 1)
+  entity.refetch()
  }
  async function openPicker() {
   if (auth.status !== 'authenticated' && !await auth.requestLogin()) return

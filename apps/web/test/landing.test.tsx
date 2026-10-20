@@ -1,5 +1,7 @@
 import { test, expect } from 'bun:test'
-import { renderToStaticMarkup } from 'react-dom/server'
+import { renderToStaticMarkup as rawRender } from 'react-dom/server'
+import { QueryProvider } from '../components/QueryProvider'
+const renderToStaticMarkup = (node: React.ReactNode) => rawRender(<QueryProvider>{node}</QueryProvider>)
 import { DuckDBInstance } from '../../../packages/core/node_modules/@duckdb/node-api'
 import { RAW_TABLES_SQL, MERGE_VIEWS_SQL, MATERIALIZE_SQL, setHeadSql } from '@asi/core'
 import { FIGURE_SQL, averageMs, readFigure } from '../components/landing/stats'
@@ -79,7 +81,7 @@ test('official landing band covers disabled, loading, populated and empty states
  const loading = render(<OfficialDashboardsView enabled items={null}/>)
  expect(loading).toContain('aria-busy="true"')
  expect(loading.match(/data-skeleton="true"/g)).toHaveLength(3)
- const items = ['First report', 'Second report'].map((title,i) => ({ cover: null, key: 'key'+i, title, user: 'wallet', official: true, widgets: 2, charts: [] as [], createdAt: 1, updatedAt: 1, expiresAt: 100 }))
+ const items = ['First report', 'Second report'].map((title,i) => ({ owner: "wallet", cover: null, key: 'key'+i, title, user: 'wallet', official: true, widgets: 2, charts: [] as [], createdAt: 1, updatedAt: 1, expiresAt: 100 }))
  const html = render(<OfficialDashboardsView enabled items={items} descriptions={new Map([['key0','Network description']])}/>)
  for (const text of ['Featured dashboards','Live network reports kept on Arkiv by this app. Open one to see every chart and its SQL.','All dashboards','href="/explore"','Network description']) expect(html).toContain(text)
  expect(html.indexOf('First report')).toBeLessThan(html.indexOf('Second report'))

@@ -36,10 +36,10 @@ test('browse SQL scopes, searches literal text, filters, sorts and pages in Duck
  } finally { close() }
 })
 test('list rows convert numeric fields and lowercase keys and owners', () => {
- expect(toListItems([[key(10).toUpperCase(), 'Name', 'bar', U.toUpperCase(), BigInt(100), '20', V.toUpperCase(), BigInt(12)]])).toEqual([{ key: key(10), name: 'Name', chart: 'bar', user: U, owner: V, expiresAt: 100, createdAt: 20, uses: 12 }])
+ expect(toListItems([[key(10).toUpperCase(), 'Name', 'bar', U.toUpperCase(), BigInt(100), '20', V.toUpperCase(), BigInt(12), BigInt(7)]])).toEqual([{ key: key(10), name: 'Name', chart: 'bar', user: U, owner: V, expiresAt: 100, createdAt: 20, updatedAt: 7, uses: 12 }])
  for (const build of [() => widgetListSql('bad', q), () => widgetCountSql(W, { search: '', chart: null, user: 'bad' }), () => widgetListSql(W, { ...q, limit: -1 })]) expect(build).toThrow()
 })
-const item = { key: key(1), name: 'Top creators', chart: 'bar' as const, user: U, owner: U, expiresAt: 43201, createdAt: 1, uses: 12 }
+const item = { key: key(1), name: 'Top creators', chart: 'bar' as const, user: U, owner: U, expiresAt: 43201, createdAt: 1, updatedAt: 0, uses: 12 }
 const props = { item, head: 1, version: 0, variant: 'explorer' as const }
 test('explorer cards show metadata, expiry and actions', () => {
  const html = render(<WidgetBrowseCard {...props} payload={null} visibleOverride/> )
@@ -107,7 +107,7 @@ test('explorer and import share the tested debounce and render payload failures'
 })
 
 test('official widget cards use official author and kept live', () => {
- const html = render(<WidgetBrowseCard item={{ key: key(1), name: 'Official widget', chart: 'bar', user: W, owner: W, expiresAt: 100, createdAt: 1, uses: 2 }} payload={undefined} version={0} variant="explorer" official/>)
+ const html = render(<WidgetBrowseCard item={{ key: key(1), name: 'Official widget', chart: 'bar', user: W, owner: W, expiresAt: 100, createdAt: 1, updatedAt: 0, uses: 2 }} payload={undefined} version={0} variant="explorer" official/>)
  expect(html).toContain('Official')
  expect(html).toContain('0xabab…abab')
  expect(html).toContain('Kept live')

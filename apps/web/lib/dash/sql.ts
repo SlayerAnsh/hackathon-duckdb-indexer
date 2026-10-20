@@ -68,7 +68,7 @@ export function syncedSql(key: string, afterBlock: number, op: 'upsert' | 'delet
 }
 
 export type WidgetListQuery = { search: string; chart: import('./schema').ChartType | null; sort: 'newest' | 'used' | 'expiring'; user: string | null; limit: number; offset: number }
-export type WidgetListItem = { key: string; name: string; chart: import('./schema').ChartType; user: string; owner: string; expiresAt: number; createdAt: number; uses: number }
+export type WidgetListItem = { key: string; name: string; chart: import('./schema').ChartType; user: string; owner: string; expiresAt: number; createdAt: number; updatedAt: number; uses: number }
 
 function widgetFilters(q: Pick<WidgetListQuery, 'search' | 'chart' | 'user'>): string {
  const filters = ["w.type = 'widget'"]
@@ -88,10 +88,10 @@ export function widgetListSql(wallet: string, q: WidgetListQuery): string {
  const order = { newest: 'w.created_at DESC', used: 'uses DESC', expiring: 'w.expires_at ASC' }[q.sort]
  if (!order) throw new Error('Invalid sort')
  return `${dashCte(wallet)}
- SELECT w.key, w.name, w.chart, w.usr, w.expires_at, w.created_at, w.owner, count(DISTINCT l.dashboard) AS uses
+ SELECT w.key, w.name, w.chart, w.usr, w.expires_at, w.created_at, w.owner, count(DISTINCT l.dashboard) AS uses, w.updated_at
  FROM dash w LEFT JOIN dash l ON l.type = 'link' AND l.widget = w.key
  WHERE ${widgetFilters(q)}
- GROUP BY w.key, w.name, w.chart, w.usr, w.expires_at, w.created_at, w.owner
+ GROUP BY w.key, w.name, w.chart, w.usr, w.expires_at, w.created_at, w.owner, w.updated_at
  ORDER BY ${order}, w.key
  LIMIT ${q.limit} OFFSET ${q.offset}`
 }
@@ -159,7 +159,7 @@ export function listValue(value: unknown): unknown[] {
  if (value && typeof (value as Iterable<unknown>)[Symbol.iterator] === 'function' && typeof value !== 'string') return Array.from(value as Iterable<unknown>)
  return []
 }
-export type DashboardListItem = { key: string; title: string; user: string; official: boolean; widgets: number; charts: import('./schema').ChartType[]; createdAt: number; updatedAt: number; expiresAt: number; cover: string | null }
+export type DashboardListItem = { key: string; title: string; user: string; official: boolean; widgets: number; charts: import('./schema').ChartType[]; createdAt: number; updatedAt: number; expiresAt: number; cover: string | null; owner: string }
 function dashboardFilters(wallet: string, q: Pick<DashboardListQuery, 'search' | 'official'>): string {
  const filters = ["d.type = 'dashboard'"]
  if (q.official) filters.push(officialSql('d', wallet))
@@ -180,7 +180,7 @@ export function dashboardListSql(wallet: string, q: DashboardListQuery): string 
  SELECT d.key, d.title, d.usr, ${officialSql('d', wallet)} AS official,
  count(DISTINCT l.key) AS widgets, list(DISTINCT w.chart ORDER BY w.chart) FILTER (WHERE w.chart IS NOT NULL) AS charts,
  d.created_at, d.updated_at, d.expires_at,
- max(CASE WHEN l.usr = d.usr AND w.key = d.cover THEN w.key END) AS cover
+ max(CASE WHEN l.usr = d.usr AND w.key = d.cover THEN w.key END) AS cover, d.owner
  FROM dash d LEFT JOIN dash l ON l.type = 'link' AND l.dashboard = d.key
  LEFT JOIN dash w ON w.type = 'widget' AND w.key = l.widget
  WHERE ${dashboardFilters(wallet, q)}
@@ -191,7 +191,7 @@ export function dashboardCountSql(wallet: string, q: Pick<DashboardListQuery, 's
  return `${dashCte(wallet)} SELECT count(*) AS n FROM dash d WHERE ${dashboardFilters(wallet, q)}`
 }
 export function toDashboardItems(rows: unknown[][]): DashboardListItem[] {
- return rows.map(([key, title, user, official, widgets, charts, createdAt, updatedAt, expiresAt, cover]) => ({ key: String(key).toLowerCase(), title: String(title), user: String(user).toLowerCase(), official: official === true || official === 1 || official === BigInt(1) || official === 'true', widgets: Number(widgets), charts: listValue(charts).map(String) as DashboardListItem['charts'], createdAt: Number(createdAt), updatedAt: Number(updatedAt), expiresAt: Number(expiresAt), cover: typeof cover === "string" && isEntityKey(cover) ? cover.toLowerCase() : null }))
+ return rows.map(([key, title, user, official, widgets, charts, createdAt, updatedAt, expiresAt, cover, owner]) => ({ key: String(key).toLowerCase(), title: String(title), owner: String(owner ?? user).toLowerCase(), user: String(user).toLowerCase(), official: official === true || official === 1 || official === BigInt(1) || official === 'true', widgets: Number(widgets), charts: listValue(charts).map(String) as DashboardListItem['charts'], createdAt: Number(createdAt), updatedAt: Number(updatedAt), expiresAt: Number(expiresAt), cover: typeof cover === "string" && isEntityKey(cover) ? cover.toLowerCase() : null }))
 }
 
 export function widgetDashboardsSql(wallet: string, widgetKey: string, limit: number): string {
@@ -208,4 +208,10 @@ export function widgetDashboardsSql(wallet: string, widgetKey: string, limit: nu
 }
 export function toUsedOn(rows: unknown[][], wallet: string): { key: string; title: string; user: string; official: boolean; widgets: number }[] {
  return rows.map(([key, title, user, widgets, owner]) => ({ key: String(key).toLowerCase(), title: String(title), user: String(user).toLowerCase(), official: isOfficialOwned(String(user).toLowerCase(), String(owner).toLowerCase(), wallet), widgets: Number(widgets) }))
+}
+
+export function dashboardWidgetRevsSql(wallet: string, key: string): string {
+ return `${dashCte(wallet)} SELECT DISTINCT w.key, w.updated_at, w.expires_at, w.owner
+ FROM dash l JOIN dash w ON w.type = 'widget' AND w.key = l.widget
+ WHERE l.type = 'link' AND l.dashboard = ${entityKey(key)}`
 }

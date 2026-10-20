@@ -13,10 +13,9 @@ import { announcement, draftFromDashboard, isDirty, onDashboard, organizeReducer
 import { dashApi } from '../../lib/dash/api'
 import { saveErrorMessage, withSession } from '../../lib/dash/auth-client'
 import { addPending } from '../../lib/dash/pending'
-import { fetchWidgets } from '../../lib/dash/read'
+import { useWidgetEntities } from '../../lib/dash/entity-cache'
 import { figureNumbers, importedFrom } from '../../lib/dash/report'
 import { widgetCountSql } from '../../lib/dash/sql'
-import { createBrowserRpc } from '../../lib/rpc-browser'
 import { useIndex } from '../../lib/use-index'
 import { useTimedQuery } from '../../lib/use-query'
 import { cx } from '../dash/cx'
@@ -104,21 +103,12 @@ function ConnectedAddTile(props: Omit<Parameters<typeof AddTile>[0], 'mine'>) {
 }
 /** Fetches widget entities for items placed in this session (imports), so new tiles render their real query. */
 function usePlacedWidgets(items: DraftItem[], known: Map<string, WidgetEntity> | null): { widgets: Map<string, WidgetEntity>; settled: Set<string> } {
- const { config } = useDashAuth()
- const [extra, setExtra] = useState<{ widgets: Map<string, WidgetEntity>; settled: Set<string> }>({ widgets: new Map(), settled: new Set() })
- const requested = useRef(new Set<string>())
- const missing = items.map(item => item.widget).filter(key => !known?.has(key) && !requested.current.has(key))
- const wanted = [...new Set(missing)].join(',')
- useEffect(() => {
-  if (!wanted || !config?.enabled) return
-  const keys = wanted.split(',')
-  for (const key of keys) requested.current.add(key)
-  void fetchWidgets(createBrowserRpc(config.rpcUrl), config.wallet, keys).then(result => {
-   setExtra(previous => ({ widgets: new Map([...previous.widgets, ...result.widgets]), settled: new Set([...previous.settled, ...keys]) }))
-  }).catch(() => setExtra(previous => ({ ...previous, settled: new Set([...previous.settled, ...keys]) })))
- }, [wanted, config?.enabled, config?.rpcUrl, config?.wallet])
- return { widgets: new Map([...(known ?? []), ...extra.widgets]), settled: new Set([...(known ? known.keys() : []), ...extra.settled]) }
+ const keys = items.map(item => item.widget).filter(key => !known?.has(key))
+ const result = useWidgetEntities(keys)
+ const extra = new Map([...(result.data ?? [])].filter((pair): pair is [string,WidgetEntity] => pair[1] !== null))
+ return { widgets: new Map([...(known ?? []), ...extra]), settled: new Set([...(known?.keys() ?? []), ...(result.data?.keys() ?? (result.error ? keys : []))]) }
 }
+
 export function OrganizeEditor({ dashboardKey, data, original }: { dashboardKey: string; data: DashboardData; original: OrganizeDraft }) {
  const auth = useDashAuth(), router = useRouter()
  const [draft, dispatch] = useReducer(organizeReducer, original)

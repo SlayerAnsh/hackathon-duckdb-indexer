@@ -1,5 +1,4 @@
 'use client'
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useCoverPayloads } from '../../lib/dash/use-cover-payloads'
 import type { WidgetEntity } from '../../lib/dash/entities'
@@ -7,8 +6,7 @@ import { useDashAuth } from '../auth/DashAuthProvider'
 import { useIndex } from '../../lib/use-index'
 import { useTimedQuery } from '../../lib/use-query'
 import { dashboardListSql, toDashboardItems, type DashboardListItem } from '../../lib/dash/sql'
-import { fetchDashboards } from '../../lib/dash/read'
-import { createBrowserRpc } from '../../lib/rpc-browser'
+import { useDashboardEntities, entityRev } from '../../lib/dash/entity-cache'
 import { DashboardBrowseCard } from '../explore/DashboardBrowseCard'
 import { EmptyState, SkeletonCards } from '../widgets/EmptyState'
 import s from './landing.module.css'
@@ -38,16 +36,8 @@ export function OfficialDashboards() {
  const query = useTimedQuery(enabled ? dashboardListSql(config!.wallet, { search: '', sort: 'oldest', official: true, limit: 6, offset: 0 }) : '', version, { skip: !enabled })
  const items = query.data ? toDashboardItems(query.data.rows) : null
  const covers = useCoverPayloads(items ?? [])
- const keys = items?.map(item => item.key).join(',') ?? ''
- const scope = `${config?.wallet}:${config?.rpcUrl}:${keys}`
- const [record, setRecord] = useState<{ scope: string; descriptions: Map<string, string> } | null>(null)
- useEffect(() => {
-  if (!config?.enabled || !keys) return
-  let active = true
-  void fetchDashboards(createBrowserRpc(config.rpcUrl), config.wallet, keys.split(',')).then(({ dashboards }) => {
-   if (active) setRecord({ scope, descriptions: new Map([...dashboards].map(([key, value]) => [key, value.dashboard.description])) })
-  }).catch(() => { if (active) setRecord({ scope, descriptions: new Map() }) })
-  return () => { active = false }
- }, [config?.enabled, config?.wallet, config?.rpcUrl, keys, scope])
- return <OfficialDashboardsView enabled={enabled} items={items} covers={covers} head={state.liveHead} error={query.error} descriptions={record?.scope === scope ? record.descriptions : undefined}/>
+ const entities = useDashboardEntities((items ?? []).map(item => item.key), new Map((items ?? []).map(item => [item.key, entityRev(item)])))
+ const descriptions = entities.data ? new Map([...entities.data].flatMap(([key,value]) => value ? [[key,value.dashboard.description] as const] : [])) : undefined
+
+ return <OfficialDashboardsView enabled={enabled} items={items} covers={covers} head={state.liveHead} error={query.error} descriptions={descriptions}/>
 }
