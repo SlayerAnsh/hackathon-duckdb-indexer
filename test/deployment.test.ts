@@ -112,7 +112,8 @@ test('images use locked workspace installs and the standalone runtime layout', (
 
 test('submission docs cover dashboard identity, schema, expiry, and observed friction', () => {
   const readme = read('README.md');
-  for (const value of ['up -d --build', '$creator', 'Open Source', 'Security', 'DataFusion', 'DuckLake', '9 to 18 October 2026']) expect(readme).toContain(value);
+  for (const value of ['up -d --build', '$creator', 'Open Source', 'Security', 'DataFusion', 'DuckLake', '9 October 2026 to the extended deadline of 20 October 2026', 'Pre-existing work: none', '## Why Arkiv', '## Why this pillar', '## On chain evidence', '0x1f61c3cac1612c020f64739b128c5f198939c8cd']) expect(readme).toContain(value);
+  for (const path of ['README.md', 'arkiv/schema.md', 'apps/web/components/about/content.tsx']) expect(read(path).toLowerCase()).not.toContain('0xb0b87eddb0bc777eb663c7a11703ba5ed4849a28');
   const schema = read('arkiv/schema.md');
   for (const value of ['widget', 'dashboard', 'link', 'project', 'addr', 'atBlock', '50', 'payload', 'verify']) expect(schema).toContain(value);
   const friction = read('arkiv/friction.md');

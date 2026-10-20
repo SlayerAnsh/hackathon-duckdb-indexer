@@ -5,17 +5,110 @@ Plain SQL over every live Arkiv entity. The project has two parts:
 1. **An open source, self hostable indexer** (`apps/indexer`). It mirrors all Arkiv entities on chain, or a subset chosen with `INDEX_EXPRESSION`, into versioned Parquet snapshots plus a JSON delta and a manifest served over HTTP. Run it with Docker Compose or Bun. MIT licensed.
 2. **A web app** (`apps/web`) that runs against the hosted indexer covering all Arkiv data on Tiramisu. It offers a SQL Playground (DuckDB WASM in your browser), widgets (one SQL query plus a chart, saved as Arkiv entities) and public dashboards, including Featured dashboards kept live by the app.
 
-Any app, script or AI agent can query the index with plain SQL instead of paging `arkiv_query` (200 results per page, no JOIN, GROUP BY or ORDER BY on attributes) and without hitting RPC rate limits. Expiry is honored everywhere: a row disappears the moment its expiry block passes. No API key is needed by default, and a `$creator` filter turns "who wrote this" into the trust boundary.
+**Who is stuck today.** Arkiv app teams, analysts and AI agents who need `GROUP BY`, `JOIN` or `ORDER BY` on attributes. `arkiv_query` returns at most 200 rows per page, newest first, with none of those, and an anonymous caller shares a budget of 10,000 cost units per hour that one broad query used up on 18 October 2026 ([friction report](arkiv/friction.md#anonymous-query-budget-and-error-envelope)). Answering "which wallets create the most entities?" means paging about 183 pages of 200 over the 36,457 live entities, more than the roughly 100 anonymous queries an hour allow. So they either burn the budget in their own paging code or trust a closed hosted indexer that decides which rows exist. **What changes on day one:** a documented data contract ([Data API](#data-api-for-apps-and-ai-agents), [arkiv/schema.md](arkiv/schema.md)), an MIT indexer anyone can run without an API key, and hosted Parquet files that DuckDB or Python read without asking anyone. That question becomes one `GROUP BY` that runs in milliseconds in the browser.
+
+**Who is protected.** A viewer of a Featured dashboard, who trusts that its charts were published by this app, and a widget author, who trusts that their address stays on their widget. Anyone can create an entity with `project = arkiv-sql-indexer-dash`, `user = <app wallet>` and `login = arkiv`. An app that trusted attributes would show that look alike as Featured. Every read here filters on the chain set `$creator`, and Featured also requires `$owner`, so a forged entity never appears. See [Why this pillar](#why-this-pillar).
 
 | | URL |
 | :--- | :--- |
 | Hosted app | https://arkiv-sql.dokploy.anshudhar.dev |
 | Hosted indexer (all Tiramisu entities) | https://arkiv-sql-indexer.dokploy.anshudhar.dev |
 | Demo video | `<VIDEO_URL>` |
+| On chain evidence (wallets, entities, transactions) | [On chain evidence](#on-chain-evidence) |
 | Entity schema and exact queries | [arkiv/schema.md](arkiv/schema.md) |
 | Arkiv friction report | [arkiv/friction.md](arkiv/friction.md) |
 
-Built during 9 to 18 October 2026 for Arkiv: Global Tour Stop on the Tiramisu testnet (chain ID 7738577) with `@arkiv-network/sdk` 0.8.1 and direct JSON RPC. Tracks: Open Source and Security. Licensed under the [MIT License](LICENSE).
+Built during Arkiv: Global Tour Stop on the Tiramisu testnet (chain ID 7738577) with `@arkiv-network/sdk` 0.8.1 and direct JSON RPC, within the challenge window of 9 October 2026 to the extended deadline of 20 October 2026. The git history runs from the first commit `9ae759d` (18 October 2026, an empty workspace scaffold with the spec and plans) to the last commit on 20 October 2026. Pre-existing work: none; no code predates the first commit. Tracks: Open Source and Security. Licensed under the [MIT License](LICENSE).
+
+## Why this pillar
+
+### Open Source: another team builds on the data without asking
+
+**Who is stuck.** Teams building on Arkiv, analysts and AI agents who need aggregates over Arkiv data. Without an index they page `arkiv_query` 200 rows at a time on a metered budget and aggregate in their own code; with someone else's closed index they cannot check what it left out, kept past expiry or added.
+
+**What they get from day one, without permission:**
+
+1. **A documented data contract.** `manifest.json`, `delta.json` and two Parquet files with fixed columns ([Data API](#data-api-for-apps-and-ai-agents), [SQL columns](arkiv/schema.md#sql-columns)). The merge rule for the delta is written down and implemented in `packages/core/src/views.ts`.
+2. **A self hostable MIT indexer.** `docker run` or `bun apps/indexer/src/main.ts`, all of Arkiv or an `INDEX_EXPRESSION` subset. It needs no API key: `apps/indexer/test/keyless.test.ts` asserts that no default request carries `Authorization` or `X-API-Key`.
+3. **Open hosted files.** The hosted indexer serves the same files with no login or key. The DuckDB CLI commands in [Data API](#data-api-for-apps-and-ai-agents) were run against it.
+4. **Proof the contract is enough.** This web app reads only that contract through `/data`; it has no private side channel to the indexer.
+
+### Security: authorship comes from `$creator`, never from a field anyone can write
+
+**Victim 1: a viewer of a Featured dashboard.** An attacker creates a dashboard with `type = dashboard`, `project = arkiv-sql-indexer-dash`, `user = <app wallet>`, `login = arkiv` and `slug = network-overview`. Every one of those is an attribute the attacker chooses. A reader that filtered on them would list the fake as the Featured "Arkiv network overview" and run its SQL in the viewer's browser. Here it never appears, because:
+
+* RPC reads always include `$creator = addr(<app wallet>)` (`scopeExpr` in `apps/web/lib/dash/entities.ts`), and the Featured query adds `user` and `$owner` (`officialExpr` in `apps/web/lib/dash/official.ts`).
+* Decoders recheck the creator before accepting an entity (`trusted` in `apps/web/lib/dash/entities.ts`), and Featured needs both `user` and `$owner` to equal the app wallet (`isOfficialOwned` in `apps/web/lib/dash/official.ts`).
+* Lists and counts in DuckDB use `WHERE e.creator = <app wallet>` and Featured needs `usr` and `owner` to match (`dashCte` and `officialSql` in `apps/web/lib/dash/sql.ts`).
+* The UI shows the owning address next to every Featured chip, so a viewer can check it on the explorer.
+
+Check it yourself: `project = str('arkiv-sql-indexer-dash') AND NOT ($creator = addr(0x1f61c3cac1612c020f64739b128c5f198939c8cd))` returned 0 entities on 20 October 2026 at block 805,170. Any entity that query ever returns is ignored by the app.
+
+**Victim 2: a widget author impersonated.** The `user` attribute names a widget's author. The server sets it from the session address, proven by a personal_sign of a single use nonce from the Privy embedded wallet (`apps/web/lib/dash/server/auth.ts`), and refuses sessions and writes from the app wallet address (`requireUser` in `apps/web/lib/dash/server/operations.ts`). User widgets are created `readonly` (`WIDGET_FLAGS` in `apps/web/lib/dash/schema.ts`), so after a transfer the new owner cannot patch `user` to another author, or to the app wallet to forge a Featured marker and hand it back. Owner controls (Delete, Transfer, My widgets) follow the chain's `$owner`, never the `user` attribute (`mineSql` in `apps/web/lib/dash/sql.ts`).
+
+## Why Arkiv
+
+The app's data is Arkiv entities: widgets, dashboards and the links between them. The indexer mirrors Arkiv and nothing else. Take Arkiv away and both trust claims disappear, because authorship is the chain's `$creator`, ownership is `$owner` and lifetime is `expiresAt`.
+
+| Alternative | What breaks for this project |
+| :--- | :--- |
+| Postgres run by an operator | The operator decides which rows exist. It can keep a row after its expiry, write rows under any author and drop rows, and readers cannot check. Here `$creator` and `expiresAt` are set by the chain, and Verify rereads any row from the RPC. |
+| IPFS | Content addressed blobs only: no typed attributes to filter on (`type`, `project`, `user`), no expiry, no owner who can transfer or delete, no query. Widget lifetimes, permissionless extension and transfer to the author would all disappear. |
+| A subgraph | Needs a schema and mapping per app plus a trusted indexer operator. This indexer is schema agnostic (any entity, any attributes), and the trust anchor stays the chain, not the indexer. |
+| Our own API | Is exactly what this project replaces: a closed endpoint that decides which rows exist and who wrote them. |
+
+What deliberately stays off Arkiv, and why:
+
+| Kept off Arkiv | Why |
+| :--- | :--- |
+| Parquet snapshots, `delta.json`, `manifest.json` | Derived data. Any copy can be rebuilt from the chain by replaying public logs, so it is a cache, not a record. |
+| DuckDB (indexer store and browser engine) | Computation, not data. SQL runs in the visitor's tab and never on a server. |
+| Session cookies, login nonces, rate limit counters | Short lived state of one web instance. On chain they would be public and outlive their purpose. |
+| Payload mirroring | Payloads stay on chain and load on demand (Payload button, widget reads). The indexer never copies them into Parquet, so the index holds no second copy of entity contents. |
+| The API key (`TIRAMISU_API_KEY`) | A secret. It lives only in the server runtime environment; `test/deployment.test.ts` enforces this. |
+| Email, social handles, Privy user IDs | Personal data. Only the embedded wallet address and the login provider name are written. |
+
+## How the app uses Arkiv
+
+Each feature below is visible to a user and checked in code and on chain.
+
+| Feature | Where | What the user sees | Why this choice |
+| :--- | :--- | :--- | :--- |
+| Typed attributes vs payload | `widgetAttributes`, `linkCreate` in `apps/web/lib/dash/server/operations.ts` | Lists, counts and filters run on attributes; the chart comes from the payload | What is filtered (`type`, `project`, `user`, `dashboard`, `widget`) is an attribute; SQL and chart settings are only read when shown |
+| Typed key attribute with set and unset patches | `planOrganize`, `organizeDashboard` in `apps/web/lib/dash/server/operations.ts`; `dashCte`, `dashboardListSql` in `apps/web/lib/dash/sql.ts` | The starred widget's live chart is the dashboard card cover | `cover` is a `key` attribute, so SQL accepts it only when a live link of the dashboard owner points to that widget; Organize sets it with `set` or removes it with `unset`, and every other attribute (`user`, `slug`, `title`) stays as it was |
+| Compound queries, cursor pages | `dashboardBundleExpr`, `widgetVersionExpr`, `queryAll` in `apps/web/lib/dash/entities.ts` | A dashboard with its links loads in one query | One scoped query (`$creator AND project AND ($key OR type AND dashboard)`) instead of one per link; every cursor page is read |
+| Expiration per type | `apps/web/lib/dash/schema.ts`, `apps/web/lib/dash/server/official.ts` | Time left chips; an expired widget leaves a named empty slot | Widgets live 1, 7, 30 or 90 days as the author chooses; dashboards 90 days renewed on save; links follow their dashboard; Featured 90 days renewed by the app |
+| `extendEntity` as a lease | `extendWidgetDirect` in `apps/web/lib/dash/widget-actions.ts`, `planOrganize`, `keepOfficialAlive` | Extend button; saving a dashboard renews it; Featured shows Kept live | Activity keeps data alive: an extend adds the widget's lifetime again, capped at 90 days remaining |
+| Creation flags | `WIDGET_FLAGS` in `apps/web/lib/dash/schema.ts` | Anyone logged in can extend a user widget; nobody can rewrite it | `permissionlessExtension` lets a community keep a useful widget alive; `readonly` keeps the author and Featured marker unforgeable after transfer |
+| `$creator` and `$owner` | `scopeExpr`, `officialExpr`, `mineSql` | Featured chip with the owning address; My widgets; Transfer | Authorship from the chain, ownership transfer to the author |
+| Atomic batches | `createWidget`, `organizeDashboard`, `deleteDashboard` | A saved widget is yours at once; a dashboard layout saves whole | Create plus transfer (plus link) land in one transaction, so a widget is never left with the app wallet or a link without its widget |
+| Live updates | `apps/web/lib/live-tail.ts`, `apps/indexer/src/sync.ts` | New rows appear without a reload | Polling `eth_getLogs` instead of the SDK event watcher keeps explicit block windows and checkpoints, and the browser continues from the indexer's published block (`delta.toBlock + 1`) (SPECS §5) |
+
+## On chain evidence
+
+All application entities are created by one wallet on Tiramisu. Explorer: https://tiramisu.explorer.arkiv.network.
+
+| Role | Address, entity key or transaction |
+| :--- | :--- |
+| App wallet, creator of every widget, dashboard and link | [`0x1f61c3cac1612c020f64739b128c5f198939c8cd`](https://tiramisu.explorer.arkiv.network/address/0x1f61c3cac1612c020f64739b128c5f198939c8cd) |
+| Featured dashboard `network-overview` | [`0x78d7f643…24376`](https://tiramisu.explorer.arkiv.network/entity/0x78d7f64354c4457ae7d8193375768b11bcf91e7f64992cb02e18df4979e24376), created in tx [`0x8e538593…a20e9`](https://tiramisu.explorer.arkiv.network/tx/0x8e538593d2516a7662fa1876ea313c5ef186a1bac877f503e7788ccb0dea20e9) |
+| Featured dashboard `expiry-watch` | [`0x06d3cd9b…0852b`](https://tiramisu.explorer.arkiv.network/entity/0x06d3cd9bab9569d89a08768750346cfc06b715051310dbed844162f255d0852b), tx [`0xb75afae4…814af`](https://tiramisu.explorer.arkiv.network/tx/0xb75afae47d011b77fc9dd5201812105bde679fe3f5e78a18a62b0a5db69814af) |
+| Featured dashboard `creators` | [`0x3f0a1beb…c7256`](https://tiramisu.explorer.arkiv.network/entity/0x3f0a1beb784edd28b1373ec5edbc1b97a3b266dc15913b31020935ac52dc7256), tx [`0x759fb064…542d0`](https://tiramisu.explorer.arkiv.network/tx/0x759fb064b7b4bfef640bc58166ae68bfb19a2a1f200700c9f6e94f57425542d0) |
+| Featured dashboard `attributes` | [`0x4b0f0f42…ddc82`](https://tiramisu.explorer.arkiv.network/entity/0x4b0f0f42f1307982afdef3323c0444b67d2a1916038815acfcd9476b967ddc82), tx [`0x320d764b…d8a7b`](https://tiramisu.explorer.arkiv.network/tx/0x320d764b92cb113293f3c80187870cea5f71741f661ea77c14e3244919fd8a7b) |
+| Featured dashboard `activity` | [`0x558952f9…cc228`](https://tiramisu.explorer.arkiv.network/entity/0x558952f966a369a864d304d76fc0ae5fb3300b840af801e56f3ff422482cc228), tx [`0xa9adb727…e63df`](https://tiramisu.explorer.arkiv.network/tx/0xa9adb7278efbcd35382824aefc90de21a564642a93a53829ded7771073fe63df) |
+| User owned widget "Total Entities" (flags `readonly` and `permissionlessExtension`, raw 3) | [`0x78ca2e9e…22be23`](https://tiramisu.explorer.arkiv.network/entity/0x78ca2e9ea9f292bc81a6356a89d7e73eddb6f491916209d673b6ec724b22be23), created and transferred in one tx [`0xa3668515…21f03`](https://tiramisu.explorer.arkiv.network/tx/0xa3668515f09911d190336e92457afba8759f79f3f18870e7d5a33f7cd7a21f03) (block 803,198, logs `EntityCreated` then `OwnershipTransferred`) |
+| Owner of that widget, a Privy embedded wallet | [`0x2f4d9088ff069c17c2ae6c051e3c78911b827757`](https://tiramisu.explorer.arkiv.network/address/0x2f4d9088ff069c17c2ae6c051e3c78911b827757) |
+
+Every transaction above was sent by the app wallet (`eth_getTransactionByHash` returns `from = 0x1f61c3cac1612c020f64739b128c5f198939c8cd`). On 20 October 2026 at block 805,079 the app wallet was creator of 76 live entities: 6 dashboards, 32 widgets (one owned by a user), 33 links and 5 `ticket` entities left by the removed demo writer. The Featured query below returned 67 entities (5 dashboards, 31 widgets, 31 links). Featured entities are renewed by the app wallet, the user widget expires at block 2,099,198 (about 19 November 2026) unless someone extends it, and the creation transactions stay on the explorer after expiry.
+
+List every live entity of the app wallet, or only the Featured ones, from the public RPC. An anonymous caller can get HTTP 429 `ANON_COST_LIMITED` when its hourly budget is spent (it happened to us while writing this section, see the [friction report](arkiv/friction.md#anonymous-budget-exhausted-again-on-20-october)); retry after `Retry-After`, add an API key, or point the same body at a deployment of this app's `/api/rpc`.
+
+```sh
+curl -s -XPOST https://rpc.tiramisu.db-chain.testnet.arkiv.network -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"arkiv_query","params":["$creator = addr(0x1f61c3cac1612c020f64739b128c5f198939c8cd)",{"limit":"0xc8","select":{"key":true,"owner":true,"creationFlags":true,"attributes":true}}]}'
+curl -s -XPOST https://rpc.tiramisu.db-chain.testnet.arkiv.network -H 'content-type: application/json' \
+  -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"arkiv_query\",\"params\":[\"\$creator = addr(0x1f61c3cac1612c020f64739b128c5f198939c8cd) AND project = str('arkiv-sql-indexer-dash') AND user = addr(0x1f61c3cac1612c020f64739b128c5f198939c8cd) AND \$owner = addr(0x1f61c3cac1612c020f64739b128c5f198939c8cd)\",{\"limit\":\"0xc8\",\"select\":{\"key\":true,\"attributes\":true}}]}"
+```
 
 ## Architecture
 

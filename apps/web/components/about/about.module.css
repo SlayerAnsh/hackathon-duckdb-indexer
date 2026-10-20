@@ -117,3 +117,8 @@
  .code{font-size:12px;padding:var(--sp-3) var(--sp-4)}
  .toc ol{columns:1}
 }
+
+/* Pillars and evidence. */
+.pillar{display:flex;flex-direction:column;gap:var(--sp-3)}
+.pillar h3{margin:var(--sp-2) 0 0;font-size:var(--fs-lg);font-weight:600}
+.tx{display:block;margin-top:2px;font:12px var(--font-mono);color:var(--text-3b)}

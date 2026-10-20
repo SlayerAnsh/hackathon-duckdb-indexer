@@ -1,6 +1,6 @@
 # Arkiv schema and queries
 
-This file lists the widget, dashboard and link entity types the web app's app wallet (the dashboard wallet) creates, their attributes and expiry, and every Arkiv RPC request the indexer and the browser send. Network: Tiramisu, chain ID 7738577, RPC `https://rpc.tiramisu.db-chain.testnet.arkiv.network`. SDK: `@arkiv-network/sdk` 0.8.1 with viem 2.57.3.
+This file lists the widget, dashboard and link entity types the web app's app wallet (the dashboard wallet) creates, their attributes and expiry, and every Arkiv RPC request the indexer and the browser send. Network: Tiramisu, chain ID 7738577, RPC `https://rpc.tiramisu.db-chain.testnet.arkiv.network`. SDK: `@arkiv-network/sdk` 0.8.1 with viem 2.57.7 (declared range `^2.57.3`). App wallet (creator of every app entity): `0x1f61c3cac1612c020f64739b128c5f198939c8cd`; on chain evidence with explorer links is in the [README](../README.md#on-chain-evidence).
 
 The open source indexer (`apps/indexer`) is schema agnostic. It mirrors every live entity that matches `INDEX_EXPRESSION` (blank means every entity on the chain), whatever its attributes. The application entity types, lifetimes and operations are documented in [Widget dashboards](#widget-dashboards). Payloads stay on chain and are fetched on demand, never stored in Parquet.
 
@@ -28,7 +28,7 @@ The row selection `ROW_SELECT` is:
 With a configured expression, a chunk of two keys renders as:
 
 ```text
-($creator = addr(0xb0b87eddb0bc777eb663c7a11703ba5ed4849a28)) AND ($key = key(0x0000000000000000000000000000000000000000000000000000000000000001) OR $key = key(0x0000000000000000000000000000000000000000000000000000000000000002))
+($creator = addr(0x1f61c3cac1612c020f64739b128c5f198939c8cd)) AND ($key = key(0x0000000000000000000000000000000000000000000000000000000000000001) OR $key = key(0x0000000000000000000000000000000000000000000000000000000000000002))
 ```
 
 A single key keeps the outer parentheses but has no `OR`. With a blank expression the indexer sends the bare `OR` of key terms.
@@ -83,11 +83,32 @@ The web backend writes `widget`, `dashboard` and `link` entities with `contentTy
 | dashboard | login | str | Login provider |
 | dashboard | title | str | Dashboard title |
 | dashboard | slug | str | Featured dashboards only, see [Featured entities](#featured-entities) |
+| dashboard | cover | key | Optional. Entity key of one live widget linked to this dashboard, starred in Organize; its live chart is the dashboard card cover. Readers ignore an unlinked, missing, expired or untrusted cover widget |
 | link | type | str | `link` |
 | link | project | str | `arkiv-sql-indexer-dash` |
 | link | user | addr | Dashboard owner's embedded wallet |
 | link | dashboard | key | Dashboard entity key |
 | link | widget | key | Widget entity key |
+
+### Expiration per entity type
+
+| Entity | Lifetime at creation | How it is renewed | Ends |
+| :--- | :--- | :--- | :--- |
+| User widget | 1, 7, 30 or 90 days, chosen by the author (`lifetimeDays`) | Anyone logged in signs `extendEntity`, adding `lifetimeDays` again, capped at 90 days remaining | Expiry, or the owner deletes it |
+| Dashboard | 90 days | Every Organize save extends it to head plus 90 days | Expiry, or the owner deletes it with its links |
+| Link | The dashboard's current expiry block | Extended with its dashboard on every Organize save | Expiry, removal in Organize, or dashboard delete |
+| Featured dashboard, widget and link | 90 days | App wallet keepalive: every 6 hours, anything with fewer than 30 days left goes to head plus 90 days | Expiry, if the app stops running |
+
+### Why these choices
+
+* **`readonly` on user widgets.** A user widget is transferred to its author, and after that the app no longer controls it. Readonly freezes attributes and payload for life (SDK `entity/flags.ts`: "The entity's attributes and payload can never be changed"). Without it the new owner could patch `user` to someone else, or to the app wallet, and transfer it back to forge the Featured marker. Edits therefore save a new version instead of a patch.
+* **`permissionlessExtension` on user widgets.** Anyone, not only the owner, can keep a useful widget alive (SDK: "Lets a third party keep something alive without being able to change it"). A viewer who relies on a widget on someone else's dashboard can extend it and pays their own fee. A rule like "only people who placed it may extend" was dropped because the chain allows anyone, so a UI rule would be bypassed by a script.
+* **Widget lifetimes of 1, 7, 30 or 90 days.** The author decides how long a public query stays public. Extending adds the same lifetime again, so a widget stays alive only while someone keeps renewing it. The 90 day cap is an app rule, not a protocol limit (the SDK accepts any `uint64` expiry), so no widget is ever more than 90 days from expiring without renewed activity.
+* **Dashboards 90 days, renewed on save; links follow their dashboard.** Editing a dashboard is the activity that keeps it alive. A link carries the dashboard's expiry block, so a placement never outlives its dashboard or dies before it; an expired widget leaves a named empty slot instead of a broken layout.
+* **Featured keepalive.** Featured dashboards are the landing content, so the app wallet renews them as a lease from inside the web server (`apps/web/lib/dash/server/keepalive.ts`), with no cron job, public endpoint or extra secret.
+* **One atomic batch.** `executeBatch` applies every operation or none (SDK `clients/decorators/arkivWallet.ts`: "the whole batch applies or none of it does"). Create plus `ownershipChanges` means a saved widget is never left owned by the app wallet; widget plus link means a link never points at a widget that failed to create; Organize saves a whole layout (creates, patches, deletes, extensions) or nothing. Keys come from `predictEntityKeys` inside the same serial queue slot, because a prediction holds only while nothing else from that owner is in flight.
+* **Polling instead of WebSocket events.** Both the indexer and the browser poll `eth_getLogs` directly rather than using the SDK event watcher, which gives explicit block windows and checkpoints (SPECS §5). The indexer commits a checkpoint per batch, and the browser live tail starts at `delta.toBlock + 1`, exactly where the indexer's published window ends.
+* **`cover` as a typed `key` attribute.** It is queryable and joinable in SQL: list queries accept the cover only when a live link of the dashboard owner points at that widget (`dashCte` and `dashboardListSql` in `apps/web/lib/dash/sql.ts`). Organize sets it with a patch `set` and removes it with `unset: ['cover']`; a patch names only what changes (SDK `actions/wallet/patchEntity.ts`: "Attributes it does not mention keep whatever value they have"), so `user`, `login`, `title` and `slug` stay as they were.
 
 ### Payloads and enums
 
@@ -145,8 +166,11 @@ One day is 43,200 blocks at two seconds per block. App wallet writes (widget cre
 | Create dashboard | `createEntity`, 90 days through `ExpirationTime.fromSeconds`; title and description in payload |
 | Rename or edit dashboard | Owner only, `patchEntity` sets title and replaces payload; this operation alone does not reset expiry |
 | Add existing widget | Dashboard owner only, `createEntity` for a link at the next position, with `ExpirationTime.atBlock` set to dashboard expiry |
-| Organize dashboard | Owner only, one `executeBatch` creates imported links, patches changed link sizes and positions, optionally patches the dashboard title, deletes removed links, and extends the dashboard and retained links to `head + 90 * 43200`. New links use the same target. Extensions are sent only when the target is later. An empty plan sends no transaction. |
+| Organize dashboard | Owner only, one `executeBatch` creates imported links, patches changed link sizes and positions, optionally patches the dashboard title and `cover` (a `set` of `cover` to the key of a live widget in the final layout, or `unset: ['cover']` when the starred widget leaves the layout or is cleared; the payload is replaced only when the title changes), deletes removed links, and extends the dashboard and retained links to `head + 90 * 43200`. New links use the same target. Extensions are sent only when the target is later. An empty plan sends no transaction. |
 | Delete dashboard | Owner only, one `executeBatch` deletes the dashboard and its live links; referenced widgets remain |
+| Seed Featured dashboard | App wallet only (`seedOfficial` in `apps/web/lib/dash/server/official.ts`). One `executeBatch` creates the dashboard, its widgets and its links with 90 day lifetimes, with keys and salts from `predictEntityKeys({ owner, count: 1 + 2n })` for n widgets. When the definition names a cover, the dashboard is created with `cover` set to the predicted widget key |
+| Featured keepalive | App wallet only (`keepOfficialAlive`). Every 6 hours, `executeBatch` extensions in chunks of 50 move live Featured entities with fewer than 30 days left to head plus 90 days; the same pass then reconciles covers |
+| Set Featured covers | App wallet only (`setOfficialCovers`, CLI `--set-covers`). For each Featured dashboard whose definition names a cover, a patch `set: { cover }` points it at the first live linked widget with that name when it differs; with `--dry-run` it only counts |
 
 Native batch order is creates, patches, deletes, extensions, ownership changes. Links follow their dashboard's expiry rather than their widget's expiry, so expired widget slots can remain until removed.
 
@@ -166,12 +190,15 @@ S AND ($key = key(K) OR type = str('link') AND widget = key(K) AND user = addr(U
 
 keysExprs(W, [K1, K2]):
 (S) AND ($key = key(K1) OR $key = key(K2))
+
+officialExpr(W):
+$creator = addr(W) AND project = str('arkiv-sql-indexer-dash') AND user = addr(W) AND $owner = addr(W)
 ```
 
-Without extras, the dashboard bundle includes only the dashboard key alternative and its links. Key chunks contain at most 50 keys; a single key has no OR group and an empty key list sends no query. The actual two key chunk for the example dashboard wallet is:
+Without extras, the dashboard bundle includes only the dashboard key alternative and its links. Key chunks contain at most 50 keys; a single key has no OR group and an empty key list sends no query. The actual two key chunk for the app wallet is:
 
 ```text
-($creator = addr(0xb0B87EdDB0bc777Eb663c7a11703ba5ED4849A28) AND project = str('arkiv-sql-indexer-dash')) AND ($key = key(0x0000000000000000000000000000000000000000000000000000000000000001) OR $key = key(0x0000000000000000000000000000000000000000000000000000000000000002))
+($creator = addr(0x1f61c3cac1612C020f64739B128C5f198939C8Cd) AND project = str('arkiv-sql-indexer-dash')) AND ($key = key(0x0000000000000000000000000000000000000000000000000000000000000001) OR $key = key(0x0000000000000000000000000000000000000000000000000000000000000002))
 ```
 
 Every expression is sent through `queryAll` as `arkiv_query(expression, { limit: 200, select: DASH_SELECT, cursor })`. No `atBlock` is supplied; the returned head is the first page's `blockNumber`, and every cursor page is read. The shared selection is:
@@ -195,9 +222,11 @@ Every expression is sent through `queryAll` as `arkiv_query(expression, { limit:
 | Server create widget with placement, dashboard edit or delete | `dashboardBundleExpr(W, D)` |
 | Server organize or add existing widget | `dashboardBundleExpr(W, D, extraKeys)` with newly imported widget keys |
 | Browser dashboard and placement layout | `dashboardBundleExpr(W, D)` |
-| Browser widget page, dashboard widget payloads, explorer previews, home lifetime data | `keysExprs(W, keys)` in chunks of 50; explorer preview batches contain 12 keys per page |
+| Browser widget page, dashboard widget payloads, explorer previews, cover payloads, home lifetime data | `keysExprs(W, keys)` in chunks of 50; explorer preview batches contain 12 keys per page |
+| Server organize, when the cover widget is not in the bundle | `keysExprs(W, [cover])[0]` |
+| Server Featured seed (slug exists check), keepalive and cover reconcile | `officialExpr(W)` (`apps/web/lib/dash/official.ts`) |
 
-Dashboard reads always filter `$creator` on the configured dashboard wallet as well as project. Another wallet can copy every attribute, so attributes alone are never trusted identity. Decoders recheck creator, project, type, required attributes and payload validity before accepting an entity. Lists, counts and activity use creator and project scoped local DuckDB SQL; RPC reads supply payloads only where needed. Stored widget SQL must pass `checkWidgetSql` before execution in the viewer's DuckDB, capped at 5,000 result rows.
+Dashboard reads always filter `$creator` on the configured dashboard wallet as well as project. Another wallet can copy every attribute, so attributes alone are never trusted identity. Decoders recheck creator, project, type, required attributes and payload validity before accepting an entity. Lists, counts and activity use creator and project scoped local DuckDB SQL; RPC reads supply payloads only where needed. Those SQL builders live in `apps/web/lib/dash/sql.ts`: `dashCte` (every app entity with `WHERE e.creator = <W>` and `project = 'arkiv-sql-indexer-dash'`, attributes pivoted into columns), `officialSql` (Featured: `usr` and `owner` equal W), `mineSql` (widgets by `owner`, dashboards and links by `usr`), `dashboardListSql` and `dashboardCountSql` (Explore dashboards, with the cover resolved only through a live link of the same `usr`), `widgetListSql` and `widgetCountSql` (Explore widgets), `myDashboardsSql`, `myWidgetsSql`, `activityCountsSql`, `expiringSoonSql` and `recentSql` (Home), `userDashboardsSql`, `widgetUsageSql` and `widgetDashboardsSql` (Used on N dashboards) and `syncedSql` (whether a pending write has reached the index). Stored widget SQL must pass `checkWidgetSql` before execution in the viewer's DuckDB, capped at 5,000 result rows.
 
 Legacy widgets without creation flags remain owned by the app wallet and have no user Extend, Delete or Transfer actions. Do not transfer them to users: mutable attributes could undermine the Featured marker.
 
@@ -205,4 +234,4 @@ Legacy widgets without creation flags remain owned by the app wallet and have no
 
 User facing copy calls these Featured; code and helpers use the name official (`apps/web/lib/dash/official.ts`). An entity is Featured when its `user` attribute and `$owner` both equal the app wallet address. Readers still require the app wallet as creator and the dashboard project tag. Featured widgets and dashboards use `login = arkiv`. Featured dashboards also carry a string `slug` attribute with at most 64 bytes, matching `^[a-z0-9]+(?:-[a-z0-9]+)*$`.
 
-Featured dashboards, widgets and links have 90 day lifetimes and are renewed by the app wallet. A user cannot forge a Featured entity through the API: the server derives `user` from the verified session, refuses app wallet sessions and rejects app wallet addresses in every user write operation. Readers accept `login = arkiv` only when `user` equals the app wallet.
+Featured dashboards, widgets and links have 90 day lifetimes and are renewed by the app wallet: an in process timer runs 60 seconds after server start and then every 6 hours, reads `officialExpr(W)`, and extends every live Featured entity with fewer than 30 days left to head plus 90 days in batches of 50 (`apps/web/lib/dash/server/keepalive.ts`, `keepOfficialAlive`). The same pass reconciles the configured covers. A user cannot forge a Featured entity through the API: the server derives `user` from the verified session, refuses app wallet sessions and rejects app wallet addresses in every user write operation. Readers accept `login = arkiv` only when `user` equals the app wallet.

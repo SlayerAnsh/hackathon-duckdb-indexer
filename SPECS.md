@@ -1,6 +1,6 @@
 # Arkiv SQL Indexer: Specification
 
-Status: implemented, 18 October 2026 (submission deadline 18 October 2026, 22:59 UTC). Sections describe the current code. Where the original plan changed, the text says so. Since 20 October 2026 the project ships two parts: the open source, self hostable indexer and a web app that runs against the hosted indexer.
+Status: implemented. The first version shipped on 18 October 2026; the challenge deadline was then extended to 20 October 2026, and sections marked 19 or 20 October record the later decisions. Git history: first commit `9ae759d` (18 October 2026, an empty scaffold with this spec and the plans), last commit 20 October 2026; no code predates it. Sections describe the current code. Where the original plan changed, the text says so. Since 20 October 2026 the project ships two parts: the open source, self hostable indexer and a web app that runs against the hosted indexer.
 
 ## 1. Summary
 
@@ -334,6 +334,8 @@ See the [design spec](docs/superpowers/specs/2026-10-20-widget-dashboards-design
 ### User owned widgets (owner decision, 20 October 2026)
 
 User widgets are created by the app wallet with fixed `readonly` and `permissionlessExtension` flags and transferred to the session wallet in the same batch. The immutable `user` attribute records the author; the Arkiv owner controls deletion, transfer and saving new versions. Editing creates a new widget and repoints only the author's dashboard links. The old version stays until expiry unless its owner deletes it. Anyone logged in can extend a live user widget by signing in the browser. Extend, transfer and delete need GLM in the signing wallet; saving stays free. Legacy widgets owned by the app wallet have no user signing actions. Featured widgets require both `user` and `$owner` to equal the app wallet and use backend keepalive.
+
+Dashboard covers (20 October 2026): a dashboard owner stars one widget in Organize, stored as the optional dashboard attribute `cover` (type `key`), and the dashboard card on Explore, Featured dashboards and My home renders that widget's live chart, with chart icons as the fallback. Organize sets it with a patch `set` and removes it with `unset: ['cover']` when the starred widget leaves the final layout; other attributes stay unchanged. List SQL accepts the cover only through a live link of the dashboard owner, so an unlinked, missing, expired or untrusted widget is ignored. Featured dashboards take their cover from `official-defs.ts`: the seed sets it at creation, `seed-official.ts --set-covers` reconciles existing ones (dry run aware), and keepalive reconciles them too.
 
 Removed widget endpoints: `PUT /api/dash/widgets/[key]`, `DELETE /api/dash/widgets/[key]` and `POST /api/dash/widgets/[key]/extend`. New versions use `POST /api/dash/widgets` with `replaces`; widget extend, delete and transfer use direct browser signatures.
 

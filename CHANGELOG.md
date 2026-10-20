@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+* Dashboard covers: an owner stars one widget in Organize, stored as the `cover` key attribute, and dashboard cards show its live chart with an automatic fallback when the cover is unavailable. `seed-official.ts --set-covers` (with optional `--dry-run`) applies the configured covers to existing Featured dashboards; keepalive keeps them in step.
+
+* Submission docs: README and /about name the harmed users per pillar, explain why Arkiv and what stays off it, list how each Arkiv feature is used and why, and give an on chain evidence table for the real app wallet `0x1f61c3cac1612c020f64739b128c5f198939c8cd` (the previously cited address had no entities). `arkiv/schema.md` adds expiry per entity type, the reasons for each feature choice, the Featured `officialExpr` query and the app's DuckDB queries. `arkiv/friction.md` adds five entries for 19 and 20 October (create and transfer in one batch, wallet transport retries, extend at the cap, the anonymous budget on 20 October, the keyless fill backlog) and corrects the viem version to 2.57.7. Dates now state the extended deadline of 20 October 2026.
+
 * Project restructure. The repository now ships two parts: an open source, self hostable indexer (`apps/indexer`, MIT, Docker Compose or Bun, all entities or an `INDEX_EXPRESSION` subset, Parquet snapshots, delta and manifest over HTTP) and a web app (`apps/web`) that runs against the hosted indexer at https://arkiv-sql-indexer.dokploy.anshudhar.dev covering all Arkiv data on Tiramisu. The app offers a SQL Playground, widgets saved as Arkiv entities, public dashboards with Featured dashboards kept live by the app wallet, Privy login, the keyed `/api/rpc` read proxy and the `/data` proxy to `INDEXER_URL`. README, SPECS, DEVELOPER, `arkiv/schema.md`, `.env.example` and page metadata describe this structure, with quick starts for self hosting the indexer and for running the app against the hosted indexer.
 
 * App owned dashboards are called Featured instead of Official in user facing copy.

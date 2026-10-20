@@ -57,9 +57,11 @@ Featured dashboards are app owned dashboards (called official in code: `lib/dash
 bun apps/web/scripts/seed-official.ts --dry-run
 bun apps/web/scripts/seed-official.ts
 bun apps/web/scripts/seed-official.ts --keepalive
+bun apps/web/scripts/seed-official.ts --set-covers --dry-run
+bun apps/web/scripts/seed-official.ts --set-covers
 ```
 
-`--dry-run` validates all definitions, queries existing Featured slugs and reports what would be created without sending writes. Seeding skips each live Featured dashboard whose slug already exists. Each new dashboard, its widgets and its links are created in one batch with 90 day lifetimes. `--keepalive` runs one renewal pass on demand.
+`--dry-run` validates all definitions, queries existing Featured slugs and reports what would be created without sending writes. Seeding skips each live Featured dashboard whose slug already exists. Each new dashboard, its widgets and its links are created in one batch with 90 day lifetimes. `--keepalive` runs one renewal pass on demand and must be used alone. `--set-covers` patches the `cover` attribute of each existing Featured dashboard to the widget its definition names (the first live linked widget with that name) and skips dashboards already pointing there; with `--dry-run` it only reports how many dashboards it would update. The keepalive pass applies the configured covers as well.
 
 Run the seed while user traffic is low. The script has its own serial write queue and cannot coordinate the wallet nonce with the running web container. A simultaneous user write can clash with its predictions or transaction nonce. Reconcile an uncertain submission before rerunning; a rerun skips live Featured slugs that already exist.
 

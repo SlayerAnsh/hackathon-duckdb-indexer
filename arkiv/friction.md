@@ -1,8 +1,8 @@
 # Arkiv integration friction
 
-These observations come from the Tiramisu spike and measurements of 18 October 2026 (recorded in SPECS §4) and from the workarounds now in the code. Each entry names the code that handles it.
+These observations come from the Tiramisu spike and measurements of 18 October 2026 (recorded in SPECS §4), from building the widget and dashboard write paths on 19 and 20 October 2026, and from the workarounds now in the code. Each entry names the code that handles it.
 
-Versions throughout: `@arkiv-network/sdk` 0.8.1, viem 2.57.3, Bun 1.3.11, Tiramisu chain ID 7738577 at `https://rpc.tiramisu.db-chain.testnet.arkiv.network`. The node server software version was not exposed. Reproduction requests spend provider budget.
+Versions throughout: `@arkiv-network/sdk` 0.8.1, viem 2.57.7, Bun 1.3.11, Tiramisu chain ID 7738577 at `https://rpc.tiramisu.db-chain.testnet.arkiv.network`. The node server software version was not exposed. Reproduction requests spend provider budget.
 
 ## Arkiv surfaces used
 
@@ -13,7 +13,9 @@ Versions throughout: `@arkiv-network/sdk` 0.8.1, viem 2.57.3, Bun 1.3.11, Tirami
 | `eth_getLogs` on the Arkiv contract, decoded with SDK `ENTITY_EVENTS_ABI` | Indexer replay and live sync, browser live tail | Log result cap, keyed live sync, expiry without event |
 | `eth_blockNumber`, `eth_chainId`, `eth_getBlockByNumber` | Indexer checkpoint and reorg checks, browser live head | Anonymous budget (these keep working) |
 | SDK query builder (`key`, `eq`, `or`, `render`) | `packages/core/src/query.ts` | Query length |
-| SDK wallet client (`executeBatch`, `createEntity`, `patchEntity`, `extendEntity`, `changeOwnership`, `predictEntityKeys`, `ExpirationTime`) | `apps/web/lib/dash/server/operations.ts` (app wallet), `apps/web/lib/dash/widget-actions.ts` (browser signed widget actions) | Mutation errors |
+| SDK wallet client (`executeBatch`, `createEntity`, `patchEntity`, `extendEntity`, `changeOwnership`, `predictEntityKeys`, `ExpirationTime`) | `apps/web/lib/dash/server/operations.ts` (app wallet), `apps/web/lib/dash/widget-actions.ts` (browser signed widget actions) | Mutation errors, create and transfer in one batch, extend at the cap |
+| viem `custom` transport over the Privy embedded wallet | `apps/web/lib/dash/wallet.ts`, `apps/web/components/auth/PrivyBridge.tsx` | Wallet transport retries |
+| Same origin read proxy `POST /api/rpc` | `apps/web/lib/dash/server/rpc-proxy.ts` | Anonymous budget exhausted again |
 
 ## Anonymous query budget and error envelope
 
@@ -35,7 +37,7 @@ Workaround: `packages/core/src/rpc.ts` accepts both shapes (an object `error` wi
 
 ### Versions
 
-SDK 0.8.1, viem 2.57.3, Bun 1.3.11, Tiramisu on 18 October 2026; server version unknown.
+SDK 0.8.1, viem 2.57.7, Bun 1.3.11, Tiramisu on 18 October 2026; server version unknown.
 
 ### Steps to reproduce
 
@@ -62,7 +64,7 @@ Workaround: `keyChunkQueries` defaults to 50 keys per query, and `apps/indexer/s
 
 ### Versions
 
-SDK 0.8.1, viem 2.57.3, Bun 1.3.11, authenticated Tiramisu on 18 October 2026; server version unknown.
+SDK 0.8.1, viem 2.57.7, Bun 1.3.11, authenticated Tiramisu on 18 October 2026; server version unknown.
 
 ### Steps to reproduce
 
@@ -88,7 +90,7 @@ Workaround: no `arkiv_query` runs per event anywhere. The indexer and browser ba
 
 ### Versions
 
-SDK 0.8.1, viem 2.57.3, Bun 1.3.11, authenticated Tiramisu on 18 October 2026; server version unknown.
+SDK 0.8.1, viem 2.57.7, Bun 1.3.11, authenticated Tiramisu on 18 October 2026; server version unknown.
 
 ### Steps to reproduce
 
@@ -114,7 +116,7 @@ Workaround: keyed clients log `Arkiv-Cost` and `Arkiv-Quota-Used-Percent` on eve
 
 ### Versions
 
-SDK 0.8.1, viem 2.57.3, Bun 1.3.11, authenticated Tiramisu on 18 October 2026; server version unknown.
+SDK 0.8.1, viem 2.57.7, Bun 1.3.11, authenticated Tiramisu on 18 October 2026; server version unknown.
 
 ### Steps to reproduce
 
@@ -138,7 +140,7 @@ The entries below use the same four parts in a compact form.
 
 Workaround: `fetchLogsAdaptive` in `apps/indexer/src/replay.ts` parses `retry with the range A-B` from the message, retries exactly that range, then continues at B plus one. Without a suggested range it halves the window. HTTP 429 waits for Retry-After. The default backfill therefore spends no `arkiv_query` at all; attributes come from keyed fills.
 
-**Versions.** SDK 0.8.1, viem 2.57.3, Bun 1.3.11, Tiramisu on 18 October 2026.
+**Versions.** SDK 0.8.1, viem 2.57.7, Bun 1.3.11, Tiramisu on 18 October 2026.
 
 **Steps to reproduce.** Request anonymous logs for address `0x4400000000000000000000000000000000000044` over a block range large enough to exceed 20,000 results and read the error message. With an API key, compare `Arkiv-Quota-Used-Percent` before and after broad pinned pages and before and after batches of 50 key predicates.
 
@@ -180,8 +182,104 @@ Workaround: every indexer batch sweeps `expires_at <= batch end` and records tom
 
 Workaround: `apps/web/lib/dash/server/operations.ts` and `apps/web/lib/dash/widget-actions.ts` match these names and messages (the server walks the `cause` chain and returns not found; the browser maps them to an expired widget error). (The original workaround lived in the removed demo writer.)
 
-**Versions.** SDK 0.8.1, viem 2.57.3, Bun 1.3.11, Tiramisu.
+**Versions.** SDK 0.8.1, viem 2.57.7, Bun 1.3.11, Tiramisu.
 
 **Steps to reproduce.** Call `patchEntity` or `extendEntity` on an entity key after it expired, and inspect the thrown error and its `cause` chain.
 
 **Suggested fix.** Export typed error classes or a stable `code` for missing and expired entities from the SDK mutation helpers.
+
+## Write surfaces and budgets, 19 and 20 October 2026
+
+These entries cover the widget and dashboard write paths and the read budget hit while building them. Two are tested paths that worked; they use the same four parts.
+
+Versions for this section: `@arkiv-network/sdk` 0.8.1, viem 2.57.7, `@privy-io/react-auth` 3.50.0, Next.js 16.4.2, Bun 1.3.11, Tiramisu chain ID 7738577.
+
+### Create and transfer in one batch with predicted keys (tested path that worked)
+
+**Expected.** A server wallet should be able to create a widget and hand it to the user's wallet atomically, so the widget is never left owned by the app. The SDK docs should say whether an `ownershipChanges` entry may name a key created earlier in the same `executeBatch`.
+
+**Actual.** The `executeBatch` docs (`clients/decorators/arkivWallet.ts`) show `ownershipChanges` only for an existing key, and the `predictEntityKeys` example (`clients/decorators/arkivPublic.ts`) covers a create that references another create through an attribute. The source shows the native order is creates, patches, deletes, extensions, ownership changes (`utils/arkivTransactions.ts`), so we tried it and it works: transaction `0xa3668515f09911d190336e92457afba8759f79f3f18870e7d5a33f7cd7a21f03` at block 803,198 emits `EntityCreated` and then `OwnershipTransferred` for widget `0x78ca2e9ea9f292bc81a6356a89d7e73eddb6f491916209d673b6ec724b22be23`. The entity reads back with creator `0x1f61c3cac1612c020f64739b128c5f198939c8cd` (app wallet), owner `0x2f4d9088ff069c17c2ae6c051e3c78911b827757` (Privy embedded wallet) and `creationFlags.raw = 3`. The same pattern creates a widget plus its dashboard link with `count: 2`, the link holding the predicted widget key. The one trap is in the docs: a prediction "holds only while nothing else from this owner is in flight".
+
+Workaround: `createWidget` in `apps/web/lib/dash/server/operations.ts` calls `predictEntityKeys` and `executeBatch` inside one slot of a serial write queue (`apps/web/lib/dash/server/queue.ts`), and each create carries the salt it was predicted with. DEVELOPER.md tells operators not to run the seed script during user traffic, because that process has its own queue.
+
+**Versions.** As above; written on Tiramisu on 20 October 2026.
+
+**Steps to reproduce.**
+
+1. With a funded wallet client, call `predictEntityKeys({ owner: account.address, count: 1 })`.
+2. Call `executeBatch({ creates: [{ payload, contentType, attributes, expires, flags: { readonly: true, permissionlessExtension: true }, salt: predicted[0].salt }], ownershipChanges: [{ entityKey: predicted[0].key, newOwner }] })`.
+3. Read `eth_getLogs` for that block on `0x4400000000000000000000000000000000000044` and `arkiv_query("$key = key(<predicted key>)")` with `owner`, `creator` and `creationFlags` selected.
+
+**Suggested fix.** State in the `executeBatch` docs that patches, extensions and ownership changes may target keys created earlier in the same batch, and consider an `owner` field on a create so a hand over needs no transfer.
+
+### Wallet transport retries can resend a signed write
+
+**Expected.** A write signed by the Privy embedded wallet through a viem `custom` transport is sent once; if the wallet returns an error, the user sees it.
+
+**Actual.** viem `createTransport` defaults to `retryCount = 3` (`clients/transports/createTransport.ts`), `custom()` inherits it (`clients/transports/custom.ts`), and `buildRequest` retries any method, including `eth_sendTransaction`, when `shouldRetry` matches (code `-1`, `-32603`, `-32005`, `429`, `-32007`, or HTTP 403, 408, 413, 429, 500 and above) (`utils/buildRequest.ts`). Privy is configured with `showWalletUIs: false` (`apps/web/components/auth/PrivyBridge.tsx`), so the embedded wallet signs without a prompt and a retry would be invisible. We found this by reading the source after the first wallet signing commit (`f114090`), not from an observed duplicate, and turned retries off 17 minutes later (`67904b9`). A probe against viem 2.57.7 with a provider that throws on `eth_sendTransaction` confirmed it: with defaults the provider is called 4 times for code `-32603` and for `-1`, once for `4001` (user rejected); with `{ retryCount: 0 }` it is called once in every case.
+
+Workaround: `splitTransport` in `apps/web/lib/dash/wallet.ts` routes wallet methods to the Privy provider and reads to the public RPC, and passes `{ retryCount: 0 }` to `custom()` and to the `http()` side. Errors map to fixed copy through `walletErrorKind` in `apps/web/lib/dash/widget-actions.ts`.
+
+**Versions.** viem 2.57.7, `@privy-io/react-auth` 3.50.0, SDK 0.8.1, Next.js 16.4.2; probe run with Bun 1.3.11 on 20 October 2026.
+
+**Steps to reproduce.**
+
+1. `createWalletClient({ transport: custom(provider) })` where `provider.request` throws `{ code: -32603 }` for `eth_sendTransaction` and counts calls.
+2. Send `client.request({ method: 'eth_sendTransaction', params: [...] })` and catch the error. The count is 4.
+3. Repeat with `custom(provider, { retryCount: 0 })`. The count is 1.
+
+**Suggested fix.** The Arkiv SDK docs for browser wallets should recommend `retryCount: 0` on wallet transports, or the SDK wallet client should not retry non idempotent methods. viem could exclude `eth_sendTransaction` and `eth_sendRawTransaction` from transport retries by default.
+
+### Extend at the cap and `ExpiryNotExtended`
+
+**Expected.** Extending an entity to a block that is not later than its current expiry should be detectable before sending, or fail with a typed SDK error.
+
+**Actual.** `extendEntity` sets an absolute expiry, it does not add to it, and the engine reverts `ExpiryNotExtended(entityKey, newExpiresAt, currentExpiresAt)` when the target is not later (`utils/arkivTransactions.ts`). The SDK only renders it as text, "already expires at block N, so extending it to M would shorten its life" (`utils/revert.ts`). This matters with `permissionlessExtension`: two viewers can extend the same widget, and the second computes its target from an `expiresAt` that has already moved. Our widgets also stop at an app cap of 90 days remaining, so near the cap the target can equal the current expiry.
+
+Workaround: `extendTarget` in `apps/web/lib/dash/time.ts` computes `min(expiresAt + lifetimeDays * 43200, head + 90 * 43200)`. `extendWidgetDirect` in `apps/web/lib/dash/widget-actions.ts` reads the head first and refuses to send when the widget has expired or `target <= expiresAt` (`at_cap`), and `walletErrorKind` maps an `ExpiryNotExtended` revert or the "would shorten its life" text to the same `at_cap` message, "Already at the 90 day maximum". Organize and the Featured keepalive only include an extension when the target is later (`planOrganize`, `keepOfficialAlive`). `apps/web/test/dash-wallet.test.ts` pins both paths.
+
+**Versions.** SDK 0.8.1, viem 2.57.7, `@privy-io/react-auth` 3.50.0; behavior read from the SDK source on 20 October 2026. We did not spend gas to trigger the revert on chain.
+
+**Steps to reproduce.**
+
+1. Read a live entity you may extend and note `expiresAt`.
+2. Call `extendEntity({ entityKey, expires: ExpirationTime.atBlock(expiresAt) })`.
+3. Inspect the thrown `EntityMutationError` and its `cause` chain for `ExpiryNotExtended`.
+
+**Suggested fix.** Export typed error classes (or a stable `code`) for `ExpiryNotExtended`, and offer a relative helper such as "extend by N blocks, never shorten" so concurrent permissionless extends cannot collide.
+
+### Anonymous budget exhausted again on 20 October
+
+**Expected.** Widget pages read a few payloads per view and should not run out of read budget during normal browsing.
+
+**Actual.** Until 20 October the browser sent its reads (widget payloads by `$key` chunks of 50, Explore previews in pages of 12, live tail attributes) straight to the public RPC, so every visitor spent their own anonymous budget. While building the widget pages on 20 October those reads failed with HTTP 429 and the plain object body `{"error":"ANON_COST_LIMITED","message":"unauthenticated query budget exhausted; get an API key at https://hub.arkiv.network for a monthly quota"}`. It happened again while writing this report: shortly after 07:00 IST on 20 October 2026 the first `arkiv_query` of this session sent straight to the public RPC returned that body, while the same query through a local `/api/rpc` succeeded.
+
+Workaround, in two commits on 20 October: `3857bd1` shows "RPC budget exhausted, retry later" and a widget page notice instead of a raw error and never retries automatically (`rpcMessage` in `apps/web/components/RowActions.tsx`, `apps/web/components/widgets/WidgetPage.tsx`), and `42f48e6` routes every browser read through the same origin read proxy `POST /api/rpc` (`apps/web/lib/dash/server/rpc-proxy.ts`), which adds the server side `TIRAMISU_API_KEY` when set. Without a key, all visitors share the web server's anonymous budget, which is worse, so a production deployment should set the key.
+
+**Versions.** SDK 0.8.1 (the browser client is direct JSON RPC in `packages/core/src/rpc.ts`), Next.js 16.4.2, Tiramisu on 20 October 2026; server version unknown.
+
+**Steps to reproduce.**
+
+1. From one IP with no API key, send `arkiv_query` requests to `https://rpc.tiramisu.db-chain.testnet.arkiv.network` (for example the app wallet scope `$creator = addr(0x1f61c3cac1612c020f64739b128c5f198939c8cd)` with `limit` 200) until one returns HTTP 429.
+2. Read the body and the `Retry-After` header.
+3. Send the same body to `POST /api/rpc` of a deployment with `TIRAMISU_API_KEY` set and compare.
+
+**Suggested fix.** Offer a publishable, origin restricted key that a browser may hold, so apps do not need a proxy, and document the anonymous cost of each `arkiv_query` shape.
+
+### Keyless attribute fill backlog (tested path that worked)
+
+**Expected.** A mirror that never sends an API key should still converge to full attributes for every live entity.
+
+**Actual.** It converges, slowly. Backfill publishes every live entity from public logs at once with `attrs_pending = true`, then the filler fetches attributes for up to 50 keys per `arkiv_query` every 4 seconds, newest `updated_at` first, and pauses on HTTP 429 until `Retry-After` (`apps/indexer/src/fill.ts`). At about 100 anonymous queries an hour that is at most about 5,000 keys an hour, while about 2,800 distinct keys change per hour (see [Keyed live sync](#keyed-live-sync-does-not-fit-the-monthly-quota)) and every create or patch marks a key pending again. The hosted indexer reported `{"headBlock":805105,"live":36457,"pending":809}` on `/health` on 20 October 2026, so 2.2 percent of live entities were still waiting for attributes. Rows stay queryable meanwhile: system columns come from logs, and the status bar shows the block from which on every changed entity has its attributes (older ones are still loading, newest first).
+
+Workaround: none needed beyond what is built. `FILL_USE_API_KEY=true` sends fills with a key for a faster catch up.
+
+**Versions.** SDK 0.8.1, Bun 1.3.11, `@duckdb/node-api` 1.5.6-r.1, Tiramisu on 20 October 2026.
+
+**Steps to reproduce.**
+
+1. Start the indexer with an empty data directory and no API key (`DATA_DIR=./data bun apps/indexer/src/main.ts`).
+2. Poll `http://localhost:8080/health` and record `live` and `pending` over time.
+3. Run `SELECT count(*) FROM entities WHERE attrs_pending` in the Playground of a local app pointed at that indexer.
+
+**Suggested fix.** The same as for keyed live sync: put attribute values (or a content hash) in `EntityCreated` and `EntityPatched` logs, or offer an unmetered bulk attribute read, so a keyless mirror is never behind.

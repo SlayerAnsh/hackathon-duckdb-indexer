@@ -1,14 +1,15 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Lifecycle, Points, StepFlow } from '../../components/about/Flow'
-import { addressUrl } from '../../lib/explorer'
-import { ARCH, FRICTION, HOSTED_INDEXER_URL, IDS, REPO_URL, Src, WIDGET_LIFE } from '../../components/about/content'
+import { ALTERNATIVES, APP_WALLET, ARCH, FRICTION, HOSTED_INDEXER_URL, IDS, OFF_CHAIN, PILLARS, REPO_URL, Src, WIDGET_LIFE, explorerUrl } from '../../components/about/content'
 import s from '../../components/about/about.module.css'
 
 export const metadata: Metadata = { title: 'About · Arkiv SQL', description: 'How Arkiv SQL Indexer runs SQL over live Arkiv data in your browser, and why it is built on Arkiv.' }
 
 const TOC = [
  { id: 'why-sql', label: 'Why SQL over Arkiv' },
+ { id: 'pillars', label: 'Who this protects' },
+ { id: 'why-arkiv', label: 'Why Arkiv' },
  { id: 'architecture', label: 'Architecture' },
  { id: 'self-host', label: 'Run your own indexer' },
  { id: 'entities', label: 'Entity model' },
@@ -16,6 +17,7 @@ const TOC = [
  { id: 'expiry', label: 'Expiry and lifetimes' },
  { id: 'verify', label: 'Verify a row' },
  { id: 'reproduce', label: 'Reproduce it' },
+ { id: 'evidence', label: 'On chain evidence' },
  { id: 'limits', label: 'Limits and trust' },
 ]
 
@@ -46,7 +48,7 @@ export default function AboutPage() {
    <p className={s.eyebrow}>About</p>
    <h1 className={s.title}>How Arkiv SQL works</h1>
    <p className={s.lead}>Two parts. An open source indexer that anyone can self host, and this app, which runs on a hosted instance that indexes all Arkiv data on Tiramisu. This page explains both, and how to check each claim yourself.</p>
-   <p className={s.facts}>MIT licensed. Built 9 to 18 October 2026 for Arkiv: Global Tour Stop, on the Tiramisu testnet (chain 7738577) with Arkiv SDK 0.8.1. <a href={REPO_URL} target="_blank" rel="noreferrer">Source on GitHub</a></p>
+   <p className={s.facts}>MIT licensed. Built for Arkiv: Global Tour Stop, within the challenge window of 9 October 2026 to the extended deadline of 20 October 2026, on the Tiramisu testnet (chain 7738577) with Arkiv SDK 0.8.1. The git history runs from 18 to 20 October 2026; pre-existing work: none. <a href={REPO_URL} target="_blank" rel="noreferrer">Source on GitHub</a></p>
   </header>
 
   <div className={s.layout}>
@@ -83,6 +85,38 @@ export default function AboutPage() {
      <Src files={['SPECS.md', 'packages/core/src/query.ts', 'apps/web/lib/dash/sql.ts']}/>
     </Section>
 
+    <Section id="pillars" title="Who this protects">
+     <p>The project enters two tracks, Open Source and Security. For each one: who is stuck or misled today, and what changes for them from the first day.</p>
+     {PILLARS.map(p => <div key={p.name} className={s.pillar}>
+      <h3>{p.name}</h3>
+      <dl className={s.parts}>
+       <div><dt>Who</dt><dd>{p.who}</dd></div>
+       <div><dt>Today</dt><dd>{p.today}</dd></div>
+       <div><dt>What changes</dt><dd>{p.change}</dd></div>
+      </dl>
+      <Src files={p.src}/>
+     </div>)}
+     <p>Check the Security claim yourself: the query <code>project = str(&apos;arkiv-sql-indexer-dash&apos;) AND NOT ($creator = addr({APP_WALLET}))</code> returned no entities on 20 October 2026. Anything it ever returns is ignored by this app.</p>
+    </Section>
+
+    <Section id="why-arkiv" title="Why Arkiv">
+     <p>The app&apos;s data is Arkiv entities, and the indexer mirrors Arkiv and nothing else. Without Arkiv both trust claims fall away, because authorship is the chain&apos;s <code>$creator</code>, ownership is <code>$owner</code> and lifetime is the expiry block.</p>
+     <div className={s.tableWrap}>
+      <table className={s.table}>
+       <thead><tr><th scope="col">Instead of Arkiv</th><th scope="col">What breaks</th></tr></thead>
+       <tbody>{ALTERNATIVES.map(a => <tr key={a.alt}><th scope="row">{a.alt}</th><td>{a.breaks}</td></tr>)}</tbody>
+      </table>
+     </div>
+     <h3 className={s.subhead}>What stays off Arkiv on purpose</h3>
+     <div className={s.tableWrap}>
+      <table className={s.table}>
+       <thead><tr><th scope="col">Kept off chain</th><th scope="col">Why</th></tr></thead>
+       <tbody>{OFF_CHAIN.map(o => <tr key={o.what}><th scope="row">{o.what}</th><td>{o.why}</td></tr>)}</tbody>
+      </table>
+     </div>
+     <Src files={['README.md', 'test/deployment.test.ts', 'apps/indexer/src/snapshot.ts']}/>
+    </Section>
+
     <Section id="architecture" title="Architecture">
      <p>The indexer turns the chain into files. The browser turns the files into a database and keeps it current.</p>
      <figure className={s.fig}><StepFlow label="Architecture from the Arkiv RPC to DuckDB in the browser" steps={ARCH}/></figure>
@@ -91,6 +125,7 @@ export default function AboutPage() {
       <div><dt>Snapshot, delta, live tail</dt><dd>A new versioned pair of Parquet files every 30 blocks, keeping the latest two. A JSON delta carries every key changed since that snapshot, and the browser polls it every 2 seconds. Between deltas, the browser tails chain logs every 4 seconds and fetches attributes for new keys at most every 20 seconds.</dd></div>
       <div><dt>DuckDB WASM</dt><dd>Merges the three sources into two views, <code>entities</code> and <code>attributes</code>. Every query runs in your tab; there is no server SQL endpoint.</dd></div>
       <div><dt><code>/data</code> proxy</dt><dd>Next.js forwards manifest, delta and Parquet requests to <code>INDEXER_URL</code> (the hosted indexer for this app, or your own), with ETags and Range support. If the indexer is down, it serves the same files from a read only mount.</dd></div>
+      <div><dt>Polling, not events</dt><dd>The indexer and the browser poll <code>eth_getLogs</code> directly instead of using the SDK event watcher. That gives explicit block windows and checkpoints: the indexer commits one per batch, and the browser tail starts at <code>delta.toBlock + 1</code>, exactly where the indexer&apos;s published window ends.</dd></div>
       <div><dt><code>/api/rpc</code> proxy</dt><dd>Browser reads (live head, logs, payloads, verify) go through this same origin proxy. It allows read only methods, limits each client to 10 requests a second, and adds the server&apos;s API key when one is configured. No key ever reaches the browser.</dd></div>
      </dl>
      <Src files={['apps/indexer/src/replay.ts', 'apps/indexer/src/fill.ts', 'apps/indexer/src/sync.ts', 'apps/indexer/src/config.ts', 'apps/web/lib/proxy.ts', 'apps/web/lib/live-tail.ts', 'apps/web/app/api/rpc/route.ts']}/>
@@ -141,6 +176,11 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build`}
        </tbody>
       </table>
      </div>
+     <dl className={s.parts}>
+      <div><dt>Why readonly</dt><dd>Once a widget is yours the app no longer controls it, so its attributes and payload are frozen for life. A new owner cannot rewrite the author, or set it to the app wallet and hand it back to fake a Featured widget. That is also why editing saves a new version.</dd></div>
+      <div><dt>Why anyone can extend</dt><dd>A widget on someone else&apos;s dashboard may matter to you. Permissionless extension lets you keep it alive, paying your own fee, without being able to change it.</dd></div>
+      <div><dt>Why one transaction</dt><dd>Saving creates the widget and transfers it to you in one batch, with its key predicted in advance. Either both happen or neither, so a widget is never left with the app wallet, and a new placement never points at a widget that failed to save. Organize saves a whole layout the same way.</dd></div>
+     </dl>
      <p><strong>Featured</strong> dashboards and widgets belong to the app wallet itself: it is both their <code>user</code> and their Arkiv owner. The server extends them on a schedule, so they stay live.</p>
      <Src files={['arkiv/schema.md', 'apps/web/lib/dash/server/operations.ts', 'apps/web/lib/dash/server/keepalive.ts']}/>
     </Section>
@@ -152,7 +192,19 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build`}
       { title: 'Indexer sweep', text: 'Deletes expired rows every batch and keeps only two snapshot versions.' },
       { title: 'Browser views', text: <>Hide rows whose expiry is at or below <code>live_head</code>, read from the RPC.</> },
      ]}/>
-     <p>So a row leaves SQL the moment its block passes, with no event needed. Extending a widget adds its chosen lifetime again, capped at 90 days remaining. When a widget expires or is deleted, its dashboard slot keeps the copied name and runs no SQL.</p>
+     <p>So a row leaves SQL the moment its block passes, with no event needed. Extending a widget adds its chosen lifetime again, capped at 90 days remaining.</p>
+     <div className={s.tableWrap}>
+      <table className={s.table}>
+       <thead><tr><th scope="col">Entity</th><th scope="col">Lifetime</th><th scope="col">Why</th></tr></thead>
+       <tbody>
+        <tr><th scope="row">Widget</th><td>1, 7, 30 or 90 days, your choice</td><td>You decide how long a public query stays public. Each extend adds that lifetime again, so it lives while someone keeps renewing it. The 90 day cap is an app rule, not an Arkiv limit.</td></tr>
+        <tr><th scope="row">Dashboard</th><td>90 days, renewed on every save</td><td>Editing a dashboard is the activity that keeps it alive.</td></tr>
+        <tr><th scope="row">Link</th><td>Same expiry as its dashboard</td><td>A placement never outlives its dashboard or dies before it.</td></tr>
+        <tr><th scope="row">Featured</th><td>90 days, renewed by the app</td><td>A lease: every 6 hours the app wallet extends anything with fewer than 30 days left back to 90.</td></tr>
+       </tbody>
+      </table>
+     </div>
+     <p> When a widget expires or is deleted, its dashboard slot keeps the copied name and runs no SQL.</p>
      <p>An older snapshot file can hold a row until it is pruned, and someone who copied data while it was live keeps their copy. Expiry here is not a promise to erase third party copies.</p>
      <Src files={['apps/indexer/src/snapshot.ts', 'apps/indexer/src/store.ts', 'packages/core/src/views.ts']}/>
     </Section>
@@ -170,10 +222,18 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build`}
       <li><span><b>Open the <Link href="/playground">playground</Link> and run &ldquo;Most placed widgets&rdquo;.</b> It joins widget and link entities and counts placements, including widgets with none.</span></li>
       <li><span><b>Run <code>SELECT key, creator, owner, updated_at, expires_at FROM entities LIMIT 20</code> and press Verify page.</b> Each row is checked against the chain.</span></li>
       <li><span><b>Watch a row expire.</b> Sort by <code>expires_at</code>, wait for the chain block in the status bar to pass one, and run again. The row is gone.</span></li>
-      <li><span><b>Look up the app wallet.</b> It is the creator of every app entity:</span></li>
+      <li><span><b>Look up the app wallet.</b> It is the creator of every app entity; see <a href="#evidence">On chain evidence</a>.</span></li>
      </ol>
-     <dl className={s.ids}>{IDS.map(i => { const url = addressUrl(i.addr); return <div key={i.addr}><dt>{i.role}</dt><dd>{url ? <a href={url} target="_blank" rel="noreferrer">{i.addr}</a> : i.addr}</dd></div> })}</dl>
      <Src files={['README.md', 'apps/web/lib/views.ts', 'apps/web/components/dash/StatusBar.tsx']}/>
+    </Section>
+
+    <Section id="evidence" title="On chain evidence">
+     <p>Every value below was read back from Tiramisu on 20 October 2026. Each creation transaction was sent by the app wallet and stays on the explorer after the entity expires.</p>
+     <dl className={s.ids}>{IDS.map(i => <div key={i.value}><dt>{i.role}</dt><dd>
+      <a href={explorerUrl(i.kind, i.value)} target="_blank" rel="noreferrer">{i.value}</a>
+      {i.tx && <span className={s.tx}>created in <a href={explorerUrl('tx', i.tx)} target="_blank" rel="noreferrer">{i.tx}</a></span>}
+     </dd></div>)}</dl>
+     <Src files={['README.md', 'arkiv/schema.md']}/>
     </Section>
 
     <Section id="limits" title="Limits and trust">
@@ -185,7 +245,7 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build`}
       <li><b>Everything is public.</b> SQL, names and dashboard content are on chain. Keep personal information out of them.</li>
      </ul>
      <h3 className={s.subhead} id="friction">Friction we measured</h3>
-     <p>On Tiramisu on 18 October 2026 with SDK 0.8.1. Reproduction steps are in <code>arkiv/friction.md</code>.</p>
+     <p>On Tiramisu between 18 and 20 October 2026 with SDK 0.8.1, viem 2.57.7 and Privy 3.50.0. Expected and actual behavior, versions and reproduction steps are in <code>arkiv/friction.md</code>.</p>
      <ul className={s.friction}>{FRICTION.map(f => <li key={f.h}>
       <h4>{f.h}<span className={s.measure}>{f.m}</span></h4>
       <p>{f.p}</p>
