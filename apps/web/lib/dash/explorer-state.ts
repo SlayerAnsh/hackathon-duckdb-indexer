@@ -26,7 +26,7 @@ export function mergeExplorerItems(items: WidgetListItem[], pending: PendingWrit
   if (state.chart && state.chart !== f.chart || state.mine && address && owner !== address.toLowerCase()) continue
   if (search && !f.name.toLowerCase().includes(search) && !(/^0x[0-9a-f]{0,40}$/i.test(search) && user.startsWith(search))) continue
   known.add(write.key)
-  added.push({ key: write.key, name: f.name, chart: f.chart as ChartType, user, owner, expiresAt: Number(f.expiresAt ?? 0), createdAt: write.afterBlock, uses: 0 })
+  added.push({ key: write.key, name: f.name, chart: f.chart as ChartType, user, owner, expiresAt: Number(f.expiresAt ?? 0), createdAt: write.afterBlock, updatedAt: 0, uses: 0 })
  }
  return [...added, ...items]
 }

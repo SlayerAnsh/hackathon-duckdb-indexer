@@ -5,8 +5,7 @@ import { useEffect, useReducer, useState } from 'react'
 import { useDashAuth } from '../auth/DashAuthProvider'
 import { dashboardBrowseQuery, dashboardBrowseReducer, initDashboardBrowse, resultsLine, type DashboardBrowseState } from '../../lib/dash/dashboard-browse-state'
 import { dashboardCountSql, dashboardListSql, toDashboardItems, type DashboardListItem, type DashboardListQuery } from '../../lib/dash/sql'
-import { fetchDashboards } from '../../lib/dash/read'
-import { createBrowserRpc } from '../../lib/rpc-browser'
+import { useDashboardEntities, entityRev } from '../../lib/dash/entity-cache'
 import { useIndex } from '../../lib/use-index'
 import { useNavigate } from '../../lib/use-navigate'
 import { useTimedQuery } from '../../lib/use-query'
@@ -59,18 +58,10 @@ function DashboardResultsPage({ q, version, head }: { q: DashboardListQuery; ver
  const list = useTimedQuery(config?.enabled ? dashboardListSql(config.wallet,q) : '',version,{skip:!config?.enabled})
  const items = toDashboardItems(list.data?.rows ?? [])
  const covers = useCoverPayloads(items)
- const keys = items.map(item=>item.key).join(',')
- const scope = `${config?.wallet}:${config?.rpcUrl}:${keys}`
- const [record,setRecord] = useState<{scope:string; descriptions:Map<string,string>} | null>(null)
- useEffect(()=>{
-  if(!config?.enabled || !keys) return
-  let active=true
-  void fetchDashboards(createBrowserRpc(config.rpcUrl),config.wallet,keys.split(',')).then(result=>{
-   if(active) setRecord({scope,descriptions:new Map([...result.dashboards].map(([key,value])=>[key,value.dashboard.description]))})
-  }).catch(()=>{if(active) setRecord({scope,descriptions:new Map()})})
-  return ()=>{active=false}
- },[config?.enabled,config?.wallet,config?.rpcUrl,keys,scope])
- return <>{items.map(item=><DashboardBrowseCard key={item.key} item={item} head={head} coverPayload={covers ? covers.get(item.cover ?? "") ?? null : undefined} description={record?.scope === scope ? record.descriptions.get(item.key) ?? null : undefined}/>)}
+ const entities = useDashboardEntities((items ?? []).map(item => item.key), new Map((items ?? []).map(item => [item.key, entityRev(item)])))
+ const descriptions = entities.data ? new Map([...entities.data].flatMap(([key,value]) => value ? [[key,value.dashboard.description] as const] : [])) : undefined
+
+ return <>{items.map(item=><DashboardBrowseCard key={item.key} item={item} head={head} coverPayload={covers ? covers.get(item.cover ?? "") ?? null : undefined} description={descriptions ? descriptions.get(item.key) ?? null : undefined}/>)}
   {showLoading({loading:list.loading,data:list.data}) && <SkeletonCards count={3} label="Loading dashboards…"/>}{list.error && <p role="alert" className="error">{list.error}</p>}</>
 }
 export function DashboardBrowse({ onWidgets }: { onWidgets?(): void } = {}) {

@@ -1,5 +1,7 @@
 import { expect, test } from 'bun:test'
-import { renderToStaticMarkup as render } from 'react-dom/server'
+import { renderToStaticMarkup as rawRender } from 'react-dom/server'
+import { QueryProvider } from '../components/QueryProvider'
+const render = (node: React.ReactNode) => rawRender(<QueryProvider>{node}</QueryProvider>)
 import { mergeDashboards, editedAgo } from '../lib/dash/home'
 import { DashboardCard } from '../components/widgets/DashboardCard'
 import { ActivityPanel } from '../components/widgets/ActivityPanel'

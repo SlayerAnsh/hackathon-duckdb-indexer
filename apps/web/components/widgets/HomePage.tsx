@@ -1,6 +1,5 @@
 'use client'
 import Link from 'next/link'
-import { rpcMessage } from '../RowActions'
 import { showLoading } from '../../lib/dash/loading'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
@@ -10,9 +9,7 @@ import { useTimedQuery } from '../../lib/use-query'
 import { activityCountsSql, expiringSoonSql, myDashboardsSql, myWidgetsSql, recentSql } from '../../lib/dash/sql'
 import { addPending, usePending, useSynced, type PendingWrite } from '../../lib/dash/pending'
 import { mergeDashboards, type HomeDashboard } from '../../lib/dash/home'
-import { fetchWidgets } from '../../lib/dash/read'
-import { createBrowserRpc } from '../../lib/rpc-browser'
-import type { WidgetEntity } from '../../lib/dash/entities'
+import { useWidgetEntities, entityRev } from '../../lib/dash/entity-cache'
 import { dashApi } from '../../lib/dash/api'
 import { saveErrorMessage, withSession } from '../../lib/dash/auth-client'
 import { shortHex } from '../../lib/format'
@@ -136,28 +133,18 @@ function AuthenticatedHome() {
   const query = params.toString()
   window.history.replaceState(null, '', window.location.pathname + (query ? '?' + query : '') + window.location.hash)
  }, [])
- const [payloadError, setPayloadError] = useState<string>()
- const [retry, setRetry] = useState(0)
- const [payloads, setPayloads] = useState<{ scope: string; widgets: Map<string, WidgetEntity> } | null>(null)
  const widgetRows = visibleWidgetRows(widgets.data?.rows ?? [], pending, address)
- const keys = widgetRows.map(row => String(row[0])).join(',')
- const scope = `${config.wallet}|${config.rpcUrl}|${address}`
- useEffect(() => {
-  let active = true
-  setPayloadError(undefined)
-  if (!keys) { setPayloads({ scope, widgets: new Map() }); return }
-  void fetchWidgets(createBrowserRpc(config.rpcUrl), config.wallet, keys.split(',')).then(result => { if (active) setPayloads({ scope, widgets: result.widgets }) }).catch(error => { if (active) setPayloadError(rpcMessage(error)) })
-  return () => { active = false }
- }, [scope, keys, config.wallet, config.rpcUrl, retry])
+ const entities = useWidgetEntities(widgetRows.map(row => String(row[0])), new Map(widgetRows.filter(row => row[4] !== null && row[4] !== undefined).map(row => [String(row[0]),entityRev({updatedAt:Number(row[4]),expiresAt:Number(row[3]),owner:address})])))
+ const payloadError = entities.error
  function extend(key: string) {
-  const widget = payloads?.scope === scope ? payloads.widgets.get(key) : undefined
+  const widget = entities.data?.get(key)
   if (!widget) return null
   const write = pending.find(w => w.key === key && w.op === 'upsert')
   const expiry = Math.max(widget.expiresAt, Number(write?.fields?.expiresAt ?? 0))
   return <ExtendButton widgetKey={key} expiresAt={expiry} head={state.liveHead} lifetimeDays={widget.widget.lifetimeDays} canExtend={canExtendWidget({ ...widget, expiresAt: expiry }, state.liveHead, address ?? null, config.wallet)} disabledReason={signDisabledReason(balance.level)} onSigned={balance.refresh}/>
  }
  function renderDelete(key: string) {
-  const widget = payloads?.scope === scope ? payloads.widgets.get(key) : undefined
+  const widget = entities.data?.get(key)
   if (!widget || widget.official || widget.owner.toLowerCase() !== address.toLowerCase() || (state.liveHead !== undefined && widget.expiresAt <= state.liveHead)) return null
   return <WidgetOwnerActions widgetKey={key} name={widget.name} address={address} disabledReason={signDisabledReason(balance.level)} onSigned={balance.refresh} onDeleted={result => addPending({key,kind:'widget',op:'delete',afterBlock:result.afterBlock,txHash:result.txHash})}/>
  }
@@ -170,7 +157,7 @@ function AuthenticatedHome() {
   <div className={h.top}><HomeHeader address={address} balance={balance}/>
    {error && <div className="notice notice-bad" role="alert"><div><p className="notice-title">The index could not load your items</p><p>{error}</p></div></div>}
   </div>
-  <HomeCollections dashboards={mergeDashboards(dashboards.data?.rows ?? [], pending)} widgets={widgetRows} head={state.liveHead} onCreate={() => setCreating(true)} payloadError={payloadError} onRetry={() => setRetry(value => value + 1)} loading={loading} failed={!!error} renderExtend={extend} renderDelete={renderDelete}/>
+  <HomeCollections dashboards={mergeDashboards(dashboards.data?.rows ?? [], pending)} widgets={widgetRows} head={state.liveHead} onCreate={() => setCreating(true)} payloadError={payloadError} onRetry={entities.refetch} loading={loading} failed={!!error} renderExtend={extend} renderDelete={renderDelete}/>
   <ActivityPanel counts={activityCounts} expiring={expiring.data?.rows ?? []} recent={recent.data?.rows ?? []} head={state.liveHead} renderExtend={extend}/>
   <CreateDashboardDialog open={creating} onClose={() => setCreating(false)}/>
  </div>

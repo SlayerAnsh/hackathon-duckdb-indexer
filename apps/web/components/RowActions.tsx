@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { keyChunkQueries, RpcError } from '@asi/core'
 import { createBrowserRpc } from '../lib/rpc-browser'
 import d from './dash/data.module.css'
-export function rpcMessage(error: unknown): string { return error instanceof RpcError && (error.status === 429 || error.code === 'ANON_COST_LIMITED') ? 'RPC budget exhausted, retry later' : String(error) }
+export function rpcMessage(error: unknown): string { return error instanceof RpcError && (error.status === 429 || error.code === 'ANON_COST_LIMITED' || /quota|budget|rate.?limit/i.test(error.message)) ? 'RPC budget exhausted, retry later' : String(error) }
 export function RowActions({ entityKey, rpcUrl }: { entityKey: string; rpcUrl: string }) {
  const [payload, setPayload] = useState(''); const [busy, setBusy] = useState(false)
  async function load() {

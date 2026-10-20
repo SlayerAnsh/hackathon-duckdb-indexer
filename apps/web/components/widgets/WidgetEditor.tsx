@@ -59,7 +59,7 @@ export function WidgetEditor({ mode, initial, widgetKey, onSaved }: { mode: 'cre
   try {
    const result = await withSession(() => mode === 'create' ? dashApi.createWidget({ widget, ...(addTo ? { addTo } : {}) }) : widgetKey ? dashApi.createWidget({ widget, replaces: widgetKey }) : Promise.reject(new Error('Missing widget key')), auth.requestLogin)
    const key = result.key ?? widgetKey
-   if (key) addPending({ key, kind: 'widget', op: 'upsert', afterBlock: result.afterBlock, txHash: result.txHash, fields: { name: widget.name, chart: widget.chart, ...(auth.address ? { user: auth.address, owner: auth.address } : {}) } })
+   if (key) addPending({ key, widgetPayload: widget, kind: 'widget', op: 'upsert', afterBlock: result.afterBlock, txHash: result.txHash, fields: { name: widget.name, chart: widget.chart, ...(auth.address ? { user: auth.address, owner: auth.address } : {}) } })
    if (result.linkKey && key && addTo) addPending({ key: result.linkKey, kind: 'link', op: 'upsert', afterBlock: result.afterBlock, txHash: result.txHash, fields: { dashboard: addTo.dashboard, widget: key, name: widget.name, size: addTo.size } })
    for (const link of result.relinked ?? []) if (key) addPending({ key: link, kind: 'link', op: 'upsert', afterBlock: result.afterBlock, txHash: result.txHash, fields: { widget: key, name: widget.name } })
    onSaved(result, widget)

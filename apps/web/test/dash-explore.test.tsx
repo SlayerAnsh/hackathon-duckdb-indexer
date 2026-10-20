@@ -32,7 +32,7 @@ test('dashboard SQL scopes, searches, sorts, counts and aggregates charts', asyn
   expect(Number((await db.runAndReadAll(dashboardCountSql(W,q))).getRowObjects()[0].n)).toBe(4)
   expect(()=>dashboardListSql(W,{...q,limit:-1})).toThrow()
  } finally { close() }
- expect(toDashboardItems([['0xAB','Title',U,true,BigInt(8),['bar'],BigInt(1),BigInt(2),BigInt(3)]])[0]).toMatchObject({key:'0xab',widgets:8,official:true,createdAt:1})
+ expect(toDashboardItems([['0xAB','Title',U,true,BigInt(8),['bar'],BigInt(1),BigInt(2),BigInt(3),null,W.toUpperCase()]])[0]).toMatchObject({key:'0xab',widgets:8,official:true,createdAt:1,updatedAt:2,expiresAt:3,owner:W})
 })
 test('tabs preserve URL parameters and support keyboard movement',()=>{
  expect(tabFromSearch('?tab=widgets')).toBe('widgets')
@@ -54,7 +54,7 @@ test('dashboard filters reset pages and label results',()=>{
  expect(resultsLine(1,{...s,sort:'widgets'})).toBe('1 dashboard, most widgets first')
  expect(resultsLine(5,{...s,sort:'expiring',official:true})).toBe('5 official dashboards, expiring soonest first')
 })
-const item = {cover:null,key:key(1),title:'Overview',user:W,official:true,widgets:8,charts:['bar','donut'] as ('bar'|'donut')[],createdAt:1,updatedAt:2,expiresAt:100}
+const item = {owner:W,cover:null,key:key(1),title:'Overview',user:W,official:true,widgets:8,charts:['bar','donut'] as ('bar'|'donut')[],createdAt:1,updatedAt:2,expiresAt:100}
 test('dashboard card authors, lifetime, chart icons and empty thumbnails',()=>{
  const html=render(<DashboardBrowseCard item={item} description="Network report"/>)
  for(const text of ['Featured','0xabab…abab','Kept live','8 widgets','Network report',`href="/d/${key(1)}"`]) expect(html).toContain(text)
@@ -103,7 +103,7 @@ test('component and page links use the Explore widgets tab', () => {
 test('explorer widget card does not mark transferred official authorship as Official', async () => {
  const { isOfficialOwned } = await import('../lib/dash/official')
  const { WidgetBrowseCard } = await import('../components/widgets/WidgetBrowseCard')
- const item = { key:key(70), name:'Transferred', chart:'bar' as const, user:W, owner:U, expiresAt:100, createdAt:1, uses:0 }
+ const item = { key:key(70), name:'Transferred', chart:'bar' as const, user:W, owner:U, expiresAt:100, createdAt:1, updatedAt:0, uses:0 }
  const html = render(<WidgetBrowseCard item={item} payload={null} version={0} variant="explorer" visibleOverride official={isOfficialOwned(item.user,item.owner,W)}/> )
  expect(html).not.toContain('Featured')
  expect(readFileSync(new URL('../components/widgets/ExplorerGrid.tsx',import.meta.url),'utf8')).toContain('isOfficialOwned(item.user, item.owner,')
