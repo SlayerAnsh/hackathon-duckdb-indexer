@@ -40,9 +40,9 @@ export function WidgetSettings({ state, dispatch }: { state: EditorState; dispat
      <Field label="Suffix"><input maxLength={LIMITS.affix} placeholder="entities" value={p.counter.suffix} onChange={ev => counter({ suffix: ev.target.value })}/></Field>
     </div>
     <Field label="Label"><input maxLength={LIMITS.counterLabel} placeholder="Shown under the number" value={p.counter.label} onChange={ev => counter({ label: ev.target.value })}/></Field>
-    <div className={e.two}>
+    <div className={`${e.two} ${e.twoNarrow}`}>
      <Field label="Decimals"><select value={p.counter.decimals} onChange={ev => counter({ decimals: Number(ev.target.value) })}>{Array.from({ length: LIMITS.decimals + 1 }, (_, n) => <option key={n} value={n}>{n}</option>)}</select></Field>
-     <div className={e.field}><span aria-hidden="true">Display</span><ToggleChip label="Compact numbers" checked={p.counter.compact} onChange={value => counter({ compact: value })}/></div>
+     <div className={`${e.field} ${e.chipCell}`}><span aria-hidden="true">Display</span><ToggleChip label="Compact numbers" checked={p.counter.compact} onChange={value => counter({ compact: value })}/></div>
     </div>
    </section>
   </> : p.chart === 'histogram' ? <section className={e.group}><h3>Data</h3>

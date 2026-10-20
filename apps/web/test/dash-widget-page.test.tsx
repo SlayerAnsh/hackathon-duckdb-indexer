@@ -31,11 +31,11 @@ test('picker merges pending dashboards and links without duplicating SQL rows', 
 test('picker row states and new dashboard action', () => {
  const rows = ['already', 'adding', 'done'].map(key => ({ key, title: key, widgets: 4, added: key === 'already' }))
  const html = render(<PickerList rows={rows} phase={{ adding: 'adding', done: 'done' }} onPick={() => {}} onNew={() => {}}/>)
- for (const copy of ['Already added', 'Adding…', 'Added ✓', 'href="/d/done"', 'View', '+ New dashboard']) expect(html).toContain(copy)
+ for (const copy of ['Already added', 'Adding…', '>Added<', 'href="/d/done"', 'View', 'New dashboard']) expect(html).toContain(copy)
 })
 test('viewer header links to the playground and missing copy links to browse', () => {
  const html = render(<ViewerHeader name="Count" sql={widget.widget.sql} onAdd={() => {}}/>)
- expect(html).toContain('+ Add to my dashboard')
+ expect(html).toContain('Add to my dashboard')
  expect(html).toContain('Open in playground')
  expect(html).toContain(`href="${playgroundHref(widget.widget.sql)}"`)
  const missing = render(<MissingWidget/>)
@@ -47,7 +47,7 @@ test('unsafe stored SQL never mounts the query runner', () => {
  let calls = 0
  const payload = { ...widget.widget, sql: 'DELETE FROM entities' }
  const html = render(<StoredWidgetPreview payload={payload} version={0} run={() => { calls++; return { loading: false } }}/>)
- expect(html).toContain('class="error"')
+ expect(html).toContain('notice-bad')
  expect(html).toContain(checkWidgetSql(payload.sql)!)
  expect(calls).toBe(0)
 })
@@ -61,6 +61,8 @@ test('widget loading waits for auth and retries pending writes and transient err
  expect(widgetLoadState({ ...input, loadError: true, attempts: 2 })).toBe('syncing')
  expect(widgetLoadState({ ...input, loadError: true, attempts: 3 })).toBe('error')
  expect(widgetLoadState(input)).toBe('missing')
+ expect(widgetLoadState({ ...input, pending: true, loadError: true, limited: true })).toBe('error')
+ expect(widgetLoadState({ ...input, pending: true, loadError: true, attempts: 2 })).toBe('syncing')
  expect(widgetPageMode({ loaded: true, widget, authStatus: 'loading' })).toBe('loading')
 })
 test('syncing widget page body shows the pending name without expired copy', () => {
@@ -75,7 +77,7 @@ test('widget detail header, used on and lifetime panels', async () => {
  const { WidgetHeader, UsedOnPanel, LifetimePanel } = await import('../components/widgets/WidgetPage')
  const props = {name:'Count',chart:'bar' as const,user:U,official:false,uses:12,expiresAt:999999,head:10,widgetKey:K,sql:'SELECT 1',canAdd:true}
  const html = render(<WidgetHeader {...props}/>)
- for (const text of ['href="/explore"','href="/explore?tab=widgets"','<h1','Bar','on 12 dashboards','Live, computed in your browser','Copy link','Open in playground','+ Add to dashboard','btn-primary']) expect(html).toContain(text)
+ for (const text of ['href="/explore"','href="/explore?tab=widgets"','<h1','Bar','on 12 dashboards','Live, computed in your browser','Copy link','Open in playground','Add to dashboard','btn-primary']) expect(html).toContain(text)
  expect(html).toContain(`href="${playgroundHref(props.sql)}"`)
  const official = render(<WidgetHeader {...props} official/> )
  for (const text of ['Arkiv SQL Indexer','Kept live']) expect(official).toContain(text)
@@ -174,4 +176,15 @@ test('lifetime owner controls respect balance, ownership and official status', a
  expect(official).toContain('Kept live'); expect(official).not.toContain('<button'); expect(official).not.toContain('Your wallet has no GLM.')
  const expired = render(<LifetimePanel {...props} expiresAt={900}/> )
  expect(expired).not.toContain('<button')
+})
+
+test('quota and rate limit read errors stop retries and show the RPC budget copy', async () => {
+ const { RpcError } = await import('@asi/core')
+ const { widgetLoadError } = await import('../components/widgets/WidgetPage')
+ const limited = widgetLoadError(new RpcError('unauthenticated query budget exhausted', 429, 'ANON_COST_LIMITED'))
+ expect(limited).toEqual({ message: 'RPC budget exhausted, retry later', limited: true })
+ expect(widgetLoadError(new Error('boom'))).toEqual({ message: 'boom', limited: false })
+ const html = render(<WidgetPageBody state="error" error={limited} onRetry={() => {}}/>)
+ for (const text of ['notice-warn', 'RPC budget exhausted, retry later', 'Try again']) expect(html).toContain(text)
+ expect(html).not.toContain('Syncing')
 })

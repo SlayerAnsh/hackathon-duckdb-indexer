@@ -73,22 +73,22 @@ export function WidgetEditor({ mode, initial, widgetKey, onSaved }: { mode: 'cre
  const kbd = <span className={e.hint}><kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>Enter</kbd></span>
  return <div className={e.editor}>
   <header className={e.head}>
-   <nav className={e.crumbs} aria-label="Breadcrumb"><Link href="/me">My home</Link><span aria-hidden="true">/</span><span>{mode === 'create' ? 'New widget' : state.draft.name.trim() || 'Untitled widget'}</span></nav>
-   <div className={e.titleRow}>
+   {mode === 'create' ? <nav className={e.crumbs} aria-label="Breadcrumb"><Link href="/me">My home</Link><span aria-hidden="true">/</span><span>New widget</span></nav> : <h2 className={e.editLabel}>Edit widget</h2>}
+   <div className={mode === 'edit' ? `${e.titleRow} ${e.titleRowEdit}` : e.titleRow}>
     <input className={e.title} aria-label="Widget name" placeholder="Untitled widget" maxLength={LIMITS.name} value={state.draft.name} onChange={ev => dispatch({ type: 'name', value: ev.target.value })}/>
-    <button type="button" className="btn btn-primary" disabled={!eligibility.ok || saving || running} title={eligibility.ok ? undefined : eligibility.reason} onClick={() => void save()}>{saving ? 'Saving…' : mode === 'create' ? 'Save to Arkiv' : 'Save new version'}</button>
+    <button type="button" className="btn btn-primary" aria-busy={saving || undefined} disabled={!eligibility.ok || saving || running} title={eligibility.ok ? undefined : eligibility.reason} onClick={() => void save()}>{saving && <span className="spinner" aria-hidden="true"/>}{saving ? 'Saving…' : mode === 'create' ? 'Save to Arkiv' : 'Save new version'}</button>
    </div>
    <div className={e.metaRow}>
     <div className={e.metaField}><span className={e.caps} id={lifetimeId}>Lifetime</span><div className={e.seg} role="group" aria-labelledby={lifetimeId}>{LIFETIME_DAYS.map(days => <button type="button" key={days} aria-pressed={state.draft.lifetimeDays === days} onClick={() => dispatch({ type: 'lifetime', value: days })}>{days} {days === 1 ? 'day' : 'days'}</button>)}</div></div>
     {mode === 'create' && state.addTo && <span className={e.addChip}>Adds to <b>{addToTitle}</b><button type="button" aria-label="Do not add to a dashboard" className="has-tip" data-tip="Do not add" onClick={() => dispatch({ type: 'addTo', value: null })}><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></span>}
    </div>
    {mode === 'edit' && <p className={e.note}>Widgets are read only on Arkiv. Saving creates a new version and moves your dashboards to it.</p>}
-   {saveError && <p className="error" role="alert">{saveError}</p>}
+   {saveError && <div className="notice notice-bad" role="alert"><div><p>{saveError}</p></div></div>}
   </header>
   <div className={e.work}>
    <div className={e.main}>
     <section className={e.card} aria-label="SQL editor">
-     <div className={e.cardHead}><h2>SQL</h2><span className={e.spacer}/>{kbd}<button type="button" className="btn btn-primary" disabled={!db || running || saving} onClick={() => void run()}>{running ? 'Running…' : '▶ Run'}</button></div>
+     <div className={e.cardHead}><h2>SQL</h2><span className={e.spacer}/>{kbd}<button type="button" className="btn btn-primary" disabled={!db || running || saving} onClick={() => void run()}>{running ? <span className="spinner" aria-hidden="true"/> : <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11l9.5-5.5Z"/></svg>}{running ? 'Running…' : 'Run'}</button></div>
      <div className={e.code}><CodeMirror aria-label="SQL query" value={state.draft.sql} height="240px" theme={theme} extensions={extensions} onChange={value => dispatch({ type: 'sql', value })} basicSetup={{ foldGutter: false }}/></div>
     </section>
     <section className={e.card} aria-label="Widget preview">
