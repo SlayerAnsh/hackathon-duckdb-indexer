@@ -47,6 +47,8 @@ services:
       NEXT_PUBLIC_PRIVY_APP_ID: ${NEXT_PUBLIC_PRIVY_APP_ID:-}
       PRIVY_APP_SECRET: ${PRIVY_APP_SECRET:-}
       DASHBOARD_PRIVATE_KEY: ${DASHBOARD_PRIVATE_KEY:-}
+      # Runtime only: the /api/rpc read proxy sends it upstream. Never a build arg or NEXT_PUBLIC_ variable.
+      TIRAMISU_API_KEY: ${TIRAMISU_API_KEY:-}
     depends_on:
       indexer:
         condition: service_started

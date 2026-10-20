@@ -34,7 +34,10 @@ test('compose keeps data persistent and credentials isolated', () => {
   }
   for (const name of ['web']) {
     expect(s[name].env_file).toBeUndefined();
-    expect(JSON.stringify(s[name])).not.toContain('TIRAMISU_API_KEY');
+    // The key reaches the web server runtime for the /api/rpc read proxy, never a public variable or the build.
+    expect(s[name].environment.TIRAMISU_API_KEY).toBe('${TIRAMISU_API_KEY:-}');
+    for (const [variable, value] of Object.entries(s[name].environment))
+      if (variable.startsWith('NEXT_PUBLIC_')) expect(String(value)).not.toContain('TIRAMISU_API_KEY');
   }
   for (const service of Object.values(s) as any[]) {
     expect(service.restart).toBe('unless-stopped');
@@ -42,6 +45,18 @@ test('compose keeps data persistent and credentials isolated', () => {
     expect(JSON.stringify(service.build.args ?? {})).not.toContain('TIRAMISU_API_KEY');
     expect(JSON.stringify(service.build.args ?? {})).not.toContain('DASHBOARD_PRIVATE_KEY');
     expect(JSON.stringify(service.build.args ?? {})).not.toContain('PRIVY_APP_SECRET');
+  }
+});
+
+test('TIRAMISU_API_KEY stays in server code and never becomes a public variable', () => {
+  function files(path: string): string[] {
+    return readdirSync(new URL(`../${path}`, import.meta.url), { withFileTypes: true }).flatMap(entry =>
+      entry.isDirectory() ? files(`${path}/${entry.name}`) : [`${path}/${entry.name}`])
+  }
+  for (const path of ['docker-compose.yml', 'docker-compose.dokploy.yml', '.env.example', 'apps/web/Dockerfile', 'apps/web/next.config.ts', ...files('apps/web/lib'), ...files('apps/web/components'), ...files('apps/web/app')].filter(p => existsSync(new URL(`../${p}`, import.meta.url)))) {
+    const text = read(path);
+    expect(text).not.toContain('NEXT_PUBLIC_TIRAMISU_API_KEY');
+    if (text.includes('TIRAMISU_API_KEY') && path.startsWith('apps/web/')) expect(path).toMatch(/^apps\/web\/lib\/dash\/server\//);
   }
 });
 

@@ -17,13 +17,14 @@ type DashDepsState = DashDeps | { disabled: string }
 declare global {
   var __dashDeps: DashDepsState | undefined
 }
-export function buildOps(privateKey: `0x${string}`, rpcUrl: string): OpsDeps {
+// The API key only raises the read budget of reader (arkiv_query); writes stay on the public transport.
+export function buildOps(privateKey: `0x${string}`, rpcUrl: string, apiKey = process.env.TIRAMISU_API_KEY?.trim() || undefined): OpsDeps {
   const account = privateKeyToAccount(privateKey)
   const wallet = createWalletClient({ chain: tiramisu, account, transport: http(rpcUrl) })
   const publicClient = createPublicClient({ chain: tiramisu, cacheTime: 0,
     transport: http(rpcUrl, { fetchOptions: { cache: 'no-store' } }) })
   const client = { ...wallet, predictEntityKeys: publicClient.predictEntityKeys }
-  return { client, reader: createRpc(rpcUrl), wallet: account.address.toLowerCase(), queue: new WriteQueue(25) }
+  return { client, reader: createRpc(rpcUrl, { apiKey }), wallet: account.address.toLowerCase(), queue: new WriteQueue(25) }
 }
 export function buildDashDeps(config: ServerDashConfig): DashDeps {
   const now = Date.now

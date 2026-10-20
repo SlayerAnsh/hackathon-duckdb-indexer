@@ -33,7 +33,7 @@ Start the frontend with `INDEXER_URL=http://localhost:8080 bun run --cwd apps/we
 
 ## Widget dashboard development
 
-Next.js loads environment files from `apps/web`, not the repository root. Copy or link the root `.env.local` to `apps/web/.env.local`, or export the variables before starting Next.js. Set `NEXT_PUBLIC_PRIVY_APP_ID`, `PRIVY_APP_SECRET` and `DASHBOARD_PRIVATE_KEY`; the RPC uses `NEXT_PUBLIC_TIRAMISU_RPC_URL`. Keep secret values out of logs and browser bundles. See the README for Privy provider and embedded wallet setup.
+Next.js loads environment files from `apps/web`, not the repository root. Copy or link the root `.env.local` to `apps/web/.env.local`, or export the variables before starting Next.js. Set `NEXT_PUBLIC_PRIVY_APP_ID`, `PRIVY_APP_SECRET` and `DASHBOARD_PRIVATE_KEY`; the RPC uses `NEXT_PUBLIC_TIRAMISU_RPC_URL`. Optionally set `TIRAMISU_API_KEY` (server only) so browser reads, which go through the same origin read proxy `POST /api/rpc` (`app/api/rpc/route.ts`, logic in `lib/dash/server/rpc-proxy.ts`), use the keyed quota instead of the anonymous budget. Restart the dev server after changing it. New browser read code must use `createBrowserRpc` or `browserRpcUrl` from `lib/rpc-browser.ts`, and any new read method must be added to `READ_METHODS` in the proxy. Keep secret values out of logs and browser bundles. See the README for Privy provider and embedded wallet setup.
 
 Browser signing needs Tiramisu (chain ID `7738577`) in Privy `supportedChains` and as the `defaultChain`. Fund a test wallet with 0.1 GLM or more before testing Extend, Transfer or Delete. Saving widgets and dashboards remains paid by the backend wallet. Balance warnings appear below 0.1 GLM; a zero balance disables signing actions.
 

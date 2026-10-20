@@ -1,4 +1,5 @@
 import { MATERIALIZE_SQL, ENTITY_EVENTS_ABI, ENTITY_INSERT_COLUMNS, decodeEventLog, createRpc, decodeEntity, keyChunkQueries, ownerTerms, ROW_SELECT, RpcError, type EntityRow, type RawLog } from '@asi/core'
+import { createBrowserRpc } from './rpc-browser'
 
 export type LiveChange = { kind: 'upsert'; entity: Partial<EntityRow> & { key: string; updated_at: number }; needsAttributes: boolean } | { kind: 'tombstone'; key: string; block: number }
 export type LiveStatus = { block: number; pending: number; budget: 'ok' | 'exhausted'; retryAt?: number }
@@ -40,7 +41,7 @@ export class LiveTail {
   private timer?: ReturnType<typeof setTimeout>
   private generation = 0
   private now: () => number
-  constructor(private opts: Options) { this.rpc = createRpc(opts.rpcUrl); this.now = opts.now ?? Date.now }
+  constructor(private opts: Options) { this.rpc = createBrowserRpc(opts.rpcUrl); this.now = opts.now ?? Date.now }
   start(fromBlock: number): void {
     this.stop()
     this.block = fromBlock - 1

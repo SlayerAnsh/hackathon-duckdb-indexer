@@ -55,7 +55,8 @@ The deployment owner must enable Google, Discord, X and Telegram in the Privy da
 | `NEXT_PUBLIC_PRIVY_APP_ID` | Web build and runtime | Public Privy app ID; blank disables dashboards |
 | `PRIVY_APP_SECRET` | Web runtime only | Privy verification and session signing |
 | `DASHBOARD_PRIVATE_KEY` | Web runtime only | Funded Tiramisu backend wallet |
-| `NEXT_PUBLIC_TIRAMISU_RPC_URL` | Web build and runtime | Public RPC for browser reads and backend writes; never include credentials |
+| `NEXT_PUBLIC_TIRAMISU_RPC_URL` | Web build and runtime | Public RPC for wallet signing and backend writes, and the upstream of the `/api/rpc` read proxy; never include credentials |
+| `TIRAMISU_API_KEY` | Web runtime only (and indexer) | Optional Arkiv API key. The web server adds it to browser reads proxied through `POST /api/rpc` and to backend dashboard reads; without it reads use the anonymous budget. Never a build argument or `NEXT_PUBLIC_` variable |
 
 Secrets belong only in the web runtime environment, never build arguments or the indexer. `GET /api/dash/config` returns `{ wallet: string | null }`, deriving the public wallet address from the configured key at runtime. Run one web instance because nonces, rate limits and the serial wallet queue are in memory. Local environment file setup is in [DEVELOPER.md](DEVELOPER.md).
 

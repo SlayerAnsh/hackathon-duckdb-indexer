@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { browserRpcUrl } from '../rpc-browser'
 import { balanceLevel, readBalance, type BalanceLevel } from './wallet'
 
 export function useWalletBalance(address: string | undefined, rpcUrl: string | undefined, revision = 0): { wei: bigint | null; level: BalanceLevel; refresh(): void } {
@@ -8,7 +9,7 @@ export function useWalletBalance(address: string | undefined, rpcUrl: string | u
  useEffect(() => {
   let active = true
   setResult(null)
-  if (address && rpcUrl) void readBalance(rpcUrl, address).then(wei => {
+  if (address && rpcUrl) void readBalance(browserRpcUrl(rpcUrl), address).then(wei => {
    if (active) setResult({ address, rpcUrl, revision, refreshRevision, wei })
   })
   return () => { active = false }

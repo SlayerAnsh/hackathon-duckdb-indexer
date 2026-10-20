@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Browser reads go through a same origin read proxy at `POST /api/rpc` that adds the server side `TIRAMISU_API_KEY` when set. It allows only read methods, caps body size and batch length, rate limits per client IP and times out after 15 seconds. Wallet signing and writes keep the public RPC. The key may now reach the web server runtime, never a public variable, build argument or the browser.
+
 * Header shows Log in; signed in users get an account popover with balance, copy address, explorer link and quick links. Explore toolbars use two aligned rows, and empty lists show designed empty states with skeletons while loading.
 
 * Owners delete and transfer their widgets by signing in the browser; low balance warnings below 0.1 GLM.
