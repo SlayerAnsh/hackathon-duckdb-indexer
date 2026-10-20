@@ -8,7 +8,7 @@ import { KeptLive, OfficialAuthor } from './Chips'
 import s from './explore.module.css'
 /** Renders from the indexer SQL row at once. `description` is undefined while the payload read is pending (one line skeleton) and null when it failed or is blank. */
 export function DashboardBrowseCard({ item, head, description }: { item: DashboardListItem; head?: number; description?: string | null }) {
- const charts = item.charts.slice(0, 8)
+ const charts = item.charts.slice(0, 4)
  return <article className={`${s.card} ${s.dash}`}>
   <div className={s.thumb} style={{ '--cols': Math.min(Math.max(charts.length, 1), 4) } as CSSProperties} aria-hidden="true">
    {charts.length ? charts.map((chart, i) => <span key={chart + i}><ChartIcon type={chart} size={20}/></span>) : <span className={s.thumbEmpty}>No widgets yet</span>}
