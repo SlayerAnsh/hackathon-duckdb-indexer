@@ -51,7 +51,7 @@ export function WidgetBrowseCard({ item, payload, head, version, variant, select
     : payload === undefined || (!!payload && showLoading({ loading: preview.loading, data: preview.data })) ? <div className={`skel ${s.previewSkel}`} data-skeleton="true" aria-label="Loading preview"/>
     : !payload || preview.error ? <span className={s.previewNote}><ChartIcon type={item.chart} size={24}/>Preview unavailable</span>
     : <div className={s.previewFill}><WidgetPreview id={'browse-' + item.key} payload={payload.widget} query={preview}/></div>}
-   {pick && selected && <span className={s.picked} aria-label="Selected"><CheckIcon/></span>}
+   {toggle && <span className={s.picked} data-on={selected ? 'true' : undefined} aria-hidden="true">{selected && <CheckIcon/>}</span>}
   </div>
   <WidgetCardBody item={item} official={official} href={pick ? undefined : href} lifetime={official ? <KeptLive/> : <TimeLeft expiresAt={item.expiresAt} head={head}/>}>
    {disabled && <span className={s.note}>Already on this dashboard</span>}
