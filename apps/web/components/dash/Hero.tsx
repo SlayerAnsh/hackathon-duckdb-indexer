@@ -1,6 +1,5 @@
 'use client'
 import Link from 'next/link'
-import { useDashAuth } from '../auth/DashAuthProvider'
 import type { Manifest } from '@asi/core'
 import { useTimedQuery } from '../../lib/use-query'
 import { compact, formatMs } from '../../lib/format'
@@ -54,7 +53,6 @@ export function Pipeline({ ms }: { ms?: number }) {
 }
 
 export function Hero({version,manifest}:{version:number;manifest?:Manifest}) {
- const auth = useDashAuth()
  const live = useTimedQuery(FIGURE_SQL.live, version), creators = useTimedQuery(FIGURE_SQL.creators, version)
  const expiring = useTimedQuery(FIGURE_SQL.expiring, version), created = useTimedQuery(FIGURE_SQL.created, version)
  const qs = { live, creators, expiring, created }
@@ -67,7 +65,7 @@ export function Hero({version,manifest}:{version:number;manifest?:Manifest}) {
     <p className={s.eyebrow}>Read only SQL index for Arkiv</p>
     <h1 id="hero-h" className={s.title}>Explore live Arkiv data, in SQL.</h1>
     <p className={s.pitch}>Browse dashboards the community builds on Arkiv, open any chart to see its SQL, or write your own. Every query runs in DuckDB in this tab.</p>
-    <div className={s.ctas}><Link className="btn btn-primary btn-lg" href="/explore">Explore dashboards <span aria-hidden="true">→</span></Link><Link className="btn btn-lg" href="/playground">Open playground</Link><Link href="/me" onClick={e => { if (auth.status !== 'authenticated') { e.preventDefault(); void auth.requestLogin().then(ok => { if (ok) window.location.assign('/me') }).catch(() => {}) } }}>Build your dashboard <span aria-hidden="true">→</span></Link></div>
+    <div className={s.ctas}><Link className="btn btn-primary btn-lg" href="/explore">Explore dashboards <span aria-hidden="true">→</span></Link><Link className="btn btn-lg" href="/playground">Open playground</Link></div>
    </div>
    <HeroFigures stats={stats} times={times}/>
   </div>

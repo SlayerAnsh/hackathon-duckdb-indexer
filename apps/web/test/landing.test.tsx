@@ -89,7 +89,7 @@ test('landing hero and Home use the official reports band', async () => {
  const defaults = { status: 'anonymous', config: { enabled: true, wallet: '0x'+'a'.repeat(40), rpcUrl: '', privyAppId: 'test' }, requestLogin: async () => false }
  const { AppRouterContext } = await import('next/dist/shared/lib/app-router-context.shared-runtime')
  const html = renderToStaticMarkup(<AppRouterContext.Provider value={{} as any}><DashAuthContext.Provider value={defaults as any}><Home>Story marker</Home></DashAuthContext.Provider></AppRouterContext.Provider>)
- for (const text of ['Explore live Arkiv data, in SQL.','Explore dashboards','href="/explore"','Open playground','href="/playground"','Build your dashboard','href="/me"']) expect(html).toContain(text)
+ for (const text of ['Explore live Arkiv data, in SQL.','Explore dashboards','href="/explore"','Open playground','href="/playground"']) expect(html).toContain(text)
  expect(html).not.toContain('/showcase')
  expect(html.indexOf('hero-h')).toBeLessThan(html.indexOf('Official dashboards'))
  expect(html.indexOf('Official dashboards')).toBeLessThan(html.indexOf('The most recent creates'))
