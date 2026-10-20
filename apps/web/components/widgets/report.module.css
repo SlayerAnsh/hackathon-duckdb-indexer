@@ -1,44 +1,117 @@
-.page{padding:36px 56px 56px;max-width:1180px;margin:0 auto}
-.breadcrumb{display:flex;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--text-3b);margin-bottom:24px}
-.breadcrumb a{color:inherit}
-.header{padding-bottom:28px;border-bottom:1px solid var(--border);margin-bottom:8px}
-.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.eyebrow{display:flex;align-items:center;gap:10px;font:600 11.5px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--text-3b)}
-.tools{display:flex;gap:2px;align-items:center}
-.title{font-size:38px;font-weight:600;letter-spacing:-.025em;margin:14px 0 0;line-height:1.1}
-.description{color:var(--text-2);font-size:16px;line-height:1.6;margin:12px 0 0;max-width:62ch}
-.meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:16px;color:var(--text-3b);font-size:13px}
-.meta>span[aria-hidden]{color:var(--text-3)}
-.pulse{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--ok);margin-right:6px;animation:pulse 2s infinite}
+/* Public dashboard report: header, figure grid, figure chrome, share menu and page states.
+   Colors only through theme tokens. Figures keep a faint 1px border and small radius (report look). */
+.page{max-width:1180px;margin:0 auto;padding:32px 56px 64px}
+
+/* ---------- header */
+.header{display:flex;flex-direction:column;padding-bottom:24px;border-bottom:1px solid var(--border)}
+.breadcrumb{margin-bottom:24px;font-size:var(--fs-sm);color:var(--text-3b);min-width:0}
+.breadcrumb ol{display:flex;align-items:center;gap:6px;margin:0;padding:0;list-style:none;min-width:0}
+.breadcrumb li{display:inline-flex;align-items:center;gap:6px;min-width:0;white-space:nowrap}
+.breadcrumb li+li::before{content:"/";color:var(--text-3)}
+.breadcrumb a{color:var(--text-3b);border-radius:var(--r-sm);transition:color var(--dur-fast)}
+.breadcrumb a:hover{color:var(--text)}
+.breadcrumb [aria-current="page"]{flex:1 1 auto;min-width:0;color:var(--text-2)}
+.breadcrumb [aria-current="page"] span{overflow:hidden;text-overflow:ellipsis}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:var(--h-md)}
+.eyebrow{display:flex;align-items:center;gap:10px;font:600 var(--fs-xs) var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--text-3b)}
+.eyebrow :global(.chip){letter-spacing:0;text-transform:none}
+.tools{display:flex;align-items:center;gap:2px;margin-right:-8px}
+.tools :global(.btn-quiet){color:var(--text-2)}
+.tools :global(.btn-quiet svg){color:var(--text-3b)}
+.tools :global(.btn-quiet:hover svg),.tools :global(.btn[aria-expanded="true"] svg){color:var(--text)}
+.tools :global(.btn[aria-expanded="true"]){background:var(--card-2);color:var(--text)}
+.toolSep{width:1px;height:16px;margin:0 6px;background:var(--border-strong)}
+.title{margin:8px 0 0;font-size:32px;font-weight:600;line-height:1.15;letter-spacing:-.025em;color:var(--text);overflow-wrap:anywhere}
+.description{max-width:64ch;margin:10px 0 0;font-size:15px;line-height:1.6;color:var(--text-2)}
+.meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 0;margin-top:16px;font-size:var(--fs-sm);color:var(--text-3b)}
+.meta>span{display:inline-flex;align-items:center;white-space:nowrap}
+.meta>span+span::before{content:"";width:3px;height:3px;margin:0 10px;border-radius:50%;background:var(--text-3)}
+.meta strong{margin-left:4px;font-weight:500;color:var(--text-2)}
+.meta :global(.addr-link){margin-left:4px}
+.pulse{display:inline-block;flex:none;width:6px;height:6px;margin-right:6px;border-radius:50%;background:var(--ok);animation:pulse 2s infinite}
 @keyframes pulse{50%{opacity:.4}}
+
+/* ---------- share menu */
 .share{position:relative}
+.share :global(.menu){position:absolute;top:calc(100% + 6px);right:0;z-index:40;min-width:200px}
+.share :global(.mi) svg{color:var(--text-3b)}
+.share .copied,.share .copied svg{color:var(--ok)}
 .announcement{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+
+/* ---------- sync note and grid */
+.sync{display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);color:var(--text-2)}
+.sync:not(:empty){margin-top:16px}
 .grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:20px;margin-top:28px}
-.figure{position:relative;grid-column:span var(--lg,6);min-width:0;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border-faint);border-radius:4px;box-shadow:none;padding:20px 22px 22px;transition:border-color .15s}
+
+/* ---------- figure chrome */
+.figure{position:relative;grid-column:span var(--lg,6);min-width:0;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border-faint);border-radius:4px;box-shadow:none;padding:20px 22px 22px;transition:border-color var(--dur-fast)}
 .figure:hover{border-color:var(--border)}
-.figure:target{outline:2px solid var(--accent)}
-.caption{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
-.caption h3{margin:0;font:600 15px var(--font-ui);letter-spacing:-.005em;color:var(--text)}
-.number{font:600 11px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
-.subtitle{font-size:13px;color:var(--text-3b);margin:3px 0 0}
-.body{flex:1;min-width:0;display:flex;flex-direction:column;padding:12px 0 0}
-.counter .caption h3{font:500 12px var(--font-mono);text-transform:uppercase;letter-spacing:.06em;color:var(--text-2)}
-.counter :global(.stat-value){font:600 34px var(--font-mono)}
-.actions{position:absolute;top:10px;right:10px;z-index:2;display:flex;align-items:center;flex-wrap:wrap;gap:4px;max-width:calc(100% - 20px);padding:4px;background:var(--card);border:1px solid var(--border-strong);border-radius:var(--r-md);box-shadow:var(--shadow-pop);opacity:0;pointer-events:none;transition:opacity .15s}
-.figure:hover .actions,.figure:focus-within .actions,.figure[data-actions-open="true"] .actions{opacity:1;pointer-events:auto}
-.overflow{position:absolute;right:10px;top:10px;opacity:0;pointer-events:none}
-.figure:focus-within .overflow{opacity:1;pointer-events:auto}.figure:focus-within .actions{right:52px}
-.sql{border:1px solid var(--border);border-radius:var(--r-md);margin-top:12px;background:var(--inset);overflow:hidden}
-.sql :global(.sqlpane){margin:0}
+.figure:target{outline:2px solid var(--accent);outline-offset:2px}
+.caption{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;min-height:20px}
+.caption>div{min-width:0}
+.caption h3{margin:0;font:600 var(--fs-md)/1.35 var(--font-ui);letter-spacing:-.005em;color:var(--text);overflow-wrap:anywhere}
+.number{margin-bottom:4px;font:600 11px/1.4 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.subtitle{margin:2px 0 0;font-size:var(--fs-sm);line-height:1.45;color:var(--text-3b)}
+.body{flex:1;min-width:0;display:flex;flex-direction:column;padding:14px 0 0}
+.body :global(.state-stale){align-self:center}
+/* Counter figures read as a stat: small label, one large tabular value. */
+.counter .caption h3{font:500 var(--fs-sm)/1.4 var(--font-ui);letter-spacing:0;color:var(--text-2)}
+.counter .body{padding-top:8px}
+.counter :global(.stat-value){font:600 32px/1.15 var(--font-ui);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+
+/* Hover action bar: hidden until hover or keyboard focus, never removed from the tab order. */
+.actions{position:absolute;top:10px;right:10px;z-index:2;display:flex;align-items:center;flex-wrap:wrap;gap:2px;max-width:calc(100% - 20px);padding:3px;background:var(--card);border:1px solid var(--border-strong);border-radius:var(--r-md);box-shadow:var(--shadow-pop);opacity:0;pointer-events:none;transform:translateY(-2px);transition:opacity var(--dur-fast),transform var(--dur-fast)}
+.actions :global(.ib){width:28px;height:28px}
+.actions>:global(.chip),.actions>:global(.quiet-chip),.actions>:global(.state){margin:0 4px}
+.figure:hover .actions,.figure:focus-within .actions,.figure[data-actions-open="true"] .actions{opacity:1;pointer-events:auto;transform:none}
+.overflow{position:absolute;top:10px;right:10px;opacity:0;pointer-events:none}
+.figure:focus-within .overflow{opacity:1;pointer-events:auto}
+.figure:focus-within .actions{right:48px}
+.sql{margin-top:14px;overflow:hidden;background:var(--inset);border:1px solid var(--border);border-radius:var(--r-md)}
+.sql :global(.sqlpane){margin:0;border:0}
+
+/* ---------- page states: empty, missing, expired, error, loading */
+.state{margin-top:28px}
+.page.state{margin-top:0;padding-top:64px;max-width:720px}
+.state :global(.empty-state){padding:56px 24px}
+.notice{max-width:640px;margin:0 auto}
+.skFigure{gap:14px}
+.skBread{width:200px;height:10px;margin-bottom:30px}
+.skEyebrow{width:90px;height:10px}
+.skTitle{width:min(420px,80%);height:30px;margin-top:16px}
+.skDesc{width:min(560px,95%);height:12px;margin-top:16px}
+.skMeta{width:min(360px,70%);height:10px;margin-top:20px}
+.skCaption{width:45%;height:12px}
+.skValue{width:60%;height:32px;margin-top:8px}
+.skChart{height:220px}
+
 @media (max-width:1100px){.figure{grid-column:span var(--md,6)}}
-@media (max-width:720px){.page{padding:16px}.title{font-size:26px}.grid{gap:12px}.figure{padding:14px 14px 16px}.tools :global(.ib),.actions :global(.ib){min-width:44px;min-height:44px}.share :global(.mi){min-height:44px}}
+@media (max-width:720px){
+ .page{padding:20px 0 48px}
+ .page.state{padding-top:32px}
+ .breadcrumb{margin-bottom:16px}
+ .title{font-size:var(--fs-2xl);letter-spacing:-.02em}
+ .description{font-size:var(--fs-base)}
+ .meta{gap:4px 14px}
+ .meta>span+span::before{content:none}
+ .grid{gap:12px;margin-top:20px}
+ .figure{padding:16px}
+ .tools{margin-right:-6px}
+ .toolLabel{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+ .tools :global(.btn){min-width:var(--h-touch);padding:0}
+ .toolSep{margin:0 2px}
+ .actions :global(.ib){width:var(--h-touch);height:var(--h-touch)}
+ .share :global(.mi){min-height:var(--h-touch)}
+}
 @media (max-width:700px){.figure{grid-column:span var(--sm,12)}.figure.counter{grid-column:span 6}}
+@media (max-width:380px){.figure.counter{grid-column:span 12}}
 @media (hover:none){
- .overflow{position:static;flex:none;opacity:1;pointer-events:auto;width:44px;height:44px;margin:-10px -8px 0 auto}
- .actions{display:none;top:48px;right:8px}
+ .overflow{position:static;flex:none;opacity:1;pointer-events:auto;width:var(--h-touch);height:var(--h-touch);margin:-12px -10px 0 auto}
+ .actions{display:none;top:52px;right:8px;transform:none}
  .figure[data-actions-open="true"] .actions{display:flex;opacity:1;pointer-events:auto}
- .actions :global(.ib),.tools :global(.ib){min-width:44px;min-height:44px}
- .share :global(.mi){min-height:44px}
+ .figure:focus-within .actions{right:8px}
+ .actions :global(.ib),.tools :global(.btn){min-width:var(--h-touch);min-height:var(--h-touch)}
+ .share :global(.mi){min-height:var(--h-touch)}
 }
 @media (prefers-reduced-motion:reduce){.pulse{animation:none}.figure,.actions{transition:none}}
 @media (forced-colors:active){.figure,.actions{border:1px solid CanvasText}}

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { WidgetPayloadError } from './WidgetPayloadError'
 import { useDebounced } from '../../lib/dash/use-debounced'
 import { showLoading } from '../../lib/dash/loading'
-import { useCallback, useEffect, useId, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { useDashAuth } from '../auth/DashAuthProvider'
 import { addLabel, initImport, importReducer, type ImportState } from '../../lib/dash/import-state'
 import type { ImportCandidate } from '../../lib/dash/organize-state'
@@ -16,6 +16,8 @@ import { ChartIcon } from './ChartIcon'
 import { CHART_LABELS } from './ChartPicker'
 import { WidgetBrowseCard } from './WidgetBrowseCard'
 import { EmptyState, PlusIcon, SkeletonCards } from './EmptyState'
+import { Dialog } from '../ui/Dialog'
+import m from './import.module.css'
 
 type List = ReturnType<typeof useWidgetList>
 type Props = { dashboardTitle: string; placed: Set<string>; remaining: number; onAdd(widgets: ImportCandidate[]): void; onClose(): void;
@@ -25,7 +27,7 @@ function Cards({ list, state, placed, head, version, toggle }: CardsProps) {
  return <><WidgetPayloadError error={list.payloadError}/>{list.items.map(item => <WidgetBrowseCard key={item.key} item={item} payload={list.payloads?.get(item.key) ?? (list.payloads ? null : undefined)}
   head={head} version={version} variant="pick" selected={state.selected.includes(item.key)} disabled={placed.has(item.key)} onToggle={() => toggle(item.key)}/>)}
   {showLoading({ loading: list.loading, data: list.total }) && <SkeletonCards count={2} label="Loading widgets…"/>}
-  {list.error && <p className="error" role="alert">{list.error}</p>}
+  {list.error && <div className={`notice notice-bad ${m.wide}`} role="alert"><div><p className="notice-title">Could not load widgets</p><p>{list.error}</p></div></div>}
  </>
 }
 function LivePage({ q, version, remember, ...props }: Omit<CardsProps, 'list'> & { q: WidgetListQuery; remember(list: List): void }) {
@@ -59,61 +61,45 @@ export function ImportModal({ dashboardTitle, placed, remaining, onAdd, onClose,
  useEffect(() => { dispatch({ type: 'search', value: debouncedSearch }) }, [debouncedSearch])
  const [counts, setCounts] = useState<{ mine: number | null; all: number | null }>({ mine: null, all: null })
  const candidates = useRef(new Map<string, ImportCandidate>())
- const dialog = useRef<HTMLDivElement>(null)
- const title = useId()
  const remember = useCallback((list: List) => {
   for (const item of list.items) candidates.current.set(item.key, { key: item.key, name: item.name, chart: item.chart, user: item.user,
    owner: item.owner, expiresAt: item.expiresAt, lifetimeDays: list.payloads?.get(item.key)?.widget.lifetimeDays ?? candidates.current.get(item.key)?.lifetimeDays ?? null })
  }, [])
  const onCounts = useCallback((mine: number | null, all: number | null) => setCounts({ mine, all }), [])
- useEffect(() => {
-  const previous = document.activeElement as HTMLElement | null
-  dialog.current?.querySelector<HTMLElement>('button, input, a[href]')?.focus()
-  return () => previous?.focus()
- }, [])
  const mine = listOverride ? listOverride.mineTotal : counts.mine
  const all = listOverride ? listOverride.allTotal : counts.all
  const total = state.tab === 'mine' ? mine : all
  const toggle = (key: string) => dispatch({ type: 'toggle', key, disabled: placed, remaining })
- return <div className="import-backdrop">
-  <style>{`.import-backdrop{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:color-mix(in srgb,var(--surface) 70%,transparent)}
-.import-dialog{width:calc(100% - 32px);max-width:880px;max-height:calc(100dvh - 48px);display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border-strong);border-radius:var(--r-lg);box-shadow:var(--shadow-pop);overflow:hidden}
-.import-header,.import-controls{padding:16px 24px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}.import-header h2{flex:1;margin:0}.import-controls input{width:100%;min-height:34px;padding:0 12px;background:var(--inset);color:var(--text);border:1px solid var(--ui-edge);border-radius:var(--r-md);font:inherit}.import-types{display:flex;gap:4px;overflow-x:auto;width:100%}.import-types button{flex-shrink:0}
-.import-results{padding:16px 24px;overflow-y:auto;flex:1;min-height:0}.import-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.import-grid>article{grid-column:auto}
-.import-footer{position:sticky;bottom:0;display:flex;align-items:center;gap:8px;padding:16px 24px;background:var(--card);border-top:1px solid var(--border)}.import-footer>span{margin-right:auto}
-@media(max-width:900px){.import-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:760px){.import-dialog{width:100%;height:100dvh;max-height:100dvh;border-radius:0}.import-grid{grid-template-columns:minmax(0,1fr)}}`}</style>
-  <div ref={dialog} className="import-dialog" role="dialog" aria-modal="true" aria-labelledby={title} tabIndex={-1} onKeyDown={event => {
-   if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose() }
-   if (event.key !== 'Tab') return
-   const focusable = Array.from(dialog.current!.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), [tabindex="0"]'))
-   const index = focusable.indexOf(document.activeElement as HTMLElement)
-   if (event.shiftKey ? index <= 0 : index === focusable.length - 1 || index < 0) {
-    event.preventDefault(); (event.shiftKey ? focusable.at(-1) : focusable[0])?.focus()
-   }
-  }}>
-   <header className="import-header"><h2 id={title}>Import widgets into “{dashboardTitle}”</h2><button type="button" className="btn btn-quiet" aria-label="Close import" onClick={onClose}>✕</button></header>
-   <div className="import-controls">
-    <div className="tabs" role="tablist" aria-label="Widget source">{(['mine', 'all'] as const).map(tab => <button key={tab} type="button" className="tab" role="tab" aria-selected={state.tab === tab} onClick={() => dispatch({ type: 'tab', value: tab })}>{tab === 'mine' ? 'My widgets' : 'All widgets'} <span className="tab-n">{(tab === 'mine' ? mine : all) ?? '…'}</span></button>)}</div>
-    <input aria-label="Search by name or creator address" placeholder="Search by name or creator address" value={search} onChange={event => setSearch(event.target.value)}/>
-    <div className="import-types" role="group" aria-label="Chart type">{([null, ...CHART_TYPES] as const).map(chart => <button key={chart ?? 'all'} type="button" className="fchip" aria-pressed={state.chart === chart} onClick={() => dispatch({ type: 'chart', value: chart })}>{chart && <ChartIcon type={chart}/>} {chart ? CHART_LABELS[chart] : 'All'}</button>)}</div>
+ const over = state.selected.length > remaining
+ const add = () => {
+  if (listOverride) remember(listOverride)
+  onAdd(state.selected.filter(key => !placed.has(key)).slice(0, remaining).flatMap(key => { const item = candidates.current.get(key); return item ? [item] : [] }))
+  onClose()
+ }
+ return <Dialog open onClose={onClose} size="lg" className={m.dialog} title={`Import widgets into “${dashboardTitle}”`}
+  description={remaining === 0 ? 'This dashboard is full. Remove a widget on Organize to make room.' : `Pick saved widgets to place on this dashboard. ${remaining} ${remaining === 1 ? 'slot' : 'slots'} left.`}
+  footer={<>
+   <span className={`dialog-f-start ${m.count}`} aria-live="polite"><strong>{state.selected.length} selected</strong>{over && <span className={m.over}> · only {remaining} {remaining === 1 ? 'fits' : 'fit'}</span>}</span>
+   <button type="button" className="btn" onClick={onClose}>Cancel</button>
+   <button type="button" className="btn btn-primary" disabled={!state.selected.length || over} onClick={add}>{addLabel(state.selected.length)}</button>
+  </>}>
+  <div className={m.controls}>
+   <div className={`tabs ${m.tabs}`} role="tablist" aria-label="Widget source">{(['mine', 'all'] as const).map(tab => <button key={tab} type="button" className="tab" role="tab" aria-selected={state.tab === tab} onClick={() => dispatch({ type: 'tab', value: tab })}>{tab === 'mine' ? 'My widgets' : 'All widgets'} <span className="tab-n">{(tab === 'mine' ? mine : all) ?? '…'}</span></button>)}</div>
+   <div className={`input-group ${m.search}`}>
+    <span className="adorn" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg></span>
+    <input type="search" data-autofocus aria-label="Search by name or creator address" placeholder="Search by name or creator address" value={search} onChange={event => setSearch(event.target.value)}/>
+    {search && <button type="button" className="ib ib-sm" aria-label="Clear search" onClick={() => setSearch('')}><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg></button>}
    </div>
-   {!listOverride && <Counts state={state} user={auth.address} onCounts={onCounts}/>}
-   <div className="import-results">
-    {total === 0 ? (state.tab === 'mine' && !state.search && !state.chart
-     ? <EmptyState compact icon="widget" title="You have no widgets yet" body="Save a query as a widget, then import it here. You can also pick from all public widgets." actions={<><Link className="btn btn-primary" href="/widgets/new"><PlusIcon/>New widget</Link><button type="button" className="btn btn-quiet" onClick={() => dispatch({ type: 'tab', value: 'all' })}>All widgets</button></>}/>
-     : <EmptyState compact icon="search" title="No matches" body="No widgets match these filters."/>) : <div className="import-grid">
-     {listOverride ? <Cards list={listOverride} state={state} placed={placed} toggle={toggle} version={0}/> : <LiveResults state={state} user={auth.address} placed={placed} toggle={toggle} remember={remember}/>}
-    </div>}
-    {total !== null && state.pages * 12 < total && <button type="button" className="btn" onClick={() => dispatch({ type: 'more' })}>Load more</button>}
-   </div>
-   <footer className="import-footer"><span aria-live="polite">{state.selected.length} selected</span><button type="button" className="btn" onClick={onClose}>Cancel</button>
-    <button type="button" className="btn btn-primary" disabled={!state.selected.length || state.selected.length > remaining} onClick={() => {
-     if (listOverride) remember(listOverride)
-     onAdd(state.selected.filter(key => !placed.has(key)).slice(0, remaining).flatMap(key => { const item = candidates.current.get(key); return item ? [item] : [] }))
-     onClose()
-    }}>{addLabel(state.selected.length)}</button>
-   </footer>
+   <div className={m.types} role="group" aria-label="Chart type">{([null, ...CHART_TYPES] as const).map(chart => <button key={chart ?? 'all'} type="button" className="fchip" aria-pressed={state.chart === chart} onClick={() => dispatch({ type: 'chart', value: chart })}>{chart && <ChartIcon type={chart}/>}{chart ? CHART_LABELS[chart] : 'All types'}</button>)}</div>
   </div>
- </div>
+  {!listOverride && <Counts state={state} user={auth.address} onCounts={onCounts}/>}
+  <div className={m.results}>
+   {total === 0 ? (state.tab === 'mine' && !state.search && !state.chart
+    ? <EmptyState compact icon="widget" title="You have no widgets yet" body="Save a query as a widget, then import it here. You can also pick from all public widgets." actions={<><Link className="btn btn-primary" href="/widgets/new"><PlusIcon/>New widget</Link><button type="button" className="btn" onClick={() => dispatch({ type: 'tab', value: 'all' })}>All widgets</button></>}/>
+    : <EmptyState compact icon="search" title="No matches" body="No widgets match these filters."/>) : <div className={m.grid}>
+    {listOverride ? <Cards list={listOverride} state={state} placed={placed} toggle={toggle} version={0}/> : <LiveResults state={state} user={auth.address} placed={placed} toggle={toggle} remember={remember}/>}
+   </div>}
+   {total !== null && state.pages * 12 < total && <div className={m.more}><button type="button" className="btn btn-outline" onClick={() => dispatch({ type: 'more' })}>Load more</button><span>{Math.min(state.pages * 12, total)} of {total}</span></div>}
+  </div>
+ </Dialog>
 }

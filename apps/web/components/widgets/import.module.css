@@ -1,0 +1,45 @@
+/* Import dialog (components/ui/Dialog, size lg): sticky source tabs, search and type filter, a pick grid with
+   a clear selection mark, and the selection count in the footer. Colors only through theme tokens. */
+.dialog{--dialog-w:880px;height:min(760px,calc(100dvh - 48px))}
+.dialog :global(.dialog-b){gap:0;padding-top:0}
+
+/* ---------- controls stay pinned while results scroll */
+.controls{position:sticky;top:0;z-index:3;display:grid;gap:12px;margin:0 -20px;padding:4px 20px 12px;background:var(--card);border-bottom:1px solid var(--border)}
+.tabs{margin:0}
+.search{min-width:0}
+.search>input{padding-left:8px}
+.types{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -20px;padding:0 20px;-webkit-mask-image:linear-gradient(90deg,transparent 0,var(--text) 20px,var(--text) calc(100% - 20px),transparent 100%);mask-image:linear-gradient(90deg,transparent 0,var(--text) 20px,var(--text) calc(100% - 20px),transparent 100%)}
+.types::-webkit-scrollbar{display:none}
+.types>:global(.fchip){flex:none;min-height:var(--h-sm);padding:0 10px}
+.types>:global(.fchip) svg{color:var(--text-3b)}
+.types>:global(.fchip[aria-pressed="true"]) svg{color:var(--accent)}
+
+/* ---------- results */
+.results{display:grid;gap:16px;padding-top:16px}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.grid>article{position:relative;grid-column:auto;--pad:16px;transition:border-color var(--dur-fast),box-shadow var(--dur-fast)}
+.grid>article[role="button"]{cursor:pointer}
+.grid>article[role="button"]:hover{border-color:var(--ui-edge)}
+.grid>article[role="button"]:focus-visible{outline:var(--focus-ring);outline-offset:2px}
+/* Selection mark: an empty ring that fills with a check when picked. */
+.grid>article[role="button"]::after{content:"";position:absolute;top:10px;right:10px;width:20px;height:20px;border-radius:50%;border:1.5px solid var(--ui-edge);background:var(--card);transition:background-color var(--dur-fast),border-color var(--dur-fast)}
+.grid>article[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.grid>article[aria-pressed="true"]::after{border-color:var(--accent-strong);background:var(--accent-strong) var(--check-img) center/12px no-repeat}
+.grid>article:not([role="button"]){cursor:default}
+.grid>article h3 [aria-label="Selected"]{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.grid :global(.skel-card){min-height:212px}
+.wide{grid-column:1/-1}
+.more{display:flex;flex-direction:column;align-items:center;gap:6px;padding:4px 0 8px;font-size:var(--fs-sm);color:var(--text-3b);font-variant-numeric:tabular-nums}
+
+/* ---------- footer */
+.count{display:inline-flex;align-items:center;gap:4px;font-variant-numeric:tabular-nums}
+.count strong{font-weight:500;color:var(--text)}
+.over{color:var(--warn)}
+
+@media (max-width:860px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:559px){
+ .dialog{height:auto;max-height:calc(100dvh - 24px)}
+ .controls{margin:0 -20px;padding-top:4px}
+ .grid{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:559px){.count{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}}
