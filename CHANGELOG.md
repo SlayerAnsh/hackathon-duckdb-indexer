@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+* `examples/ws_events_probe.ts`: the WebSocket entity events probe from the friction report, runnable with `bun examples/ws_events_probe.ts [seconds]` from the repo root (SDK and viem resolved from `packages/core`). `verify_against_chain.py` accepts `ARKIV_RPC_URL` to ask an RPC node of your choice.
+
+* Precision: the anonymous budget is sourced everywhere as the `RateLimit` header reading of 18 October 2026 (`limit=10000`, reset about one hour), not a documented value, next to the 20 October header (`limit=600, reset=60`, counted per request). Why Arkiv states that the trust point moves from a database operator to the public chain and that Verify still trusts the RPC node it asks. The live Verify result and the delta merge check are dated recordings with block numbers. The Featured chip address is `user` on dashboards and `$owner` on widget cards and widget pages.
+
 * Data contract versioning: `manifest.json` carries `schemaVersion` (`SCHEMA_VERSION = 1` in `packages/core`), bumped only on a breaking change. The web app refuses a newer version (`schemaCheck`) and reads a manifest without the field as version 1. README "Data API" and `arkiv/schema.md` state the compatibility rule.
 
 * `examples/`: `top-creators.sh` (DuckDB CLI) and `top_creators.py` (duckdb package) read the hosted indexer directly and compute the top creators; `verify_against_chain.py` applies the Verify rule to indexed rows against the public RPC. README records their output of 20 October 2026, including a paused store caught as 45 `deleted` and 5 `extended` rows.

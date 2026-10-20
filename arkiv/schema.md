@@ -65,7 +65,7 @@ Browser reads go to the web app's same origin `POST /api/rpc`, which forwards th
 | Payload button | `arkiv_query("$key = key(<key>)", {select: {"payload":true,"contentType":true}})` at current head | On click |
 | Verify button (`verifyRows` in `apps/web/lib/verify.ts`) | `arkiv_query(<bare key chunk>, {select: {"key":true,"updatedAt":true,"expiresAt":true,"owner":true}, cursor})` for the result's keys, chunks of 50 | On click |
 
-Payload and Verify use bare key predicates without the configured expression, without `atBlock` and without an explicit limit. Verify compares returned metadata with the indexed row and the live head; it is an RPC comparison, not a cryptographic proof, and a missing entity cannot distinguish deletion from expiry. The browser relevance prefilter matches the indexer: a log is used when its key is already known, when its `EntityCreated` owner matches a `$creator` or `$owner` term, or when the expression has no such terms.
+Payload and Verify use bare key predicates without the configured expression, without `atBlock` and without an explicit limit. Verify compares returned metadata with the indexed row and the live head; it is an RPC comparison, not a cryptographic proof, so it trusts the RPC node that answers (the server's `NEXT_PUBLIC_TIRAMISU_RPC_URL`, reached through `/api/rpc`; a self hosted app can point it at any endpoint or its own node), and a missing entity cannot distinguish deletion from expiry. The browser relevance prefilter matches the indexer: a log is used when its key is already known, when its `EntityCreated` owner matches a `$creator` or `$owner` term, or when the expression has no such terms.
 
 ## Widget dashboards
 

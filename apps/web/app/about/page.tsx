@@ -100,7 +100,12 @@ export default function AboutPage() {
     </Section>
 
     <Section id="why-arkiv" title="Why Arkiv">
-     <p>The app&apos;s data is Arkiv entities, and the indexer mirrors Arkiv and nothing else. Without Arkiv both trust claims fall away, because authorship is the chain&apos;s <code>$creator</code>, ownership is <code>$owner</code> and lifetime is the expiry block.</p>
+     <p>Arkiv moves the trust point from a database operator to the public chain. With an ordinary database you trust whoever runs it to say which rows exist, who wrote them and when they expire. Here those facts are chain state: the chain sets <code>$creator</code> and <code>$owner</code>, enforces the expiry block, and logs every create, patch, extend, transfer and delete publicly.</p>
+     <Points items={[
+      { title: 'Completeness', text: 'Anyone can replay the public logs from block zero without an API key, or run the MIT indexer, and compare the result with the hosted files.' },
+      { title: 'Freshness', text: 'Verify rereads rows from an RPC node. Anyone can choose the RPC endpoint, self host this app, or run their own node.' },
+      { title: 'Still trusted', text: <>Verify trusts the RPC node it asks, since <code>eth_getProof</code> is not available. Choosing your own node moves that trust to a party you pick; it does not remove it.</> },
+     ]}/>
      <div className={s.tableWrap}>
       <table className={s.table}>
        <thead><tr><th scope="col">Instead of Arkiv</th><th scope="col">What breaks</th></tr></thead>
@@ -213,7 +218,7 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build`}
      <p>When a result has a <code>key</code> column, Verify (or Verify page for every row) asks the RPC for each key&apos;s current update block, expiry and owner, in batches of 50, and compares them with your copy:</p>
      <dl className={s.statuses}>{VERIFY.map(v => <div key={v.label}><dt><span className={`chip ${v.tone}`}>{v.label}</span></dt><dd>{v.text}</dd></div>)}</dl>
      <p>This is a consistency check against the RPC, not a cryptographic proof, because <code>eth_getProof</code> is not available on Arkiv.</p>
-     <p>The chain is the reference, not the index. To see a stale copy caught, start an indexer with <code>SYNC_PAUSED=true</code> on an old data directory and run <code>examples/verify_against_chain.py</code> against it: it applies the same rule to the 50 newest rows. On 20 October 2026 a copy 48,478 blocks behind came back 45 <code>deleted</code> and 5 <code>extended</code>, while the live hosted index came back 50 <code>ok</code>. In this app the browser live tail replays chain logs on top of a paused index, so here a stale copy shows only until the tail catches up.</p>
+     <p>The chain is the reference, not the index. To see a stale copy caught, start an indexer with <code>SYNC_PAUSED=true</code> on an old data directory and run <code>examples/verify_against_chain.py</code> against it: it applies the same rule to the 50 newest rows. Recorded on 20 October 2026 at 01:58 UTC: a copy paused at block 757,400, 48,478 blocks behind, came back 45 <code>deleted</code> and 5 <code>extended</code>; the live hosted index, at snapshot block 805,871 with the chain head at 805,881, came back 50 <code>ok</code>. That second result drifts with live churn: about 2,800 keys change per hour, so a rerun can show a few <code>stale</code> or <code>extended</code> rows updated since the last snapshot. In this app the browser live tail replays chain logs on top of a paused index, so here a stale copy shows only until the tail catches up.</p>
      <Src files={['apps/web/lib/verify.ts', 'apps/web/components/dash/ResultsGrid.tsx', 'examples/verify_against_chain.py', 'apps/web/test/helpers.test.ts']}/>
     </Section>
 

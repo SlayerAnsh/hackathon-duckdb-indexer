@@ -16,7 +16,7 @@ Versions throughout: `@arkiv-network/sdk` 0.8.1, viem 2.57.7, Bun 1.3.11, Tirami
 | SDK wallet client (`executeBatch`, `createEntity`, `patchEntity`, `extendEntity`, `changeOwnership`, `predictEntityKeys`, `ExpirationTime`) | `apps/web/lib/dash/server/operations.ts` (app wallet), `apps/web/lib/dash/widget-actions.ts` (browser signed widget actions) | Mutation errors, create and transfer in one batch, extend at the cap |
 | viem `custom` transport over the Privy embedded wallet | `apps/web/lib/dash/wallet.ts`, `apps/web/components/auth/PrivyBridge.tsx` | Wallet transport retries |
 | Same origin read proxy `POST /api/rpc` | `apps/web/lib/dash/server/rpc-proxy.ts` | Anonymous budget exhausted again |
-| SDK `watchEntityEvents` over the Tiramisu WebSocket RPC | Not used in the app; tested for this report | WebSocket entity events |
+| SDK `watchEntityEvents` over the Tiramisu WebSocket RPC | Not used in the app; tested for this report with `examples/ws_events_probe.ts` | WebSocket entity events |
 | Public RPC from a script (Python `urllib`) | `examples/verify_against_chain.py` | RPC rejects the default Python user agent |
 
 ## Anonymous query budget and error envelope
@@ -27,13 +27,15 @@ A selective, small response should leave room for further anonymous queries. RPC
 
 ### Actual
 
-One broad `$expiresAt > u64(0)` query with limit 5 exhausted the anonymous 10000 unit budget. Later queries returned HTTP 429 with a plain object instead of a JSON RPC envelope:
+On 18 October 2026 the `RateLimit` header of anonymous `arkiv_query` responses reported `limit=10000` cost units with a reset after about one hour (recorded that day in the spike notes, SPECS §4). One broad `$expiresAt > u64(0)` query with limit 5 exhausted that budget. Later queries returned HTTP 429 with a plain object instead of a JSON RPC envelope:
 
 ```json
 {"error":"ANON_COST_LIMITED","message":"unauthenticated query budget exhausted; get an API key at https://hub.arkiv.network for a monthly quota"}
 ```
 
 `eth_blockNumber`, `eth_getLogs`, `arkiv_getEntityCount` and `arkiv_getBlockTiming` still worked. Headers indicated a reset after about an hour.
+
+**Where the number comes from, and what the header says now.** The 10,000 figure is our own header reading of 18 October, not a documented value. The Arkiv docs give no anonymous number: the [access keys page](https://docs.arkiv.network/start-here/access-keys/) says only that the public RPC works without a key "at the default rate limit", and the [cookbook configuration](https://arkiv-cookbook.vercel.app/cookbook.json) publishes `anonymousRequestsPerMinute: 600`. On 20 October 2026 at 02:36 UTC two anonymous requests (one `eth_blockNumber`, then one `$key` `arkiv_query` with limit 1) returned `RateLimit: limit=600, remaining=599, reset=60` and then `limit=600, remaining=598, reset=47` with `Arkiv-Cost: 100`. `remaining` fell by one per request, not by the cost, so today's header counts requests in a 60 second window and no longer reports a cost budget. A cost budget still exists: anonymous reads returned `ANON_COST_LIMITED` again on 20 October ([below](#anonymous-budget-exhausted-again-on-20-october)), but its current size is not exposed.
 
 Workaround: `packages/core/src/rpc.ts` accepts both shapes (an object `error` with `code` and `message`, or a string `error` plus top level `message`) and keeps `Retry-After`. The filler and browser live tail pause only attribute fetches on 429.
 
@@ -86,7 +88,7 @@ Pricing guidance should explain whether selection size, page size and key count 
 
 ### Actual
 
-Authenticated `arkiv_query` calls each cost 100 units according to `Arkiv-Cost: 100`. A single key, 50 OR keys, a full 200 row page and a failing call all showed the same cost. Anonymous calls show the same header: on 20 October 2026 at 01:55 UTC, one anonymous `$key = key(0x78d7…24376)` query with limit 1 and one anonymous query rejected by the parser (an untyped hex literal, code `-32001`) each returned `Arkiv-Cost: 100` and `RateLimit: limit=600, remaining=…, reset=60`. That per minute limit is not the hourly anonymous budget of 10,000 units, which no header reports, so the "about 100 anonymous queries an hour" we use elsewhere is 10,000 divided by the header cost, an estimate. The 18 October observation that one broad query exhausted the whole budget means the header does not always equal what is charged. The header alone does not describe monthly quota consumption (see the quota observations below). Chain wide churn makes one query per entity event unnecessarily costly.
+Authenticated `arkiv_query` calls each cost 100 units according to `Arkiv-Cost: 100`. A single key, 50 OR keys, a full 200 row page and a failing call all showed the same cost. Anonymous calls show the same header: on 20 October 2026 at 01:55 UTC, one anonymous `$key = key(0x78d7…24376)` query with limit 1 and one anonymous query rejected by the parser (an untyped hex literal, code `-32001`) each returned `Arkiv-Cost: 100` and `RateLimit: limit=600, remaining=…, reset=60`. That header counts requests per 60 second window; the cost budget it showed on 18 October (`limit=10000`, reset about one hour, see [Anonymous query budget](#anonymous-query-budget-and-error-envelope)) is no longer reported. So "about 100 anonymous queries an hour" is 10,000 divided by the header cost, an estimate based on the 18 October budget. The 18 October observation that one broad query exhausted the whole budget means the header does not always equal what is charged. The header alone does not describe monthly quota consumption (see the quota observations below). Chain wide churn makes one query per entity event unnecessarily costly.
 
 Workaround: no `arkiv_query` runs per event anywhere. The indexer and browser batch up to 50 keys per query, and Payload and Verify are explicit user clicks.
 
@@ -152,7 +154,7 @@ Workaround: `fetchLogsAdaptive` in `apps/indexer/src/replay.ts` parses `retry wi
 
 **Expected.** A mirror should be able to stay current by looking up each changed entity.
 
-**Actual.** Tiramisu showed 4,011 entity events in 1,800 blocks (about one hour), touching about 2,800 distinct keys per hour. Keyed live sync looks those keys up in chunks of at most 50 at every batch block, which would spend roughly 25 to 35 percent of the monthly quota per day, so the quota would last about three to four days. The anonymous budget allows about 100 queries of up to 50 keys per hour (about 5,000 keys). An `EntityPatched` log carries no attribute values, so every patch forces a query.
+**Actual.** Tiramisu showed 4,011 entity events in 1,800 blocks (about one hour), touching about 2,800 distinct keys per hour. Keyed live sync looks those keys up in chunks of at most 50 at every batch block, which would spend roughly 25 to 35 percent of the monthly quota per day, so the quota would last about three to four days. At the anonymous budget the header showed on 18 October (10,000 units per hour), that is about 100 queries of up to 50 keys per hour (about 5,000 keys). An `EntityPatched` log carries no attribute values, so every patch forces a query.
 
 Workaround: the indexer never sends the API key by default (decision of 18 October 2026). Live sync applies creations, patches, extensions, transfers and deletions straight from public logs, and only attribute values come from anonymous key lookups, newest first. Patched entities briefly keep their previous attributes until the filler fetches them again. `SYNC_USE_API_KEY=true` restores keyed sync for deployments with a larger quota.
 
@@ -272,7 +274,7 @@ Workaround, in two commits on 20 October: `3857bd1` shows "RPC budget exhausted,
 
 **Expected.** A mirror that never sends an API key should still converge to full attributes for every live entity.
 
-**Actual.** It converges, slowly. Backfill publishes every live entity from public logs at once with `attrs_pending = true`, then the filler fetches attributes for up to 50 keys per `arkiv_query` every 4 seconds, newest `updated_at` first, and pauses on HTTP 429 until `Retry-After` (`apps/indexer/src/fill.ts`). At an estimated 100 anonymous queries an hour (10,000 units over `Arkiv-Cost: 100`, see [Flat query cost](#flat-query-cost-and-batching-guidance)) that is at most about 5,000 keys an hour, while about 2,800 distinct keys change per hour (see [Keyed live sync](#keyed-live-sync-does-not-fit-the-monthly-quota)) and every create or patch marks a key pending again. The hosted indexer reported `{"headBlock":805105,"live":36457,"pending":809}` on `/health` on 20 October 2026, so 2.2 percent of live entities were still waiting for attributes. Rows stay queryable meanwhile: system columns come from logs, and the status bar shows the block from which on every changed entity has its attributes (older ones are still loading, newest first).
+**Actual.** It converges, slowly. Backfill publishes every live entity from public logs at once with `attrs_pending = true`, then the filler fetches attributes for up to 50 keys per `arkiv_query` every 4 seconds, newest `updated_at` first, and pauses on HTTP 429 until `Retry-After` (`apps/indexer/src/fill.ts`). At an estimated 100 anonymous queries an hour (the 10,000 unit budget the header showed on 18 October over `Arkiv-Cost: 100`, see [Flat query cost](#flat-query-cost-and-batching-guidance)) that is at most about 5,000 keys an hour, while about 2,800 distinct keys change per hour (see [Keyed live sync](#keyed-live-sync-does-not-fit-the-monthly-quota)) and every create or patch marks a key pending again. The hosted indexer reported `{"headBlock":805105,"live":36457,"pending":809}` on `/health` on 20 October 2026, so 2.2 percent of live entities were still waiting for attributes. Rows stay queryable meanwhile: system columns come from logs, and the status bar shows the block from which on every changed entity has its attributes (older ones are still loading, newest first).
 
 Workaround: none needed beyond what is built. `FILL_USE_API_KEY=true` sends fills with a key for a faster catch up.
 
@@ -305,11 +307,11 @@ So the subscription is a good live signal but not a complete feed by itself. A c
 
 Workaround: none needed in the app, which never used the watcher. The indexer and the browser live tail poll `eth_getLogs` in explicit windows from a stored checkpoint (`apps/indexer/src/sync.ts`, `apps/web/lib/live-tail.ts`); a reconnect there cannot skip a block, because the next window starts at the checkpoint (SPECS §5).
 
-**Steps to reproduce.**
+**Steps to reproduce.** Run `bun examples/ws_events_probe.ts` from the repo root after `bun install` (read only, no key). It performs the four steps below and prints the events received, the `onError` calls and the logs missing from the subscription. Pass a duration in seconds for a shorter run: on 20 October 2026 at 02:38 UTC, `bun examples/ws_events_probe.ts 20` (socket closed at 10 seconds) covered blocks 807,045 to 807,054 and printed `ws events 26, eth_getLogs 28, missing from ws 2, duplicates 0` and `missing blocks 807050`, the block mined during the reconnect.
 
 1. `createPublicClient({ chain: tiramisu, transport: webSocket(tiramisu.rpcUrls.default.webSocket[0]) })` from `@arkiv-network/sdk` and `viem`.
 2. `client.watchEntityEvents({ onEvent, onError })` and record each event's `blockNumber`, `transactionHash` and `logIndex`.
-3. After 30 seconds call `(await client.transport.getRpcClient()).socket.close()`, keep watching 40 more seconds, then `unwatch()`.
+3. After 30 seconds call `(await client.transport.getRpcClient()).socket.close()`, keep watching 40 more seconds, then `unwatch()`. The 70 second runs in the table used these defaults.
 4. Fetch `eth_getLogs({ address: 0x4400000000000000000000000000000000000044, fromBlock: <first seen>, toBlock: <last seen> })` over HTTP and compare by transaction hash and log index. The missing logs sit in the blocks mined during the reconnect.
 
 **Suggested fix.** In `watchEntityEvents`, remember the last delivered block and, when the subscription is re-established, fetch `eth_getLogs` from the next block before delivering live events (or emit a typed "gap" error naming the block range). Document in the SDK that `onError` during a WebSocket watch means events may have been missed.
