@@ -5,7 +5,7 @@ Plain SQL over every live Arkiv entity. The project has two parts:
 1. **An open source, self hostable indexer** (`apps/indexer`). It mirrors all Arkiv entities on chain, or a subset chosen with `INDEX_EXPRESSION`, into versioned Parquet snapshots plus a JSON delta and a manifest served over HTTP. Run it with Docker Compose or Bun. MIT licensed.
 2. **A web app** (`apps/web`) that runs against the hosted indexer covering all Arkiv data on Tiramisu. It offers a SQL Playground (DuckDB WASM in your browser), widgets (one SQL query plus a chart, saved as Arkiv entities) and public dashboards, including Featured dashboards kept live by the app.
 
-**Who is stuck today.** Arkiv app teams, analysts and AI agents who need `GROUP BY`, `JOIN` or `ORDER BY` on attributes. `arkiv_query` returns at most 200 rows per page, newest first, with none of those, and an anonymous caller shares a budget of 10,000 cost units per hour that one broad query used up on 18 October 2026 ([friction report](arkiv/friction.md#anonymous-query-budget-and-error-envelope)). Answering "which wallets create the most entities?" means paging about 183 pages of 200 over the 36,457 live entities, more than the roughly 100 anonymous queries an hour allow. So they either burn the budget in their own paging code or trust a closed hosted indexer that decides which rows exist. **What changes on day one:** a documented data contract ([Data API](#data-api-for-apps-and-ai-agents), [arkiv/schema.md](arkiv/schema.md)), an MIT indexer anyone can run without an API key, and hosted Parquet files that DuckDB or Python read without asking anyone. That question becomes one `GROUP BY` that runs in milliseconds in the browser.
+**Who is stuck today.** Arkiv app teams, analysts and AI agents who need `GROUP BY`, `JOIN` or `ORDER BY` on attributes. `arkiv_query` returns at most 200 rows per page, newest first, with none of those, and an anonymous caller shares a budget of 10,000 cost units per hour that one broad query used up on 18 October 2026 ([friction report](arkiv/friction.md#anonymous-query-budget-and-error-envelope)). Answering "which wallets create the most entities?" means paging about 183 pages of 200 over the 36,457 live entities. Each anonymous `arkiv_query` we sent on 20 October 2026 answered `Arkiv-Cost: 100`, a selective one and a failing one alike, so the 10,000 unit budget covers at most about 100 queries an hour, and fewer when broad queries cost more. That is an estimate from the cost header; the hourly budget itself is not exposed in any header. So they either burn the budget in their own paging code or trust a closed hosted indexer that decides which rows exist. **What changes on day one:** a documented data contract ([Data API](#data-api-for-apps-and-ai-agents), [arkiv/schema.md](arkiv/schema.md)), an MIT indexer anyone can run without an API key, and hosted Parquet files that DuckDB or Python read without asking anyone. That question becomes one `GROUP BY` that runs in milliseconds in the browser.
 
 **Who is protected.** A viewer of a Featured dashboard, who trusts that its charts were published by this app, and a widget author, who trusts that their address stays on their widget. Anyone can create an entity with `project = arkiv-sql-indexer-dash`, `user = <app wallet>` and `login = arkiv`. An app that trusted attributes would show that look alike as Featured. Every read here filters on the chain set `$creator`, and Featured also requires `$owner`, so a forged entity never appears. See [Why this pillar](#why-this-pillar).
 
@@ -30,8 +30,9 @@ Built during Arkiv: Global Tour Stop on the Tiramisu testnet (chain ID 7738577) 
 
 1. **A documented data contract.** `manifest.json`, `delta.json` and two Parquet files with fixed columns ([Data API](#data-api-for-apps-and-ai-agents), [SQL columns](arkiv/schema.md#sql-columns)). The merge rule for the delta is written down and implemented in `packages/core/src/views.ts`.
 2. **A self hostable MIT indexer.** `docker run` or `bun apps/indexer/src/main.ts`, all of Arkiv or an `INDEX_EXPRESSION` subset. It needs no API key: `apps/indexer/test/keyless.test.ts` asserts that no default request carries `Authorization` or `X-API-Key`.
-3. **Open hosted files.** The hosted indexer serves the same files with no login or key. The DuckDB CLI commands in [Data API](#data-api-for-apps-and-ai-agents) were run against it.
+3. **Open hosted files.** The hosted indexer serves the same files with no login or key. Two consumers in [`examples/`](examples) (DuckDB CLI and Python) read it with no web app involved; their recorded output is in [Data API](#data-api-for-apps-and-ai-agents).
 4. **Proof the contract is enough.** This web app reads only that contract through `/data`; it has no private side channel to the indexer.
+5. **A versioned contract.** `manifest.json` carries `schemaVersion`, which changes only on a breaking change, so a consumer can refuse data it does not understand ([compatibility rule](#compatibility-schemaversion)).
 
 ### Security: authorship comes from `$creator`, never from a field anyone can write
 
@@ -40,7 +41,7 @@ Built during Arkiv: Global Tour Stop on the Tiramisu testnet (chain ID 7738577) 
 * RPC reads always include `$creator = addr(<app wallet>)` (`scopeExpr` in `apps/web/lib/dash/entities.ts`), and the Featured query adds `user` and `$owner` (`officialExpr` in `apps/web/lib/dash/official.ts`).
 * Decoders recheck the creator before accepting an entity (`trusted` in `apps/web/lib/dash/entities.ts`), and Featured needs both `user` and `$owner` to equal the app wallet (`isOfficialOwned` in `apps/web/lib/dash/official.ts`).
 * Lists and counts in DuckDB use `WHERE e.creator = <app wallet>` and Featured needs `usr` and `owner` to match (`dashCte` and `officialSql` in `apps/web/lib/dash/sql.ts`).
-* The UI shows the owning address next to every Featured chip, so a viewer can check it on the explorer.
+* The UI shows the author address next to every Featured chip (the `user` attribute on dashboard cards, dashboard pages and widget pages, `$owner` on widget cards). Featured requires `user` and `$owner` both to equal the app wallet, so that address is always the app wallet, and a viewer can check it on the explorer.
 
 Check it yourself: `project = str('arkiv-sql-indexer-dash') AND NOT ($creator = addr(0x1f61c3cac1612c020f64739b128c5f198939c8cd))` returned 0 entities on 20 October 2026 at block 805,170. Any entity that query ever returns is ignored by the app.
 
@@ -54,7 +55,7 @@ The app's data is Arkiv entities: widgets, dashboards and the links between them
 | :--- | :--- |
 | Postgres run by an operator | The operator decides which rows exist. It can keep a row after its expiry, write rows under any author and drop rows, and readers cannot check. Here `$creator` and `expiresAt` are set by the chain, and Verify rereads any row from the RPC. |
 | IPFS | Content addressed blobs only: no typed attributes to filter on (`type`, `project`, `user`), no expiry, no owner who can transfer or delete, no query. Widget lifetimes, permissionless extension and transfer to the author would all disappear. |
-| A subgraph | Needs a schema and mapping per app plus a trusted indexer operator. This indexer is schema agnostic (any entity, any attributes), and the trust anchor stays the chain, not the indexer. |
+| A subgraph | Has no expiry semantics: an entity lives until a mapping removes it, so widget lifetimes and the expiry filter would be app code that a reader cannot check. Every schema change means a new mapping and a redeploy and resync. Readers trust whoever hosts the subgraph to report rows faithfully. This indexer is schema agnostic (any entity, any attributes, no redeploy), expiry is the chain's `expiresAt`, and the trust anchor stays the chain: any row can be rechecked against the RPC ([Judge reproduction](#judge-reproduction), step 8). |
 | Our own API | Is exactly what this project replaces: a closed endpoint that decides which rows exist and who wrote them. |
 
 What deliberately stays off Arkiv, and why:
@@ -77,12 +78,12 @@ Each feature below is visible to a user and checked in code and on chain.
 | Typed attributes vs payload | `widgetAttributes`, `linkCreate` in `apps/web/lib/dash/server/operations.ts` | Lists, counts and filters run on attributes; the chart comes from the payload | What is filtered (`type`, `project`, `user`, `dashboard`, `widget`) is an attribute; SQL and chart settings are only read when shown |
 | Typed key attribute with set and unset patches | `planOrganize`, `organizeDashboard` in `apps/web/lib/dash/server/operations.ts`; `dashCte`, `dashboardListSql` in `apps/web/lib/dash/sql.ts` | The starred widget's live chart is the dashboard card cover | `cover` is a `key` attribute, so SQL accepts it only when a live link of the dashboard owner points to that widget; Organize sets it with `set` or removes it with `unset`, and every other attribute (`user`, `slug`, `title`) stays as it was |
 | Compound queries, cursor pages | `dashboardBundleExpr`, `widgetVersionExpr`, `queryAll` in `apps/web/lib/dash/entities.ts` | A dashboard with its links loads in one query | One scoped query (`$creator AND project AND ($key OR type AND dashboard)`) instead of one per link; every cursor page is read |
-| Expiration per type | `apps/web/lib/dash/schema.ts`, `apps/web/lib/dash/server/official.ts` | Time left chips; an expired widget leaves a named empty slot | Widgets live 1, 7, 30 or 90 days as the author chooses; dashboards 90 days renewed on save; links follow their dashboard; Featured 90 days renewed by the app |
+| Expiration per type | `apps/web/lib/dash/schema.ts`, `apps/web/lib/dash/server/official.ts` | Time left chips; an expired widget leaves a named empty slot | Widgets live 1, 7, 30 or 90 days as the author chooses; dashboards 90 days renewed on save; links follow their dashboard; Featured 90 days, checked by the app every 6 hours and renewed when under 30 days remain |
 | `extendEntity` as a lease | `extendWidgetDirect` in `apps/web/lib/dash/widget-actions.ts`, `planOrganize`, `keepOfficialAlive` | Extend button; saving a dashboard renews it; Featured shows Kept live | Activity keeps data alive: an extend adds the widget's lifetime again, capped at 90 days remaining |
 | Creation flags | `WIDGET_FLAGS` in `apps/web/lib/dash/schema.ts` | Anyone logged in can extend a user widget; nobody can rewrite it | `permissionlessExtension` lets a community keep a useful widget alive; `readonly` keeps the author and Featured marker unforgeable after transfer |
-| `$creator` and `$owner` | `scopeExpr`, `officialExpr`, `mineSql` | Featured chip with the owning address; My widgets; Transfer | Authorship from the chain, ownership transfer to the author |
+| `$creator` and `$owner` | `scopeExpr`, `officialExpr`, `mineSql` | Featured chip with the author address; My widgets; Transfer | Authorship from the chain, ownership transfer to the author |
 | Atomic batches | `createWidget`, `organizeDashboard`, `deleteDashboard` | A saved widget is yours at once; a dashboard layout saves whole | Create plus transfer (plus link) land in one transaction, so a widget is never left with the app wallet or a link without its widget |
-| Live updates | `apps/web/lib/live-tail.ts`, `apps/indexer/src/sync.ts` | New rows appear without a reload | Polling `eth_getLogs` instead of the SDK event watcher keeps explicit block windows and checkpoints, and the browser continues from the indexer's published block (`delta.toBlock + 1`) (SPECS §5) |
+| Live updates | `apps/web/lib/live-tail.ts`, `apps/indexer/src/sync.ts` | New rows appear without a reload | Polling `eth_getLogs` instead of the SDK event watcher keeps explicit block windows and checkpoints, and the browser continues from the indexer's published block (`delta.toBlock + 1`) (SPECS §5). We tested `watchEntityEvents` over WebSocket: it delivered every event while connected, but lost the blocks of a forced reconnect, which a checkpointed log window never does ([friction report](arkiv/friction.md#websocket-entity-events-tested-path-gap-on-reconnect)) |
 
 ## On chain evidence
 
@@ -99,7 +100,18 @@ All application entities are created by one wallet on Tiramisu. Explorer: https:
 | User owned widget "Total Entities" (flags `readonly` and `permissionlessExtension`, raw 3) | [`0x78ca2e9e…22be23`](https://tiramisu.explorer.arkiv.network/entity/0x78ca2e9ea9f292bc81a6356a89d7e73eddb6f491916209d673b6ec724b22be23), created and transferred in one tx [`0xa3668515…21f03`](https://tiramisu.explorer.arkiv.network/tx/0xa3668515f09911d190336e92457afba8759f79f3f18870e7d5a33f7cd7a21f03) (block 803,198, logs `EntityCreated` then `OwnershipTransferred`) |
 | Owner of that widget, a Privy embedded wallet | [`0x2f4d9088ff069c17c2ae6c051e3c78911b827757`](https://tiramisu.explorer.arkiv.network/address/0x2f4d9088ff069c17c2ae6c051e3c78911b827757) |
 
-Every transaction above was sent by the app wallet (`eth_getTransactionByHash` returns `from = 0x1f61c3cac1612c020f64739b128c5f198939c8cd`). On 20 October 2026 at block 805,079 the app wallet was creator of 76 live entities: 6 dashboards, 32 widgets (one owned by a user), 33 links and 5 `ticket` entities left by the removed demo writer. The Featured query below returned 67 entities (5 dashboards, 31 widgets, 31 links). Featured entities are renewed by the app wallet, the user widget expires at block 2,099,198 (about 19 November 2026) unless someone extends it, and the creation transactions stay on the explorer after expiry.
+Lifecycle actions not yet exercised on chain. Each row needs either the owner's logged in browser or a second funded wallet; none is filled in until its transaction exists and has been read back from the RPC.
+
+| Action | Expected on chain | Transaction |
+| :--- | :--- | :--- |
+| Widget saved with a 1 day lifetime | `EntityCreated` with `expiresAt` = block + 43,200, then `OwnershipTransferred` in the same tx | TODO |
+| Widget saved with a 7 day lifetime | `EntityCreated` with `expiresAt` = block + 302,400, then `OwnershipTransferred` | TODO |
+| Permissionless extend of a user widget, signed by a wallet that is neither creator nor owner | `ExpiryExtended`, tx `from` = that second wallet | TODO |
+| User transfers their widget to another address | `OwnershipTransferred` from the user's wallet | TODO |
+| User deletes their widget | `EntityDeleted` from the user's wallet | TODO |
+| Forgery attempt: a second wallet creates a dashboard with `project = arkiv-sql-indexer-dash`, `user = <app wallet>`, `login = arkiv`, `slug = network-overview` | `EntityCreated` with creator = second wallet; the app never lists it (`apps/web/test/forged-featured.test.ts` proves the SQL side on a fixture) | TODO |
+
+Every transaction above was sent by the app wallet (`eth_getTransactionByHash` returns `from = 0x1f61c3cac1612c020f64739b128c5f198939c8cd`). On 20 October 2026 at block 805,079 the app wallet was creator of 76 live entities: 6 dashboards, 32 widgets (one owned by a user), 33 links and 5 `ticket` entities left by the removed demo writer, which expire around 25 October 2026 ([arkiv/schema.md](arkiv/schema.md#leftover-ticket-entities)). The Featured query below returned 67 entities (5 dashboards, 31 widgets, 31 links). Featured entities are checked by the app wallet every 6 hours and renewed when under 30 days remain; all 67 were created at blocks 804,188 to 804,203 with exactly 90 days, so no renewal has fallen due yet (the first is due around 19 December 2026). The user widget expires at block 2,099,198 (about 19 November 2026) unless someone extends it, and the creation transactions stay on the explorer after expiry.
 
 List every live entity of the app wallet, or only the Featured ones, from the public RPC. An anonymous caller can get HTTP 429 `ANON_COST_LIMITED` when its hourly budget is spent (it happened to us while writing this section, see the [friction report](arkiv/friction.md#anonymous-budget-exhausted-again-on-20-october)); retry after `Retry-After`, add an API key, or point the same body at a deployment of this app's `/api/rpc`.
 
@@ -269,18 +281,53 @@ The indexer serves these paths at its root, and the web app proxies them read on
 | Request | Returns |
 | :--- | :--- |
 | `GET /health` | `{"headBlock","headLag","lastSnapshot","live","pending"}` |
-| `GET /manifest.json` | `chainId`, `genesisHash`, `expression`, `version`, `snapshotBlock`, `headBlock`, `files` (`entities`, `attributes`), `delta`, `live`, `pending` |
+| `GET /manifest.json` | `schemaVersion`, `chainId`, `genesisHash`, `expression`, `version`, `snapshotBlock`, `headBlock`, `files` (`entities`, `attributes`), `delta`, `live`, `pending` |
 | `GET /delta.json` | `{"fromBlock","toBlock","entities":[...],"attributes":[...],"tombstones":[{"key","block"}]}` for every key changed after `snapshotBlock` |
 | `GET` or `HEAD /snap/v<N>/entities.parquet` | Entity rows: `key`, `owner`, `creator`, `created_at`, `updated_at`, `expires_at`, `content_type`, `creation_flags`, `attrs_pending` |
 | `GET` or `HEAD /snap/v<N>/attributes.parquet` | Attribute rows: `key`, `name`, `type`, `value`, `num` |
 
 Manifest and delta use `Cache-Control: no-cache` with an ETag, so `If-None-Match` returns 304 when nothing changed. Parquet files are immutable (`public, max-age=300, immutable`) and support `Range` requests (206). Always read file paths from the manifest: the indexer publishes a new version about every 30 blocks and keeps only the latest two, so a 404 on a Parquet file means it was pruned and the manifest should be read again. Column meanings are in [arkiv/schema.md](arkiv/schema.md).
 
+### Compatibility: `schemaVersion`
+
+`schemaVersion` (currently `1`, `SCHEMA_VERSION` in `packages/core/src/types.ts`) versions the whole contract: the manifest fields, the `delta.json` shape and the columns of both Parquet files. It is unrelated to `version`, the snapshot counter that rises every 30 blocks.
+
+* **It is bumped** when a field or column is removed, renamed or retyped, or when its meaning changes (for example `expires_at` no longer being a block number, or a new delta merge rule).
+* **It is not bumped** for additions: a new optional manifest field or a new Parquet column. Consumers must ignore fields and columns they do not know.
+* **A consumer checks it** by reading `manifest.json` first and refusing anything but the version it was written for. A manifest without the field was published before versioning and reads as `1`. The web app does this in `schemaCheck` (`apps/web/lib/indexdb.ts`), and both scripts in `examples/` do the same. The hosted indexer gains the field on its next deploy; until then its manifest has none, which reads as `1`.
+
 ```sh
 BASE=https://arkiv-sql-indexer.dokploy.anshudhar.dev   # or http://localhost:3000/data
 curl -s $BASE/health
 curl -s $BASE/manifest.json
 ```
+
+### Tested consumers in `examples/`
+
+Both read the hosted indexer directly (manifest, then Parquet over HTTPS), check `schemaVersion` and compute the top creators of live entities. No web app, no API key and no RPC are involved.
+
+```sh
+./examples/top-creators.sh                                   # DuckDB CLI 1.5.5
+uv run --no-project --with duckdb python3 examples/top_creators.py   # or: pip install duckdb, then python3 examples/top_creators.py
+```
+
+Recorded on 20 October 2026 at 01:55 UTC. Output of the Python script (duckdb 1.5.6, CPython 3.14.7); the DuckDB CLI script printed the same snapshot and the same ten rows as box tables.
+
+```text
+schemaVersion 1 (absent), snapshot v1561 at block 805751, chain 7738577
+0xe33a7e038837a75f5bdd891afcfd48eae6a2b703    7309
+0xc7bd0b3731ed69a3c769050668cdbf4edb609ea9    2530
+0x182d1160966a15f0289f9d79dd862d2010eee3ac    2475
+0x822bb671e6ce0f2b69a500344764d9fede31e725    1749
+0x458d1c13ae8cd9a23aa62841b76f8a5dca6f0faa    1625
+0xd06d85eb20f126f796e4a341b711b1a757c66bd2    1426
+0x048a053e77e7771b212d04d906e7b70139fc3760    1425
+0x8fef3395e22bfbf31041d80f9e14462ccef9498d    1230
+0x679b5ab1cd4b488d73025d0d72d4017fa2d97b59     815
+0x1c92087ec55b3b4114c7647ecade3ab0b494c9b6     682
+```
+
+`examples/verify_against_chain.py` rechecks indexed rows against the chain; see [Judge reproduction](#judge-reproduction), step 8.
 
 Count snapshot rows with the DuckDB CLI (tested against the hosted indexer: 36,456 rows):
 
@@ -316,22 +363,7 @@ CREATE TABLE live AS
 SELECT count(*) AS live_entities FROM live WHERE expires_at > (SELECT toBlock FROM delta);
 ```
 
-Python with the `duckdb` package (untested sketch, same SQL as above):
-
-```python
-import duckdb, json, urllib.request
-
-base = "https://arkiv-sql-indexer.dokploy.anshudhar.dev/"
-manifest = json.load(urllib.request.urlopen(base + "manifest.json"))
-con = duckdb.connect()
-con.execute("INSTALL httpfs; LOAD httpfs;")
-print(con.sql(f"""
-  SELECT a.name, count(*) AS entities
-  FROM read_parquet('{base}{manifest['files']['entities']}') e
-  JOIN read_parquet('{base}{manifest['files']['attributes']}') a USING (key)
-  GROUP BY a.name ORDER BY entities DESC LIMIT 5
-""").fetchall())
-```
+From Python, follow `examples/top_creators.py`: read the manifest with `urllib`, then pass the Parquet URLs from it to `con.execute(...)` as parameters. Any SQL above runs the same way.
 
 ## Judge reproduction
 
@@ -342,6 +374,26 @@ print(con.sql(f"""
 5. Run `SELECT key, creator, owner, updated_at, expires_at FROM entities LIMIT 20` and click Payload or Verify on a row (or Verify page for all rows). Payload fetches the payload by `$key` from the RPC. Verify compares `updatedAt` and `expiresAt` from the RPC with the indexed row and the live head, and labels it `ok`, `stale`, `extended`, `expired` or `deleted`.
 6. Watch expiry: `SELECT key, expires_at FROM entities ORDER BY expires_at LIMIT 5`, wait until the status bar's chain block passes one `expires_at`, and run it again. The row is gone without any event, because the public `entities` view filters against the live head read from RPC.
 7. Optional: `bun install && bun test` runs every suite offline against fakes. `apps/indexer/test/keyless.test.ts` asserts that no default indexer request carries `Authorization` or `X-API-Key`.
+8. The chain, not the index, is the trust anchor. Serve an old store with no RPC calls and recheck it against the chain:
+
+   ```sh
+   SYNC_PAUSED=true DATA_DIR=./data PORT=18080 bun apps/indexer/src/main.ts &   # any data directory a few hours old
+   uv run --no-project --with duckdb python3 examples/verify_against_chain.py http://localhost:18080
+   uv run --no-project --with duckdb python3 examples/verify_against_chain.py   # the live hosted index, for contrast
+   ```
+
+   The script applies the Verify rule (`classifyVerify` in `apps/web/lib/verify.ts`) to the 50 most recently updated rows, with one `arkiv_query` (about 100 anonymous units). Recorded on 20 October 2026 at 01:58 UTC with a store paused at block 757,400:
+
+   ```text
+   index snapshot at block 757400, chain head 805878, 48478 blocks behind
+   labels: {'deleted': 45, 'extended': 5}
+     extended 0x78bf29fa2df02658  index updated 757400 expires 768200  chain updated 805070 expires 815870
+     deleted  0xc3588a258e0f4f9b  index updated 757400 expires 758300  not on chain
+   index snapshot at block 805871, chain head 805881, 10 blocks behind
+   labels: {'ok': 50}
+   ```
+
+   The labels come from the chain, so a stale or lying index cannot pass as current. The rule itself is unit tested in `apps/web/test/helpers.test.ts` ("verification branches": `deleted`, `expired`, `extended`, `stale` and `ok`). In the web app, Verify uses the same rule, but the browser live tail replays chain logs on top of a paused index (windows of 1,000 blocks every 4 seconds), so a stale copy shows `stale` or `extended` rows only until the tail has caught up, and rows whose expiry has passed are hidden by the `entities` view rather than labelled.
 
 ## Security and trust
 

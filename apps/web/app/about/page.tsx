@@ -200,7 +200,7 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build`}
         <tr><th scope="row">Widget</th><td>1, 7, 30 or 90 days, your choice</td><td>You decide how long a public query stays public. Each extend adds that lifetime again, so it lives while someone keeps renewing it. The 90 day cap is an app rule, not an Arkiv limit.</td></tr>
         <tr><th scope="row">Dashboard</th><td>90 days, renewed on every save</td><td>Editing a dashboard is the activity that keeps it alive.</td></tr>
         <tr><th scope="row">Link</th><td>Same expiry as its dashboard</td><td>A placement never outlives its dashboard or dies before it.</td></tr>
-        <tr><th scope="row">Featured</th><td>90 days, renewed by the app</td><td>A lease: every 6 hours the app wallet extends anything with fewer than 30 days left back to 90.</td></tr>
+        <tr><th scope="row">Featured</th><td>90 days, kept alive by the app</td><td>A lease: every 6 hours the app wallet checks Featured entities and extends any with fewer than 30 days left back to 90. The first renewal falls due about 60 days after creation.</td></tr>
        </tbody>
       </table>
      </div>
@@ -213,7 +213,8 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build`}
      <p>When a result has a <code>key</code> column, Verify (or Verify page for every row) asks the RPC for each key&apos;s current update block, expiry and owner, in batches of 50, and compares them with your copy:</p>
      <dl className={s.statuses}>{VERIFY.map(v => <div key={v.label}><dt><span className={`chip ${v.tone}`}>{v.label}</span></dt><dd>{v.text}</dd></div>)}</dl>
      <p>This is a consistency check against the RPC, not a cryptographic proof, because <code>eth_getProof</code> is not available on Arkiv.</p>
-     <Src files={['apps/web/lib/verify.ts', 'apps/web/components/dash/ResultsGrid.tsx']}/>
+     <p>The chain is the reference, not the index. To see a stale copy caught, start an indexer with <code>SYNC_PAUSED=true</code> on an old data directory and run <code>examples/verify_against_chain.py</code> against it: it applies the same rule to the 50 newest rows. On 20 October 2026 a copy 48,478 blocks behind came back 45 <code>deleted</code> and 5 <code>extended</code>, while the live hosted index came back 50 <code>ok</code>. In this app the browser live tail replays chain logs on top of a paused index, so here a stale copy shows only until the tail catches up.</p>
+     <Src files={['apps/web/lib/verify.ts', 'apps/web/components/dash/ResultsGrid.tsx', 'examples/verify_against_chain.py', 'apps/web/test/helpers.test.ts']}/>
     </Section>
 
     <Section id="reproduce" title="Reproduce it">

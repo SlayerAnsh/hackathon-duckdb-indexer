@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { MATERIALIZE_SQL, RAW_TABLES_SQL, MERGE_VIEWS_SQL, setHeadSql, type Delta, type Manifest } from '@asi/core'
-import { applyDeltaSql, chainCheck } from '../lib/indexdb'
+import { applyDeltaSql, chainCheck, schemaCheck } from '../lib/indexdb'
 
 const empty: Delta = { fromBlock: 1, toBlock: 2, entities: [], attributes: [], tombstones: [] }
 
@@ -37,6 +37,15 @@ test('chain mismatch has reason', () => {
 test('genesis mismatch has reason', () => {
   expect(chainCheck(manifest, 1, '0xdef').ok).toBe(false)
   expect(chainCheck(manifest, 1, '0xdef').reason).toMatch(/genesis/i)
+})
+test('a manifest without schemaVersion predates versioning and is accepted as version 1', () => {
+  expect(schemaCheck(manifest)).toEqual({ ok: true })
+  expect(schemaCheck({ ...manifest, schemaVersion: 1 })).toEqual({ ok: true })
+})
+test('a newer schemaVersion is refused with a reason naming both versions', () => {
+  const check = schemaCheck({ ...manifest, schemaVersion: 2 })
+  expect(check.ok).toBe(false)
+  expect(check.reason).toMatch(/schema version 2.*reads version 1/)
 })
 
 test('run excludes queued wait and measures send through last batch', async () => {

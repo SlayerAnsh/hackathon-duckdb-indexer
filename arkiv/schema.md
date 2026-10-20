@@ -11,6 +11,8 @@ Every entity also has the system fields `key`, `owner`, `creator`, `createdAt`, 
 * `entities`: `key`, `owner`, `creator`, `created_at`, `updated_at`, `expires_at`, `content_type`, `creation_flags`, `attrs_pending`.
 * `attributes`: `key`, `name`, `type`, `value`, `num`.
 
+These columns, the manifest fields and the `delta.json` shape form the data contract, versioned by `schemaVersion` in `manifest.json` (currently `1`, `SCHEMA_VERSION` in `packages/core/src/types.ts`). The version is bumped only when a field or column is removed, renamed or retyped, or its meaning changes; adding a column or an optional field keeps it, and consumers ignore what they do not know. A consumer reads the manifest first and refuses any version other than the one it was written for; a manifest without the field predates versioning and reads as `1` (`schemaCheck` in `apps/web/lib/indexdb.ts`, `examples/`).
+
 Block numbers are numeric. Addresses and keys are lowercase hex. `value` is canonical text (decimal for `u64`, `u256`, `i32` and `dec`; lowercase `0x` hex for `addr`, `key` and `bytes32`). `num` is an approximate DOUBLE for numeric types and `bool`. `attrs_pending` is true for rows written from log data whose attributes are not fetched yet; these rows have no attribute rows. `attributes` follows only the winning live entity version. Both views hide rows with `expires_at <= live_head`.
 
 ## Exact Arkiv queries
@@ -97,7 +99,7 @@ The web backend writes `widget`, `dashboard` and `link` entities with `contentTy
 | User widget | 1, 7, 30 or 90 days, chosen by the author (`lifetimeDays`) | Anyone logged in signs `extendEntity`, adding `lifetimeDays` again, capped at 90 days remaining | Expiry, or the owner deletes it |
 | Dashboard | 90 days | Every Organize save extends it to head plus 90 days | Expiry, or the owner deletes it with its links |
 | Link | The dashboard's current expiry block | Extended with its dashboard on every Organize save | Expiry, removal in Organize, or dashboard delete |
-| Featured dashboard, widget and link | 90 days | App wallet keepalive: every 6 hours, anything with fewer than 30 days left goes to head plus 90 days | Expiry, if the app stops running |
+| Featured dashboard, widget and link | 90 days | App wallet keepalive: checked every 6 hours, and anything with fewer than 30 days left goes to head plus 90 days. No renewal has fallen due yet; the first is due about 60 days after creation | Expiry, if the app stops running |
 
 ### Why these choices
 
@@ -107,7 +109,7 @@ The web backend writes `widget`, `dashboard` and `link` entities with `contentTy
 * **Dashboards 90 days, renewed on save; links follow their dashboard.** Editing a dashboard is the activity that keeps it alive. A link carries the dashboard's expiry block, so a placement never outlives its dashboard or dies before it; an expired widget leaves a named empty slot instead of a broken layout.
 * **Featured keepalive.** Featured dashboards are the landing content, so the app wallet renews them as a lease from inside the web server (`apps/web/lib/dash/server/keepalive.ts`), with no cron job, public endpoint or extra secret.
 * **One atomic batch.** `executeBatch` applies every operation or none (SDK `clients/decorators/arkivWallet.ts`: "the whole batch applies or none of it does"). Create plus `ownershipChanges` means a saved widget is never left owned by the app wallet; widget plus link means a link never points at a widget that failed to create; Organize saves a whole layout (creates, patches, deletes, extensions) or nothing. Keys come from `predictEntityKeys` inside the same serial queue slot, because a prediction holds only while nothing else from that owner is in flight.
-* **Polling instead of WebSocket events.** Both the indexer and the browser poll `eth_getLogs` directly rather than using the SDK event watcher, which gives explicit block windows and checkpoints (SPECS §5). The indexer commits a checkpoint per batch, and the browser live tail starts at `delta.toBlock + 1`, exactly where the indexer's published window ends.
+* **Polling instead of WebSocket events.** Both the indexer and the browser poll `eth_getLogs` directly rather than using the SDK event watcher, which gives explicit block windows and checkpoints (SPECS §5). The indexer commits a checkpoint per batch, and the browser live tail starts at `delta.toBlock + 1`, exactly where the indexer's published window ends. We tested `watchEntityEvents` over the Tiramisu WebSocket on 20 October 2026: it pushed every event while connected, but after a forced reconnect it resumed at the new head and skipped the blocks in between ([friction report](friction.md#websocket-entity-events-tested-path-gap-on-reconnect)). A mirror that must not miss a key needs the checkpointed window anyway.
 * **`cover` as a typed `key` attribute.** It is queryable and joinable in SQL: list queries accept the cover only when a live link of the dashboard owner points at that widget (`dashCte` and `dashboardListSql` in `apps/web/lib/dash/sql.ts`). Organize sets it with a patch `set` and removes it with `unset: ['cover']`; a patch names only what changes (SDK `actions/wallet/patchEntity.ts`: "Attributes it does not mention keep whatever value they have"), so `user`, `login`, `title` and `slug` stay as they were.
 
 ### Payloads and enums
@@ -234,4 +236,20 @@ Legacy widgets without creation flags remain owned by the app wallet and have no
 
 User facing copy calls these Featured; code and helpers use the name official (`apps/web/lib/dash/official.ts`). An entity is Featured when its `user` attribute and `$owner` both equal the app wallet address. Readers still require the app wallet as creator and the dashboard project tag. Featured widgets and dashboards use `login = arkiv`. Featured dashboards also carry a string `slug` attribute with at most 64 bytes, matching `^[a-z0-9]+(?:-[a-z0-9]+)*$`.
 
-Featured dashboards, widgets and links have 90 day lifetimes and are renewed by the app wallet: an in process timer runs 60 seconds after server start and then every 6 hours, reads `officialExpr(W)`, and extends every live Featured entity with fewer than 30 days left to head plus 90 days in batches of 50 (`apps/web/lib/dash/server/keepalive.ts`, `keepOfficialAlive`). The same pass reconciles the configured covers. A user cannot forge a Featured entity through the API: the server derives `user` from the verified session, refuses app wallet sessions and rejects app wallet addresses in every user write operation. Readers accept `login = arkiv` only when `user` equals the app wallet.
+Featured dashboards, widgets and links have 90 day lifetimes and are kept alive by the app wallet: an in process timer runs 60 seconds after server start and then every 6 hours, reads `officialExpr(W)`, and extends every live Featured entity with fewer than 30 days left to head plus 90 days in batches of 50 (`apps/web/lib/dash/server/keepalive.ts`, `keepOfficialAlive`). The same pass reconciles the configured covers. A user cannot forge a Featured entity through the API: the server derives `user` from the verified session, refuses app wallet sessions and rejects app wallet addresses in every user write operation. Readers accept `login = arkiv` only when `user` equals the app wallet.
+
+On 20 October 2026 at block 805,828 the 67 live Featured entities had been created at blocks 804,188 to 804,203 and expired at blocks 4,692,188 to 4,692,203, exactly 90 days later, so no keepalive extension had been sent yet. The first falls due when fewer than 30 days remain, around 19 December 2026.
+
+## Leftover `ticket` entities
+
+The app wallet is also the creator of 5 `ticket` entities with `project = arkiv-sql-indexer-demo`. A demo writer (`apps/demo-writer`, added in `852c707`) created them on 18 October 2026 as sample data for the indexer, before widgets and dashboards existed. Commit `9599b10` removed the writer on 20 October 2026, and nothing in the app reads or writes these entities any more; every application read is scoped to `project = arkiv-sql-indexer-dash`. They were left to expire rather than deleted, which costs nothing and shows Entity Expiration at work.
+
+| Attribute | Arkiv type | Values seen |
+| :--- | :--- | :--- |
+| type | str | `ticket` |
+| project | str | `arkiv-sql-indexer-demo` |
+| title | str | `Coral console`, `Blue widget`, `Amber console`, `Blue beacon`, `Coral beacon` |
+| status | str | `open` or `closed` |
+| priority | u64 | 1 to 3 |
+
+Payload `text/plain`, creation flags `permissionlessExtension` (raw 2), owner and creator the app wallet. Read back through `POST /api/rpc` on 20 October 2026 at block 805,811 with `$creator = addr(0x1f61c3cac1612c020f64739b128c5f198939c8cd) AND project = str('arkiv-sql-indexer-demo')`: created at blocks 744,721 to 744,807 with lifetimes of about 7 days (about 302,400 blocks), they expire at blocks 1,047,142 to 1,047,207, about 25 October 2026 at 16:00 UTC. After that only their creation transactions remain on the explorer.

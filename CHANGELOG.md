@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+* Data contract versioning: `manifest.json` carries `schemaVersion` (`SCHEMA_VERSION = 1` in `packages/core`), bumped only on a breaking change. The web app refuses a newer version (`schemaCheck`) and reads a manifest without the field as version 1. README "Data API" and `arkiv/schema.md` state the compatibility rule.
+
+* `examples/`: `top-creators.sh` (DuckDB CLI) and `top_creators.py` (duckdb package) read the hosted indexer directly and compute the top creators; `verify_against_chain.py` applies the Verify rule to indexed rows against the public RPC. README records their output of 20 October 2026, including a paused store caught as 45 `deleted` and 5 `extended` rows.
+
+* Accuracy: the anonymous query rate is stated as an estimate from the measured `Arkiv-Cost: 100`; the Featured chip address is described as the author address; Featured renewal is described as checked every 6 hours and due when under 30 days remain (none has fallen due yet); `arkiv/schema.md` documents the 5 leftover `ticket` entities; the subgraph comparison names expiry, redeploys and the hosting trust point. README "On chain evidence" lists the lifecycle actions still to be exercised on chain as TODO rows.
+
+* Friction report: tested `watchEntityEvents` over the Tiramisu WebSocket (complete while connected, a gap of 2 to 3 logs across a forced reconnect), measured the anonymous `Arkiv-Cost`, and recorded that the public RPC answers HTTP 403 to the default Python user agent. A fixture test (`apps/web/test/forged-featured.test.ts`) proves a dashboard forged by another wallet with every Featured attribute is never listed.
+
 * Dashboard covers: an owner stars one widget in Organize, stored as the `cover` key attribute, and dashboard cards show its live chart with an automatic fallback when the cover is unavailable. `seed-official.ts --set-covers` (with optional `--dry-run`) applies the configured covers to existing Featured dashboards; keepalive keeps them in step.
 
 * Submission docs: README and /about name the harmed users per pillar, explain why Arkiv and what stays off it, list how each Arkiv feature is used and why, and give an on chain evidence table for the real app wallet `0x1f61c3cac1612c020f64739b128c5f198939c8cd` (the previously cited address had no entities). `arkiv/schema.md` adds expiry per entity type, the reasons for each feature choice, the Featured `officialExpr` query and the app's DuckDB queries. `arkiv/friction.md` adds five entries for 19 and 20 October (create and transfer in one batch, wallet transport retries, extend at the cap, the anonymous budget on 20 October, the keyless fill backlog) and corrects the viem version to 2.57.7. Dates now state the extended deadline of 20 October 2026.

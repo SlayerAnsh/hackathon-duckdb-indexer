@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test'
-import { readdir, readFile, mkdir } from 'node:fs/promises'
+import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { writeSnapshot, readManifest } from '../src/snapshot'
+import { writeSnapshot, readManifest, refreshManifestCounts } from '../src/snapshot'
 import { Store } from '../src/store'
 import { temp, track, row, rows, hash, expression } from './helpers'
 const meta = { chainId: 1, genesisHash: hash, expression }
@@ -10,7 +10,7 @@ test('versioned parquet filters expired entities and attributes; manifest is ren
   expect(await readManifest(dir)).toBeNull()
   await s.upsert([row('expired', 100), row('live', 101)], 100)
   const m = await writeSnapshot(s, dir, 100, meta, 2)
-  expect(m).toEqual({ ...meta, version: 1, snapshotBlock: 100, headBlock: 100, files: { entities: 'snap/v1/entities.parquet', attributes: 'snap/v1/attributes.parquet' }, delta: 'delta.json', live: 1, pending: 0 })
+  expect(m).toEqual({ schemaVersion: 1, ...meta, version: 1, snapshotBlock: 100, headBlock: 100, files: { entities: 'snap/v1/entities.parquet', attributes: 'snap/v1/attributes.parquet' }, delta: 'delta.json', live: 1, pending: 0 })
   for (const file of Object.values(m.files)) expect(await rows(s, "SELECT key FROM read_parquet('" + join(dir, file) + "')")).toEqual([{ key: 'live' }])
   expect(await readManifest(dir)).toEqual(m)
   expect(await readdir(dir)).not.toContain('manifest.json.tmp')
@@ -50,4 +50,13 @@ test('failed snapshot retains replay keys and fetched progress until publication
   await rm(join(dir, 'manifest.json.tmp'), { recursive: true })
   await writeSnapshot(s, dir, 100, meta, 1)
   expect(await rows(s, "SELECT 1 FROM information_schema.tables WHERE table_name LIKE 'replay_%'")).toHaveLength(0)
+})
+test('refreshing counts stamps schemaVersion on a manifest written before versioning', async () => {
+  const dir = await temp(), s = track(await Store.open(dir, expression, 1, hash))
+  await s.upsert([row('live', 200)], 100)
+  const { schemaVersion, ...legacy } = await writeSnapshot(s, dir, 100, meta, 2)
+  expect(schemaVersion).toBe(1)
+  await writeFile(join(dir, 'manifest.json'), JSON.stringify(legacy))
+  await refreshManifestCounts(s, dir)
+  expect(await readManifest(dir)).toEqual({ ...legacy, schemaVersion: 1, live: 1, pending: 0 })
 })

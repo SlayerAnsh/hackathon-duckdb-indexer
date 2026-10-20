@@ -8,7 +8,14 @@ export type EntityRow = {
 }
 export type AttributeRow = { key: string; name: string; type: AttrType; value: string; num: number | null }
 export type Tombstone = { key: string; block: number }
+/**
+ * Version of the published data contract: the manifest fields and the entities/attributes Parquet
+ * columns. Bumped only on a breaking change (a column or field removed, renamed or retyped, or a
+ * meaning changed). Adding a column or an optional field keeps the version.
+ */
+export const SCHEMA_VERSION = 1
 export type Manifest = {
+  schemaVersion?: number   // absent in manifests published before versioning; read as 1
   chainId: number; genesisHash: string; expression: string
   version: number; snapshotBlock: number; headBlock: number
   files: { entities: string; attributes: string }; delta: string

@@ -2,7 +2,7 @@ import * as T from '@duckdb/node-api'
 import { clearReplay } from './replay'
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import type { Manifest } from '@asi/core'
+import { SCHEMA_VERSION, type Manifest } from '@asi/core'
 import type { Store } from './store'
 export async function readManifest(dir: string): Promise<Manifest | null> {
   try { return JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')) }
@@ -16,7 +16,7 @@ async function publishManifest(dir: string, manifest: Manifest): Promise<void> {
 export async function refreshManifestCounts(store: Store, dir: string): Promise<void> {
   const manifest = await readManifest(dir), state = await store.state()
   if (!manifest || !state) return
-  await publishManifest(dir, { ...manifest, ...await store.counts(state.head_block) })
+  await publishManifest(dir, { ...manifest, schemaVersion: SCHEMA_VERSION, ...await store.counts(state.head_block) })
 }
 export async function writeSnapshot(store: Store, dir: string, head: number, meta: { chainId: number; genesisHash: string; expression: string }, keep: number): Promise<Manifest> {
   if (!Number.isSafeInteger(head) || head < 0) throw Error('Invalid snapshot head')
@@ -30,7 +30,7 @@ export async function writeSnapshot(store: Store, dir: string, head: number, met
   const quote = (path: string) => "'" + resolve(dir, path).replaceAll("'", "''") + "'"
   await store.conn.run(`COPY (SELECT * FROM entities WHERE expires_at > ${head}) TO ${quote(files.entities)} (FORMAT parquet)`)
   await store.conn.run(`COPY (SELECT a.* FROM attributes a JOIN entities e USING (key) WHERE e.expires_at > ${head}) TO ${quote(files.attributes)} (FORMAT parquet)`)
-  const manifest: Manifest = { ...meta, version, snapshotBlock: head, headBlock: head, files, delta: 'delta.json', ...await store.counts(head) }
+  const manifest: Manifest = { schemaVersion: SCHEMA_VERSION, ...meta, version, snapshotBlock: head, headBlock: head, files, delta: 'delta.json', ...await store.counts(head) }
   await publishManifest(dir, manifest)
   await store.transaction(async () => {
     await store.conn.run('DELETE FROM changes WHERE block <= ?', [head], [T.UBIGINT])

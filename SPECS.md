@@ -38,7 +38,7 @@ Non goals: server side SQL endpoint, history beyond current state, Parquet expir
 - `select` fields: `key, owner, creator, createdAt, updatedAt, expiresAt, creationFlags, contentType, payload, attributeSchema, attributes`. All default off except `key`. `updatedAt` is selectable even though `$updatedAt` cannot be used as a predicate.
 - `$key` works as a predicate: the SDK `getEntity` is `arkiv_query("$key = <key>", select "*", limit 1)`. There is no `arkiv_getEntity` call in the SDK.
 - Attribute values arrive typed by tag: `i32` as a JSON number, `u64` and `u256` as `0x` quantities, `dec` as a decimal string, byte types as `0x` data, `str` as a string.
-- `watchEntityEvents({ fromBlock?, pollingInterval?, onEvent, onError })` polls logs from `ARKIV_ADDRESS` (`0x4400000000000000000000000000000000000044`). Default polling is half a block. Events: `EntityCreated`, `EntityPatched`, `ExpiryExtended`, `OwnershipTransferred`, `EntityDeleted`, each with `blockNumber`, `transactionHash`, `logIndex`, `entityKey`.
+- `watchEntityEvents({ fromBlock?, pollingInterval?, onEvent, onError })` wraps viem `watchEvent` on `ARKIV_ADDRESS` (`0x4400000000000000000000000000000000000044`). Over an HTTP transport, or with `fromBlock`, it polls (default interval half a block); over a WebSocket transport without `fromBlock` viem uses an `eth_subscribe` push subscription (viem `actions/public/watchEvent.ts`, `enablePolling`). Events: `EntityCreated`, `EntityPatched`, `ExpiryExtended`, `OwnershipTransferred`, `EntityDeleted`, each with `blockNumber`, `transactionHash`, `logIndex`, `entityKey`.
 - Block time is 2 seconds (`BLOCK_TIME` constant).
 - Bun 1.3.11 runs `@duckdb/node-api` 1.5.6 and writes and reads Parquet (smoke tested). `COPY ... TO 'dir' (FORMAT parquet)` without `PARTITION_BY` writes a single file named `dir`, so always give a full file path.
 
@@ -61,7 +61,7 @@ Non goals: server side SQL endpoint, history beyond current state, Parquet expir
 
 1. `atBlock` 200,000 blocks back (about 4.6 days) worked (section 4).
 2. Chunk size: 50 `$key` terms per query (section 4).
-3. `watchEntityEvents` is not used. Both the indexer and the browser poll `eth_getLogs` directly, which gives explicit windows and checkpoints.
+3. `watchEntityEvents` is not used. Both the indexer and the browser poll `eth_getLogs` directly, which gives explicit windows and checkpoints. Tested on 20 October 2026 over `wss://rpc.tiramisu.db-chain.testnet.arkiv.network`: the subscription delivered one batch per block while connected, but after a forced socket close viem resubscribed at the new head and 2 to 3 logs from the blocks mined during the reconnect were never delivered (`arkiv/friction.md`, WebSocket entity events). A window that restarts from a stored checkpoint cannot skip a block, so polling stays.
 4. The browser uses a one row `live_head` table instead of `getvariable()`.
 5. `expiresAt` is a block number, and an entity is live while `expiresAt > block`.
 
@@ -230,13 +230,13 @@ Contents: latest state for every key in `changes` above the snapshot block. Big 
 ### 7.8 Manifest
 
 ```json
-{ "chainId": 60138453045, "genesisHash": "0x..", "expression": "$creator = 0x..",
+{ "schemaVersion": 1, "chainId": 60138453045, "genesisHash": "0x..", "expression": "$creator = 0x..",
   "version": 12, "snapshotBlock": 1200, "headBlock": 1217,
   "files": { "entities": "snap/v12/entities.parquet", "attributes": "snap/v12/attributes.parquet" },
   "delta": "delta.json", "live": 30700, "pending": 18200 }
 ```
 
-`live` counts entities alive at the head and `pending` those still waiting for attributes. The indexer rewrites these two counts after each fill; the browser shows a progress line while `pending` is above zero.
+`schemaVersion` versions the data contract (manifest fields, delta shape, Parquet columns) and is bumped only on a breaking change; additions keep it. Consumers refuse other versions, and a manifest without it reads as 1 (README, Compatibility). `live` counts entities alive at the head and `pending` those still waiting for attributes. The indexer rewrites these two counts after each fill; the browser shows a progress line while `pending` is above zero.
 
 ### 7.9 HTTP (Bun.serve)
 

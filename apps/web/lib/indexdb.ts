@@ -1,4 +1,4 @@
-import { ENTITY_INSERT_COLUMNS, LIVE_TABLES, RAW_TABLES_SQL, MERGE_VIEWS_SQL, MATERIALIZE_SQL, setHeadSql, loadSnapshotSql, type Delta, type Manifest } from '@asi/core'
+import { SCHEMA_VERSION, ENTITY_INSERT_COLUMNS, LIVE_TABLES, RAW_TABLES_SQL, MERGE_VIEWS_SQL, MATERIALIZE_SQL, setHeadSql, loadSnapshotSql, type Delta, type Manifest } from '@asi/core'
 import type { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm'
 import { LiveTail, type LiveStatus } from './live-tail'
 import { createBrowserRpc } from './rpc-browser'
@@ -24,6 +24,12 @@ export function chainCheck(m: Manifest, chainId: number, genesisHash: string): {
   if (m.chainId !== chainId) return { ok: false, reason: 'chain ID mismatch' }
   if (m.genesisHash.toLowerCase() !== genesisHash.toLowerCase()) return { ok: false, reason: 'genesis hash mismatch' }
   return { ok: true }
+}
+
+/** A manifest without `schemaVersion` predates versioning and reads as version 1. A newer version is refused. */
+export function schemaCheck(m: Manifest, supported = SCHEMA_VERSION): { ok: boolean; reason?: string } {
+  const version = m.schemaVersion ?? 1
+  return version === supported ? { ok: true } : { ok: false, reason: 'unsupported data schema version ' + version + ', this client reads version ' + supported }
 }
 
 export type IndexState = {
@@ -234,6 +240,8 @@ export class IndexDb {
       const manifestResponse = await this.data('manifest.json')
       const source = manifestResponse.headers.get('x-served-by') === 'disk' ? 'disk' : 'indexer'
       const manifest: Manifest = await manifestResponse.json()
+      const schema = schemaCheck(manifest)
+      if (!schema.ok) throw new Error(schema.reason)
       if (!this.chain) { const [id, genesis] = await Promise.all([this.rpc.chainId(), this.rpc.genesisHash()]); this.chain = { id, genesis } }
       const check = chainCheck(manifest, this.chain.id, this.chain.genesis)
       const plan = snapshotPlan({ loadedVersion: this.state.manifest?.version, latestVersion: manifest.version, loadedAt: this.loadedAt, now: this.now(), tailing: !!this.tail })

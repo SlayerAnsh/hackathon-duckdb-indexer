@@ -17,6 +17,7 @@ Use Bun 1.3.x (tested with 1.3.11). Docker uses `oven/bun:1.3` for workspace ins
 | `apps/web/app/api/rpc` | Keyed read only RPC proxy for browser reads (logic in `lib/dash/server/rpc-proxy.ts`) |
 | `apps/web/lib/dash/server` | Server only code: Privy auth, sessions, nonces, rate limits, wallet queue, operations, Featured seed and keepalive, RPC proxy |
 | `arkiv` | Entity schema, exact queries, and the friction report |
+| `examples` | External consumers of the data contract, run against the hosted indexer: DuckDB CLI and Python top creators, and a Verify style recheck of indexed rows against the RPC. Not part of `bun test`; they need the network and DuckDB (`uv run --no-project --with duckdb python3 ...`) |
 | `test/deployment.test.ts` | Offline deployment and documentation checks |
 
 From the repository root:

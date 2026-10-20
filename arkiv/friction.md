@@ -1,6 +1,6 @@
 # Arkiv integration friction
 
-These observations come from the Tiramisu spike and measurements of 18 October 2026 (recorded in SPECS §4), from building the widget and dashboard write paths on 19 and 20 October 2026, and from the workarounds now in the code. Each entry names the code that handles it.
+These observations come from the Tiramisu spike and measurements of 18 October 2026 (recorded in SPECS §4), from building the widget and dashboard write paths on 19 and 20 October 2026, from tests run on 20 October 2026 for this report (WebSocket entity events, anonymous query cost, RPC access from Python), and from the workarounds now in the code. Each entry names the code that handles it.
 
 Versions throughout: `@arkiv-network/sdk` 0.8.1, viem 2.57.7, Bun 1.3.11, Tiramisu chain ID 7738577 at `https://rpc.tiramisu.db-chain.testnet.arkiv.network`. The node server software version was not exposed. Reproduction requests spend provider budget.
 
@@ -16,6 +16,8 @@ Versions throughout: `@arkiv-network/sdk` 0.8.1, viem 2.57.7, Bun 1.3.11, Tirami
 | SDK wallet client (`executeBatch`, `createEntity`, `patchEntity`, `extendEntity`, `changeOwnership`, `predictEntityKeys`, `ExpirationTime`) | `apps/web/lib/dash/server/operations.ts` (app wallet), `apps/web/lib/dash/widget-actions.ts` (browser signed widget actions) | Mutation errors, create and transfer in one batch, extend at the cap |
 | viem `custom` transport over the Privy embedded wallet | `apps/web/lib/dash/wallet.ts`, `apps/web/components/auth/PrivyBridge.tsx` | Wallet transport retries |
 | Same origin read proxy `POST /api/rpc` | `apps/web/lib/dash/server/rpc-proxy.ts` | Anonymous budget exhausted again |
+| SDK `watchEntityEvents` over the Tiramisu WebSocket RPC | Not used in the app; tested for this report | WebSocket entity events |
+| Public RPC from a script (Python `urllib`) | `examples/verify_against_chain.py` | RPC rejects the default Python user agent |
 
 ## Anonymous query budget and error envelope
 
@@ -84,7 +86,7 @@ Pricing guidance should explain whether selection size, page size and key count 
 
 ### Actual
 
-Authenticated `arkiv_query` calls each cost 100 units according to `Arkiv-Cost: 100`. A single key, 50 OR keys, a full 200 row page and a failing call all showed the same cost. The header alone does not describe monthly quota consumption (see the quota observations below). Chain wide churn makes one query per entity event unnecessarily costly.
+Authenticated `arkiv_query` calls each cost 100 units according to `Arkiv-Cost: 100`. A single key, 50 OR keys, a full 200 row page and a failing call all showed the same cost. Anonymous calls show the same header: on 20 October 2026 at 01:55 UTC, one anonymous `$key = key(0x78d7…24376)` query with limit 1 and one anonymous query rejected by the parser (an untyped hex literal, code `-32001`) each returned `Arkiv-Cost: 100` and `RateLimit: limit=600, remaining=…, reset=60`. That per minute limit is not the hourly anonymous budget of 10,000 units, which no header reports, so the "about 100 anonymous queries an hour" we use elsewhere is 10,000 divided by the header cost, an estimate. The 18 October observation that one broad query exhausted the whole budget means the header does not always equal what is charged. The header alone does not describe monthly quota consumption (see the quota observations below). Chain wide churn makes one query per entity event unnecessarily costly.
 
 Workaround: no `arkiv_query` runs per event anywhere. The indexer and browser batch up to 50 keys per query, and Payload and Verify are explicit user clicks.
 
@@ -94,7 +96,7 @@ SDK 0.8.1, viem 2.57.7, Bun 1.3.11, authenticated Tiramisu on 18 October 2026; s
 
 ### Steps to reproduce
 
-1. Send an authenticated single key query and record `Arkiv-Cost`.
+1. Send an authenticated single key query and record `Arkiv-Cost`. Repeat it without a key and compare `Arkiv-Cost` and `RateLimit`.
 2. Send a 50 key OR query and a selective 200 row page with full selection.
 3. Compare the cost headers, then compare a known failing overlength query if budget permits.
 
@@ -270,7 +272,7 @@ Workaround, in two commits on 20 October: `3857bd1` shows "RPC budget exhausted,
 
 **Expected.** A mirror that never sends an API key should still converge to full attributes for every live entity.
 
-**Actual.** It converges, slowly. Backfill publishes every live entity from public logs at once with `attrs_pending = true`, then the filler fetches attributes for up to 50 keys per `arkiv_query` every 4 seconds, newest `updated_at` first, and pauses on HTTP 429 until `Retry-After` (`apps/indexer/src/fill.ts`). At about 100 anonymous queries an hour that is at most about 5,000 keys an hour, while about 2,800 distinct keys change per hour (see [Keyed live sync](#keyed-live-sync-does-not-fit-the-monthly-quota)) and every create or patch marks a key pending again. The hosted indexer reported `{"headBlock":805105,"live":36457,"pending":809}` on `/health` on 20 October 2026, so 2.2 percent of live entities were still waiting for attributes. Rows stay queryable meanwhile: system columns come from logs, and the status bar shows the block from which on every changed entity has its attributes (older ones are still loading, newest first).
+**Actual.** It converges, slowly. Backfill publishes every live entity from public logs at once with `attrs_pending = true`, then the filler fetches attributes for up to 50 keys per `arkiv_query` every 4 seconds, newest `updated_at` first, and pauses on HTTP 429 until `Retry-After` (`apps/indexer/src/fill.ts`). At an estimated 100 anonymous queries an hour (10,000 units over `Arkiv-Cost: 100`, see [Flat query cost](#flat-query-cost-and-batching-guidance)) that is at most about 5,000 keys an hour, while about 2,800 distinct keys change per hour (see [Keyed live sync](#keyed-live-sync-does-not-fit-the-monthly-quota)) and every create or patch marks a key pending again. The hosted indexer reported `{"headBlock":805105,"live":36457,"pending":809}` on `/health` on 20 October 2026, so 2.2 percent of live entities were still waiting for attributes. Rows stay queryable meanwhile: system columns come from logs, and the status bar shows the block from which on every changed entity has its attributes (older ones are still loading, newest first).
 
 Workaround: none needed beyond what is built. `FILL_USE_API_KEY=true` sends fills with a key for a faster catch up.
 
@@ -283,3 +285,46 @@ Workaround: none needed beyond what is built. `FILL_USE_API_KEY=true` sends fill
 3. Run `SELECT count(*) FROM entities WHERE attrs_pending` in the Playground of a local app pointed at that indexer.
 
 **Suggested fix.** The same as for keyed live sync: put attribute values (or a content hash) in `EntityCreated` and `EntityPatched` logs, or offer an unmetered bulk attribute read, so a keyless mirror is never behind.
+
+## Tests run for this report, 20 October 2026
+
+Versions for this section: `@arkiv-network/sdk` 0.8.1, viem 2.57.7 (the copy the SDK resolves), Bun 1.3.11, Python 3.14.7 with duckdb 1.5.6, DuckDB CLI 1.5.5, macOS, Tiramisu chain ID 7738577.
+
+### WebSocket entity events (tested path, gap on reconnect)
+
+**Expected.** `client.watchEntityEvents(...)` on a public client with `webSocket()` transport and no `fromBlock` should push every entity event as blocks arrive, without a polling loop, and after a dropped connection it should either resume where it stopped or say clearly that events were missed.
+
+**Actual.** While connected it works well. The SDK passes `pollingInterval` but no `poll` flag to viem `watchEvent`, and viem picks `eth_subscribe` for a WebSocket transport when no `fromBlock` is given (`actions/public/watchEvent.ts`, `enablePolling`), so the transport is a push subscription. In two runs of 70 seconds each against `wss://rpc.tiramisu.db-chain.testnet.arkiv.network` (the URL in the SDK `tiramisu` chain definition), events arrived as one batch per block, every 2.0 seconds, for each of the 14 and 15 consecutive blocks before the forced disconnect and each block after it, decoded with block, transaction and log index. Outside the reconnect window every log that `eth_getLogs` returned over HTTP was delivered, with no duplicates. To test reconnect, the script closed the raw socket at 30 seconds (`(await client.transport.getRpcClient()).socket.close()`). viem reconnected and resubscribed by itself, and `onError` received three `SocketClosedError: The socket has been closed.` and one `WebSocketRequestError: WebSocket request failed.` Events resumed after about 4 seconds, but at the new head: the blocks in between were never delivered.
+
+| Run (UTC) | Blocks covered | Events received | `eth_getLogs` for the same range | Missing | Missing blocks |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| 01:59:57 | 805,917 to 805,950 | 62 | 65 | 3 | 805,931 and 805,932 (during the reconnect) |
+| 02:01:22 | 805,959 to 805,993 | 70 | 72 | 2 | 805,974 (during the reconnect) |
+
+So the subscription is a good live signal but not a complete feed by itself. A consumer has to remember the last block it saw and fill the gap with `eth_getLogs` after every `onError`, which is the checkpointed window loop the indexer and browser already run. Passing `fromBlock` to replay switches viem to polling, so there is no SDK option for "subscribe, and replay what I missed".
+
+Workaround: none needed in the app, which never used the watcher. The indexer and the browser live tail poll `eth_getLogs` in explicit windows from a stored checkpoint (`apps/indexer/src/sync.ts`, `apps/web/lib/live-tail.ts`); a reconnect there cannot skip a block, because the next window starts at the checkpoint (SPECS §5).
+
+**Steps to reproduce.**
+
+1. `createPublicClient({ chain: tiramisu, transport: webSocket(tiramisu.rpcUrls.default.webSocket[0]) })` from `@arkiv-network/sdk` and `viem`.
+2. `client.watchEntityEvents({ onEvent, onError })` and record each event's `blockNumber`, `transactionHash` and `logIndex`.
+3. After 30 seconds call `(await client.transport.getRpcClient()).socket.close()`, keep watching 40 more seconds, then `unwatch()`.
+4. Fetch `eth_getLogs({ address: 0x4400000000000000000000000000000000000044, fromBlock: <first seen>, toBlock: <last seen> })` over HTTP and compare by transaction hash and log index. The missing logs sit in the blocks mined during the reconnect.
+
+**Suggested fix.** In `watchEntityEvents`, remember the last delivered block and, when the subscription is re-established, fetch `eth_getLogs` from the next block before delivering live events (or emit a typed "gap" error naming the block range). Document in the SDK that `onError` during a WebSocket watch means events may have been missed.
+
+### RPC rejects the default Python user agent
+
+**Expected.** A plain HTTPS JSON RPC POST works from any HTTP client, so an analyst's script can query Arkiv with the standard library.
+
+**Actual.** `urllib.request` from Python 3.14.7 got HTTP 403 from `https://rpc.tiramisu.db-chain.testnet.arkiv.network` for `arkiv_query`. The same `eth_blockNumber` body returned 403 with `User-Agent: Python-urllib/3.14`, and 200 with `curl/8.7.1` or a custom agent such as `arkiv-sql-indexer-example/1` (checked with curl on 20 October 2026 at 01:58 UTC). The 403 body is not a JSON RPC error, so the script only sees an HTTP error. The response comes from Cloudflare (`server: cloudflare`). The hosted indexer, which also serves through a proxy, accepted the default Python agent.
+
+Workaround: `examples/verify_against_chain.py` sends `user-agent: arkiv-sql-indexer-example/1`.
+
+**Steps to reproduce.**
+
+1. `curl -s -o /dev/null -w '%{http_code}' -A 'Python-urllib/3.14' -XPOST https://rpc.tiramisu.db-chain.testnet.arkiv.network -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'` prints 403.
+2. Repeat with `-A 'curl/8.7.1'`; it prints 200.
+
+**Suggested fix.** Allow the default agents of common HTTP libraries on the public RPC, or document the rule and return a JSON body that says why the request was refused.
