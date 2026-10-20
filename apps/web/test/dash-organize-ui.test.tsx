@@ -80,7 +80,7 @@ test('extend requires login and a live widget', () => {
  expect(canExtendRow({ link: null, widgetUser: user, expired: false }, null)).toBe(false)
 })
 test('title whitespace is not a change and input requires at most 80 characters', () => {
- const original = { title: 'Title', items: [] }
+ const original = { title: 'Title', cover: null, items: [] }
  const draft = { ...original, title: 'Title ' }
  expect(isDirty(draft, original)).toBe(false)
  expect(toOrganizeInput(draft, original)).not.toHaveProperty('title')

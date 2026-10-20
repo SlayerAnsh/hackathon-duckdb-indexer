@@ -31,6 +31,7 @@ export function dashCte(wallet: string): string {
   max(a.value) FILTER (WHERE a.name = 'chart') AS chart,
   max(a.value) FILTER (WHERE a.name = 'dashboard') AS dashboard,
   max(a.value) FILTER (WHERE a.name = 'slug') AS slug,
+  max(a.value) FILTER (WHERE a.name = 'cover') AS cover,
   max(a.value) FILTER (WHERE a.name = 'widget') AS widget
  FROM entities e JOIN attributes a ON a.key = e.key
  WHERE e.creator = ${address(wallet)}
@@ -101,8 +102,11 @@ export function widgetCountSql(wallet: string, q: Omit<WidgetListQuery, 'sort' |
 
 export function myDashboardsSql(wallet: string, user: string): string {
   return `${dashCte(wallet)}
- SELECT d.key, d.title, count(l.key) AS widgets, d.updated_at
+ SELECT d.key, d.title, count(l.key) AS widgets, d.updated_at,
+ max(CASE WHEN l.usr = d.usr AND w.key = d.cover THEN w.key END) AS cover,
+ list(DISTINCT w.chart ORDER BY w.chart) FILTER (WHERE w.chart IS NOT NULL) AS charts
  FROM dash d LEFT JOIN dash l ON l.type = 'link' AND l.dashboard = d.key
+ LEFT JOIN dash w ON w.type = 'widget' AND w.key = l.widget
  WHERE d.type = 'dashboard' AND d.usr = ${address(user)}
  GROUP BY d.key, d.title, d.updated_at
  ORDER BY d.updated_at DESC, d.key`
@@ -155,7 +159,7 @@ export function listValue(value: unknown): unknown[] {
  if (value && typeof (value as Iterable<unknown>)[Symbol.iterator] === 'function' && typeof value !== 'string') return Array.from(value as Iterable<unknown>)
  return []
 }
-export type DashboardListItem = { key: string; title: string; user: string; official: boolean; widgets: number; charts: import('./schema').ChartType[]; createdAt: number; updatedAt: number; expiresAt: number }
+export type DashboardListItem = { key: string; title: string; user: string; official: boolean; widgets: number; charts: import('./schema').ChartType[]; createdAt: number; updatedAt: number; expiresAt: number; cover: string | null }
 function dashboardFilters(wallet: string, q: Pick<DashboardListQuery, 'search' | 'official'>): string {
  const filters = ["d.type = 'dashboard'"]
  if (q.official) filters.push(officialSql('d', wallet))
@@ -167,6 +171,7 @@ function dashboardFilters(wallet: string, q: Pick<DashboardListQuery, 'search' |
  }
  return filters.join(' AND ')
 }
+// Public entities and attributes views contain live rows only, including natural expiration sweeps.
 export function dashboardListSql(wallet: string, q: DashboardListQuery): string {
  for (const n of [q.limit, q.offset]) if (!Number.isSafeInteger(n) || n < 0) throw new Error('Invalid pagination')
  const order = { newest: 'd.created_at DESC', oldest: 'd.created_at ASC', widgets: 'widgets DESC', expiring: 'd.expires_at ASC' }[q.sort]
@@ -174,7 +179,8 @@ export function dashboardListSql(wallet: string, q: DashboardListQuery): string 
  return `${dashCte(wallet)}
  SELECT d.key, d.title, d.usr, ${officialSql('d', wallet)} AS official,
  count(DISTINCT l.key) AS widgets, list(DISTINCT w.chart ORDER BY w.chart) FILTER (WHERE w.chart IS NOT NULL) AS charts,
- d.created_at, d.updated_at, d.expires_at
+ d.created_at, d.updated_at, d.expires_at,
+ max(CASE WHEN l.usr = d.usr AND w.key = d.cover THEN w.key END) AS cover
  FROM dash d LEFT JOIN dash l ON l.type = 'link' AND l.dashboard = d.key
  LEFT JOIN dash w ON w.type = 'widget' AND w.key = l.widget
  WHERE ${dashboardFilters(wallet, q)}
@@ -185,7 +191,7 @@ export function dashboardCountSql(wallet: string, q: Pick<DashboardListQuery, 's
  return `${dashCte(wallet)} SELECT count(*) AS n FROM dash d WHERE ${dashboardFilters(wallet, q)}`
 }
 export function toDashboardItems(rows: unknown[][]): DashboardListItem[] {
- return rows.map(([key, title, user, official, widgets, charts, createdAt, updatedAt, expiresAt]) => ({ key: String(key).toLowerCase(), title: String(title), user: String(user).toLowerCase(), official: official === true || official === 1 || official === BigInt(1) || official === 'true', widgets: Number(widgets), charts: listValue(charts).map(String) as DashboardListItem['charts'], createdAt: Number(createdAt), updatedAt: Number(updatedAt), expiresAt: Number(expiresAt) }))
+ return rows.map(([key, title, user, official, widgets, charts, createdAt, updatedAt, expiresAt, cover]) => ({ key: String(key).toLowerCase(), title: String(title), user: String(user).toLowerCase(), official: official === true || official === 1 || official === BigInt(1) || official === 'true', widgets: Number(widgets), charts: listValue(charts).map(String) as DashboardListItem['charts'], createdAt: Number(createdAt), updatedAt: Number(updatedAt), expiresAt: Number(expiresAt), cover: typeof cover === "string" && isEntityKey(cover) ? cover.toLowerCase() : null }))
 }
 
 export function widgetDashboardsSql(wallet: string, widgetKey: string, limit: number): string {

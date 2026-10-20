@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import { useCoverPayloads } from '../../lib/dash/use-cover-payloads'
 import { useEffect, useReducer, useState } from 'react'
 import { useDashAuth } from '../auth/DashAuthProvider'
 import { dashboardBrowseQuery, dashboardBrowseReducer, initDashboardBrowse, resultsLine, type DashboardBrowseState } from '../../lib/dash/dashboard-browse-state'
@@ -57,6 +58,7 @@ function DashboardResultsPage({ q, version, head }: { q: DashboardListQuery; ver
  const {config} = useDashAuth()
  const list = useTimedQuery(config?.enabled ? dashboardListSql(config.wallet,q) : '',version,{skip:!config?.enabled})
  const items = toDashboardItems(list.data?.rows ?? [])
+ const covers = useCoverPayloads(items)
  const keys = items.map(item=>item.key).join(',')
  const scope = `${config?.wallet}:${config?.rpcUrl}:${keys}`
  const [record,setRecord] = useState<{scope:string; descriptions:Map<string,string>} | null>(null)
@@ -68,7 +70,7 @@ function DashboardResultsPage({ q, version, head }: { q: DashboardListQuery; ver
   }).catch(()=>{if(active) setRecord({scope,descriptions:new Map()})})
   return ()=>{active=false}
  },[config?.enabled,config?.wallet,config?.rpcUrl,keys,scope])
- return <>{items.map(item=><DashboardBrowseCard key={item.key} item={item} head={head} description={record?.scope === scope ? record.descriptions.get(item.key) ?? null : undefined}/>)}
+ return <>{items.map(item=><DashboardBrowseCard key={item.key} item={item} head={head} coverPayload={covers ? covers.get(item.cover ?? "") ?? null : undefined} description={record?.scope === scope ? record.descriptions.get(item.key) ?? null : undefined}/>)}
   {showLoading({loading:list.loading,data:list.data}) && <SkeletonCards count={3} label="Loading dashboards…"/>}{list.error && <p role="alert" className="error">{list.error}</p>}</>
 }
 export function DashboardBrowse({ onWidgets }: { onWidgets?(): void } = {}) {

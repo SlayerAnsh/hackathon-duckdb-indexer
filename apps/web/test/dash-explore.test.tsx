@@ -54,7 +54,7 @@ test('dashboard filters reset pages and label results',()=>{
  expect(resultsLine(1,{...s,sort:'widgets'})).toBe('1 dashboard, most widgets first')
  expect(resultsLine(5,{...s,sort:'expiring',official:true})).toBe('5 official dashboards, expiring soonest first')
 })
-const item = {key:key(1),title:'Overview',user:W,official:true,widgets:8,charts:['bar','donut'] as ('bar'|'donut')[],createdAt:1,updatedAt:2,expiresAt:100}
+const item = {cover:null,key:key(1),title:'Overview',user:W,official:true,widgets:8,charts:['bar','donut'] as ('bar'|'donut')[],createdAt:1,updatedAt:2,expiresAt:100}
 test('dashboard card authors, lifetime, chart icons and empty thumbnails',()=>{
  const html=render(<DashboardBrowseCard item={item} description="Network report"/>)
  for(const text of ['Featured','0xabab…abab','Kept live','8 widgets','Network report',`href="/d/${key(1)}"`]) expect(html).toContain(text)

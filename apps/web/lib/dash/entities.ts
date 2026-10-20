@@ -7,7 +7,7 @@ import { CHART_TYPES, DASH_PROJECT, LOGINS, isEntityKey, isHexAddress, parseDash
 
 export type DashEntity = { key: string; owner: string; creator: string; createdAt: number; updatedAt: number; expiresAt: number; attrs: Record<string, string>; payload: unknown | null }
 export type WidgetEntity = DashEntity & { kind: 'widget'; user: string; official: boolean; login: Login | typeof OFFICIAL_LOGIN; name: string; chart: ChartType; widget: WidgetPayload }
-export type DashboardEntity = DashEntity & { kind: 'dashboard'; user: string; official: boolean; login: Login | typeof OFFICIAL_LOGIN; slug: string | null; title: string; dashboard: DashboardPayload }
+export type DashboardEntity = DashEntity & { kind: 'dashboard'; user: string; official: boolean; login: Login | typeof OFFICIAL_LOGIN; slug: string | null; cover: string | null; title: string; dashboard: DashboardPayload }
 export type LinkEntity = DashEntity & { kind: 'link'; official: boolean; user: string; dashboardKey: string; widgetKey: string; link: LinkPayload }
 
 export const DASH_SELECT: RpcSelect = { key: true, owner: true, creator: true, createdAt: true, updatedAt: true, expiresAt: true, attributes: true, payload: true }
@@ -54,7 +54,7 @@ export function asDashboard(e: DashEntity, wallet: string): DashboardEntity | nu
   if (!trusted(e, wallet, 'dashboard') || !provider || !validName(e.attrs.title)) return null
   const parsed = parseDashboardPayload(e.payload)
   if (!parsed.ok) return null
-  return { ...e, kind: 'dashboard', official: isOfficialOwned(e.attrs.user!, e.owner, wallet), slug: dashboardSlug(e.attrs.slug), user: e.attrs.user!.toLowerCase(), login: provider, title: e.attrs.title, dashboard: parsed.value }
+  return { ...e, kind: 'dashboard', official: isOfficialOwned(e.attrs.user!, e.owner, wallet), slug: dashboardSlug(e.attrs.slug), cover: isEntityKey(e.attrs.cover ?? "") ? e.attrs.cover.toLowerCase() : null, user: e.attrs.user!.toLowerCase(), login: provider, title: e.attrs.title, dashboard: parsed.value }
 }
 export function asLink(e: DashEntity, wallet: string): LinkEntity | null {
   if (!trusted(e, wallet, 'link') || !isEntityKey(e.attrs.dashboard ?? '') || !isEntityKey(e.attrs.widget ?? '')) return null

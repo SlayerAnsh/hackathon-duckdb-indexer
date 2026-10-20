@@ -50,15 +50,15 @@ export function tileStatus(item: DraftItem, widget: WidgetEntity | undefined, se
 }
 type Dispatch = React.Dispatch<Parameters<typeof organizeReducer>[1]>
 type TileProps = { item: DraftItem; index: number; count: number; head: number; version: number; widget?: WidgetEntity; settled: boolean; figure?: number; subtitle: string | null
- selected: boolean; saving: boolean; dispatch: Dispatch; onSelect(id: string): void }
-function SortableTile({ item, index, count, head, version, widget, settled, figure, subtitle, selected, saving, dispatch, onSelect }: TileProps) {
+ starred: boolean; selected: boolean; saving: boolean; dispatch: Dispatch; onSelect(id: string): void }
+function SortableTile({ item, index, count, head, version, widget, settled, figure, subtitle, starred, selected, saving, dispatch, onSelect }: TileProps) {
  const status = tileStatus(item, widget, settled, head)
  const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: item.id, disabled: saving })
  return <SavedWidgetCard id={'tile-' + item.id} name={item.name} payload={widget?.widget ?? null} status={status} size={item.size} version={version} head={head}
   figure={figure} subtitle={subtitle} official={widget?.official}
   edit={{ selected, dragging: isDragging, flash: item.flash, rootRef: setNodeRef, transition, onSelect: () => onSelect(item.id),
    transform: transform ? `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)` : undefined,
-   header: <OrganizeTileHeader item={item} index={index} count={count} onRemove={() => dispatch({ type: 'remove', id: item.id })}
+   header: <OrganizeTileHeader starred={starred} onStar={() => dispatch({ type: "star", key: item.widget })} item={item} index={index} count={count} onRemove={() => dispatch({ type: 'remove', id: item.id })}
     dragHandle={<button type="button" ref={setActivatorNodeRef} {...attributes} {...listeners} className={`${s.handle} has-tip`} data-tip-pos="start" data-tip="Drag to move" aria-label={`Reorder ${item.name}`} disabled={saving}><GripIcon/></button>}/>,
    footer: <OrganizeTileFooter item={item} head={head} importedUser={widget?.user} onResize={size => dispatch({ type: 'resize', id: item.id, size })}/> }}/>
 }
@@ -215,7 +215,7 @@ export function OrganizeEditor({ dashboardKey, data, original }: { dashboardKey:
     <section className={cx(r.grid, s.grid)} aria-label="Dashboard layout" aria-busy={saving || undefined}>
      {draft.items.map((item, index) => {
       const widget = widgets.get(item.widget)
-      return <SortableTile key={item.id} item={item} index={index} count={draft.items.length} head={head} version={version} widget={widget} settled={settled.has(item.widget)}
+      return <SortableTile starred={draft.cover === item.widget} key={item.id} item={item} index={index} count={draft.items.length} head={head} version={version} widget={widget} settled={settled.has(item.widget)}
        figure={numbers.get(item.id)} subtitle={widget && wallet ? importedFrom(widget.user, owner, wallet) : null} selected={selected === item.id} saving={saving} dispatch={dispatch} onSelect={setSelected}/>
      })}
      <ConnectedAddTile key={draft.items.length ? 'add' : 'add-empty'} empty={!draft.items.length} size={draft.items.at(-1)?.size} remaining={slotsLeft} newHref={'/widgets/new?dashboard=' + dashboardKey} onImport={() => setImportOpen(true)}/>

@@ -117,7 +117,7 @@ export function DashboardView({ dashboardKey }: { dashboardKey: string }) {
   {slots.length === 0 ? <EmptyDashboard owner={owner} dashboardKey={key}/> : <div className={s.grid}>
    {slots.map(slot => <SavedWidgetCard key={slot.id} id={slot.id} name={slot.name} size={slot.size}
     figure={numbers.get(slot.id)} subtitle={slot.widget ? importedFrom(slot.widget.user, data.dashboard!.user, auth.config!.wallet) : null} official={slot.widget?.official} status={slot.status} payload={slot.widget?.widget ?? null}
-    version={version} head={head} expiresAt={slot.widget?.expiresAt} widgetKey={slot.widgetKey} owner={owner}/>)}
+    version={version} head={head} expiresAt={slot.widget?.expiresAt} widgetKey={slot.widgetKey} owner={owner} starred={owner && data.dashboard?.cover === slot.widgetKey && slot.status === "live"}/>)}
   </div>}
  </div>
 }

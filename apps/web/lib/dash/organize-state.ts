@@ -5,13 +5,13 @@ import type { Slot } from './slots'
 
 export type DraftItem = { id: string; link: string | null; widget: string; name: string; chart: ChartType | null; size: Size; imported: boolean;
  owner: string | null; expiresAt: number | null; lifetimeDays: LifetimeDays | null; expired: boolean; flash: boolean }
-export type OrganizeDraft = { title: string; items: DraftItem[] }
+export type OrganizeDraft = { title: string; cover: string | null; items: DraftItem[] }
 export type ImportCandidate = { key: string; name: string; chart: ChartType; user: string; owner: string | null; expiresAt: number; lifetimeDays: LifetimeDays | null }
 export type OrganizeAction = { type: 'move'; from: number; to: number } | { type: 'resize'; id: string; size: Size } | { type: 'remove'; id: string }
- | { type: 'import'; widgets: ImportCandidate[]; owner: string } | { type: 'title'; value: string } | { type: 'clearFlash' }
+ | { type: 'star'; key: string } | { type: 'import'; widgets: ImportCandidate[]; owner: string } | { type: 'title'; value: string } | { type: 'clearFlash' }
 
 export function draftFromDashboard(dashboard: DashboardEntity, slots: Slot[]): OrganizeDraft {
- return { title: dashboard.title, items: slots.map(slot => ({
+ return { title: dashboard.title, cover: dashboard.cover ?? null, items: slots.map(slot => ({
   id: slot.linkKey, link: slot.linkKey, widget: slot.widgetKey, name: slot.name, chart: slot.widget?.chart ?? null,
   size: slot.size, imported: slot.widget ? slot.widget.user !== dashboard.user : false,
   owner: slot.widget?.owner ?? null, expiresAt: slot.widget?.expiresAt ?? null, lifetimeDays: slot.widget?.widget.lifetimeDays ?? null,
@@ -23,7 +23,8 @@ export function organizeReducer(draft: OrganizeDraft, action: OrganizeAction): O
  switch (action.type) {
   case 'move': return { ...draft, items: arrayMove(draft.items, action.from, action.to) }
   case 'resize': return { ...draft, items: draft.items.map(item => item.id === action.id ? { ...item, size: action.size } : item) }
-  case 'remove': return { ...draft, items: draft.items.filter(item => item.id !== action.id) }
+  case 'star': return draft.items.some(i => i.widget === action.key && !i.expired) ? { ...draft, cover: draft.cover === action.key ? null : action.key } : draft
+  case 'remove': return { ...draft, cover: draft.items.find(i => i.id === action.id)?.widget === draft.cover ? null : draft.cover, items: draft.items.filter(item => item.id !== action.id) }
   case 'title': return { ...draft, title: action.value }
   case 'clearFlash': return { ...draft, items: draft.items.map(item => ({ ...item, flash: false })) }
   case 'import': {
@@ -43,14 +44,14 @@ export function organizeReducer(draft: OrganizeDraft, action: OrganizeAction): O
 }
 
 export function isDirty(draft: OrganizeDraft, original: OrganizeDraft): boolean {
- return draft.title.trim() !== original.title || draft.items.length !== original.items.length || draft.items.some((item, index) => {
+ return draft.cover !== original.cover || draft.title.trim() !== original.title || draft.items.length !== original.items.length || draft.items.some((item, index) => {
   const before = original.items[index]!
   return item.link !== before.link || item.widget !== before.widget || item.size !== before.size
  })
 }
 
-export function toOrganizeInput(draft: OrganizeDraft, original: OrganizeDraft): { title?: string; items: { link: string | null; widget: string; size: Size }[] } {
- return { ...(draft.title.trim() !== original.title ? { title: draft.title.trim() } : {}),
+export function toOrganizeInput(draft: OrganizeDraft, original: OrganizeDraft): { title?: string; cover?: string | null; items: { link: string | null; widget: string; size: Size }[] } {
+ return { ...(draft.cover !== original.cover ? { cover: draft.cover } : {}), ...(draft.title.trim() !== original.title ? { title: draft.title.trim() } : {}),
   items: draft.items.map(({ link, widget, size }) => ({ link, widget, size })) }
 }
 

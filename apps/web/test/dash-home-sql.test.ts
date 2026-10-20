@@ -40,7 +40,7 @@ test('home SQL scopes live lists, placements and distinct creation and update da
     expect(await query(activityCountsSql(W, U))).toEqual([{
       live_widgets: BigInt(2), live_dashboards: BigInt(1), placements: BigInt(2), active_days: BigInt(3),
     }])
-    expect(await query(myDashboardsSql(W, U))).toEqual([
+    expect((await query(myDashboardsSql(W, U))).map(({ cover, charts, ...row }) => { expect(cover).toBeNull(); expect(charts).toBeDefined(); return row })).toEqual([
       { key: key(3), title: 'Overview', widgets: BigInt(2), updated_at: BigInt(90000) },
     ])
     expect(await query(myWidgetsSql(W, U))).toEqual([

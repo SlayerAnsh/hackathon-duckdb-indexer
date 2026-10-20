@@ -88,12 +88,12 @@ export function createWidget(deps: OpsDeps, s: Session, input: { widget: WidgetP
   })
 }
 
-export type OrganizeItem = { link: string | null; widget: string; size: Size }
-export type OrganizeInput = { title?: string; items: OrganizeItem[] }
+export type { OrganizeItem, OrganizeInput } from '../schema'
+import type { OrganizeItem, OrganizeInput } from '../schema'
 export type OrganizePlan = {
   creates: { widget: string; size: Size; position: number; name: string }[]
   patches: { link: string; size: Size; position: number; name: string }[]
-  deletes: string[]; extend: string[]; target: number; title?: string
+  deletes: string[]; extend: string[]; target: number; title?: string; cover?: string | null
 }
 export function parseOrganizeInput(input: unknown): Parsed<OrganizeInput> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return { ok: false, error: 'Invalid organize input.' }
@@ -105,6 +105,8 @@ export function parseOrganizeInput(input: unknown): Parsed<OrganizeInput> {
     if (!parsed.ok) return parsed
     title = parsed.value.title
   }
+  if (value.cover !== undefined && value.cover !== null && (typeof value.cover !== 'string' || !isEntityKey(value.cover))) return { ok: false, error: 'Invalid cover key.' }
+  const cover = typeof value.cover === 'string' ? value.cover.toLowerCase() : value.cover
   const items: OrganizeItem[] = []
   for (const item of value.items) {
     if (!item || typeof item !== 'object' || Array.isArray(item) ||
@@ -112,7 +114,7 @@ export function parseOrganizeInput(input: unknown): Parsed<OrganizeInput> {
       typeof item.widget !== 'string' || !isEntityKey(item.widget) || !SIZES.includes(item.size)) return { ok: false, error: 'Invalid organize item.' }
     items.push({ link: item.link === null ? null : item.link.toLowerCase(), widget: item.widget.toLowerCase(), size: item.size })
   }
-  return { ok: true, value: { items, ...(title === undefined ? {} : { title }) } }
+  return { ok: true, value: { items, ...(cover === undefined ? {} : { cover: cover as string | null }), ...(title === undefined ? {} : { title }) } }
 }
 export function planOrganize(state: { head: number; dashboard: DashboardEntity; links: LinkEntity[]; widgets: Map<string, WidgetEntity> }, input: OrganizeInput): OrganizePlan {
   if (input.items.length > MAX_LINKS_PER_DASHBOARD) throw dashErrors.conflict('full', 'Dashboard is full.')
@@ -137,6 +139,9 @@ export function planOrganize(state: { head: number; dashboard: DashboardEntity; 
       plan.creates.push({ widget: widgetKey, size: item.size, position, name: w.name })
     }
   })
+  const wanted = input.cover === undefined ? state.dashboard.cover ?? null : input.cover === null ? null : hex(input.cover)
+  const cover = wanted && widgets.has(wanted) && state.widgets.has(wanted) && state.widgets.get(wanted)!.expiresAt > state.head ? wanted : null
+  if (cover !== (state.dashboard.cover ?? null)) plan.cover = cover
   plan.deletes = state.links.filter(l => !kept.has(l.key)).map(l => l.key)
   return plan
 }
@@ -184,9 +189,18 @@ export function organizeDashboard(deps: OpsDeps, s: Session, entityKey: string, 
   return deps.queue.run(async () => {
     requireUser(deps, s)
     const state = await readDashboard(deps, s, entityKey, input.items.filter(i => i.link === null).map(i => i.widget))
+    const coverKey = input.cover === undefined ? state.dashboard.cover : input.cover
+    if (coverKey && !state.widgets.has(hex(coverKey))) {
+      const result = await read(() => queryAll(deps.reader, keysExprs(deps.wallet, [coverKey])[0]))
+      for (const entity of result.entities) { const widget = asWidget(entity, deps.wallet); if (widget && widget.expiresAt > state.head) state.widgets.set(widget.key, widget) }
+    }
     const plan = planOrganize(state, input)
     const patches = plan.patches.map(p => ({ entityKey: hex(p.link), payload: jsonPayload({ v: 1, size: p.size, position: p.position, name: p.name }), contentType: CONTENT_TYPE }))
-    const titlePatches = plan.title === undefined ? [] : [{ entityKey: hex(state.dashboard.key), set: { title: plan.title }, payload: jsonPayload({ ...state.dashboard.dashboard, title: plan.title }), contentType: CONTENT_TYPE }]
+    // SDK set merges named attributes; unset removes cover without touching identity or slug.
+    const titlePatches = plan.title === undefined && plan.cover === undefined ? [] : [{ entityKey: hex(state.dashboard.key),
+      set: { ...(plan.title === undefined ? {} : { title: plan.title }), ...(plan.cover ? { cover: key(hex(plan.cover)) } : {}) },
+      ...(plan.cover === null ? { unset: ['cover'] } : {}),
+      ...(plan.title === undefined ? {} : { payload: jsonPayload({ ...state.dashboard.dashboard, title: plan.title }), contentType: CONTENT_TYPE }) }]
     if (!plan.creates.length && !patches.length && !titlePatches.length && !plan.deletes.length && !plan.extend.length) return { txHash: '', afterBlock: state.head }
     const result = await write(() => deps.client.executeBatch({ creates: plan.creates.map(c => linkCreate(state.dashboard, c, plan.target)), patches: [...patches, ...titlePatches],
       deletes: plan.deletes.map(k => ({ entityKey: hex(k) })), extensions: plan.extend.map(k => ({ entityKey: hex(k), expires: ExpirationTime.atBlock(BigInt(plan.target)) })) }))

@@ -1,4 +1,5 @@
 'use client'
+import { StarIcon } from './StarIcon'
 import type { ReactNode } from 'react'
 import { useDashAuth } from '../auth/DashAuthProvider'
 import { type DraftItem } from '../../lib/dash/organize-state'
@@ -22,11 +23,11 @@ export function useOfficial(item: DraftItem, importedUser?: string): boolean {
 }
 
 /** Strip above a tile on Organize: drag handle on the left, remove on the right. */
-export function OrganizeTileHeader({ item, index, count, onRemove, dragHandle }: Pick<ToolProps, 'item' | 'index' | 'count' | 'onRemove' | 'dragHandle'>) {
+export function OrganizeTileHeader({ item, index, count, onRemove, dragHandle, starred = false, onStar }: { starred?: boolean; onStar?(): void } & Pick<ToolProps, 'item' | 'index' | 'count' | 'onRemove' | 'dragHandle'>) {
  return <>
   <span className={s.pill}>{dragHandle ?? <button type="button" className={s.handle} aria-label={`Reorder ${item.name}`} disabled={item.expired}><GripIcon/></button>}</span>
   <span className="sr-only">Position {index + 1} of {count}</span>
-  <span className={s.pill}><button type="button" className="ib ib-sm ib-danger has-tip" data-tip-pos="top" data-tip="Remove from dashboard" aria-label={`Remove ${item.name}`} onClick={event => { event.stopPropagation(); onRemove() }}><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg></button></span>
+  <span className={s.pill}><button type="button" className="ib ib-sm has-tip" data-tip-pos="top" data-tip={starred ? 'Cover widget' : 'Use as cover'} aria-label={starred ? 'Cover widget' : 'Use as cover'} aria-pressed={starred} disabled={item.expired} style={starred ? { color: 'var(--accent)' } : undefined} onClick={event => { event.stopPropagation(); onStar?.() }}><StarIcon filled={starred}/></button><button type="button" className="ib ib-sm ib-danger has-tip" data-tip-pos="top" data-tip="Remove from dashboard" aria-label={`Remove ${item.name}`} onClick={event => { event.stopPropagation(); onRemove() }}><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg></button></span>
  </>
 }
 

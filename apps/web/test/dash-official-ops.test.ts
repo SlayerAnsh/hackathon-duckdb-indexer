@@ -25,7 +25,7 @@ test('seed predicts and creates each dashboard, widgets and links in one queued 
     expect(predict.mock.calls[i][0]).toEqual({ owner: W, count: 1 + 2 * n })
     const creates = f.calls[i].data.creates
     expect(creates).toHaveLength(1 + 2 * n)
-    expect(creates[0].attributes).toMatchObject({ type: 'dashboard', user: addr(W), login: 'arkiv', slug: def.slug })
+    expect(creates[0].attributes).toMatchObject({ type: 'dashboard', user: addr(W), login: 'arkiv', slug: def.slug, cover: key(`0x${(0xa2 + def.cover!).toString(16).padStart(64, '0')}`) })
     def.widgets.forEach((w, j) => {
       expect(creates[j + 1].attributes).toMatchObject({ type: 'widget', login: 'arkiv' })
       expect(payload(creates[j + 1].payload)).toEqual(w.widget)
@@ -186,4 +186,25 @@ test('keepalive ignores official looking entities owned by users', async () => {
  expect(result.checked).toBe(1)
  expect(f.calls).toHaveLength(1)
  expect(f.calls[0].data.extensions.map((e: any) => e.entityKey)).toEqual([entityKey(501)])
+})
+
+test('cover backfill CLI dry runs in either flag order without predicting or broadcasting', async () => {
+ const { linkRow, K, D } = await import('./dash-fakes')
+ const { setOfficialCovers } = await import('../lib/dash/server/official')
+ const rows = [officialDashboardRow('creators'), officialWidgetRow(), linkRow({ user: W, dashboard: D, widget: K })]
+ const f = fakeChain(rows)
+ const predict = spyOn(f.deps.client, 'predictEntityKeys')
+ const env = { DASHBOARD_PRIVATE_KEY: `0x${'01'.repeat(32)}` }
+ for (const flags of [['--set-covers', '--dry-run'], ['--dry-run', '--set-covers']]) {
+  const logs: string[] = []
+  expect(await runSeedCli(flags, env, { makeOps: () => f.deps, log: s => logs.push(s) })).toBe(0)
+  expect(logs).toEqual(['Official covers would update 1 dashboards'])
+ }
+ expect(f.calls).toEqual([])
+ expect(predict).not.toHaveBeenCalled()
+ expect(await setOfficialCovers(f.deps)).toBe(1)
+ expect(f.calls[0].data.patches).toEqual([{ entityKey: D, set: { cover: key(K) } }])
+ const g = fakeChain(rows)
+ await keepOfficialAlive(g.deps)
+ expect(g.calls.some(c => c.data.patches?.[0]?.set.cover)).toBe(true)
 })

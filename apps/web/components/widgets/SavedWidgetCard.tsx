@@ -1,6 +1,7 @@
 'use client'
 import { useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import Link from 'next/link'
+import { StarIcon } from './StarIcon'
 import { SIZE_SPAN, type Size, type WidgetPayload } from '../../lib/dash/schema'
 import type { SlotStatus } from '../../lib/dash/slots'
 import { useWidgetQuery } from '../../lib/dash/use-widget-query'
@@ -19,9 +20,9 @@ export function figureSpans(size: Size): CSSProperties {
  return { '--lg': SIZE_SPAN[size], '--md': size === 'xs' || size === 'sm' ? 6 : 12, '--sm': 12 } as CSSProperties
 }
 
-export function SavedWidgetCard({ id, name, payload, status, size, version, head, expiresAt, widgetKey, owner, query, figure, subtitle, official, initialActionsOpen = false, edit }: {
+export function SavedWidgetCard({ id, name, payload, status, size, version, head, expiresAt, widgetKey, owner, query, figure, subtitle, official, initialActionsOpen = false, edit, starred }: {
  id: string; name: string; payload: WidgetPayload | null; status: SlotStatus; size: Size; version: number; head?: number;
- expiresAt?: number; widgetKey?: string; owner?: boolean; query?: TimedResult; figure?: number; subtitle?: string | null; official?: boolean; initialActionsOpen?: boolean; edit?: FigureEdit
+ expiresAt?: number; widgetKey?: string; owner?: boolean; query?: TimedResult; figure?: number; subtitle?: string | null; official?: boolean; initialActionsOpen?: boolean; edit?: FigureEdit; starred?: boolean
 }) {
  const [actionsOpen, setActionsOpen] = useState(initialActionsOpen)
  const overflow = useRef<HTMLButtonElement>(null)
@@ -33,7 +34,7 @@ export function SavedWidgetCard({ id, name, payload, status, size, version, head
  const style = { ...figureSpans(size), transform: edit?.transform, transition: edit?.transition }
  if (edit) return <article id={id} ref={edit.rootRef} className={cx(r.figure, stat && r.counter, r.editing)} style={style} aria-labelledby={id + '-t'} aria-busy={status === 'loading' || (live && q.loading)}
   data-actions-open={edit.selected || edit.dragging || undefined} data-selected={edit.selected || undefined} data-dragging={edit.dragging || undefined} data-flash={edit.flash || undefined} onClick={edit.onSelect}>
-  <header className={r.caption}><div>{!stat && figure !== undefined && <div className={r.number}>Figure {figure}</div>}<h3 id={id + '-t'}>{name}</h3>{subtitle && <p className={r.subtitle}>{subtitle}</p>}</div></header>
+  <header className={r.caption}><div>{!stat && figure !== undefined && <div className={r.number}>Figure {figure}</div>}<h3 id={id + '-t'}>{name}{starred && <span aria-label="Cover widget" style={{ color: "var(--accent)", marginLeft: 8 }}><StarIcon filled/></span>}</h3>{subtitle && <p className={r.subtitle}>{subtitle}</p>}</div></header>
   <div className={`${r.body} ${kind}`}>
    {status === 'loading' ? <div className={cx('skel', r.loading)} aria-label="Loading widget"/> : !live ? <div className={r.expired}>
     <span className="state state-stale">Expired</span>
@@ -46,7 +47,7 @@ export function SavedWidgetCard({ id, name, payload, status, size, version, head
  return <article id={id} className={`${r.figure}${stat ? ' ' + r.counter : ''}`} style={style} aria-labelledby={id + '-t'} aria-busy={status === 'loading' || (live && q.loading)} data-actions-open={actionsOpen}
   onKeyDown={event => { if (event.key === 'Escape' && actionsOpen) { event.preventDefault(); setActionsOpen(false); overflow.current?.focus() } }}>
   <header className={r.caption}>
-   <div>{!stat && figure !== undefined && <div className={r.number}>Figure {figure}</div>}<h3 id={id + '-t'}>{name}</h3>{subtitle && <p className={r.subtitle}>{subtitle}</p>}</div>
+   <div>{!stat && figure !== undefined && <div className={r.number}>Figure {figure}</div>}<h3 id={id + '-t'}>{name}{starred && <span aria-label="Cover widget" style={{ color: "var(--accent)", marginLeft: 8 }}><StarIcon filled/></span>}</h3>{subtitle && <p className={r.subtitle}>{subtitle}</p>}</div>
    {live && <button ref={overflow} type="button" className={`ib ${r.overflow}`} aria-label={'Actions for ' + name} aria-expanded={actionsOpen} aria-controls={id + '-actions'} onClick={() => setActionsOpen(value => !value)}><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1"/><circle cx="8" cy="8" r="1"/><circle cx="13" cy="8" r="1"/></svg></button>}
   </header>
   <div className={`${r.body} ${kind}`}>

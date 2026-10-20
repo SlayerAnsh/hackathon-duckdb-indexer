@@ -17,6 +17,7 @@ import { dashApi } from '../../lib/dash/api'
 import { saveErrorMessage, withSession } from '../../lib/dash/auth-client'
 import { shortHex } from '../../lib/format'
 import { CHART_TYPES, type ChartType } from '../../lib/dash/schema'
+import { useCoverPayloads } from '../../lib/dash/use-cover-payloads'
 import { DashboardCard } from './DashboardCard'
 import { ActivityPanel } from './ActivityPanel'
 import { LoginGate } from './LoginGate'
@@ -42,13 +43,14 @@ export function RetryNotice({ error, onRetry }: { error?: string; onRetry?(): vo
  return <div className={`notice notice-bad ${h.retry}`} role="alert"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 4.75v3.75M8 11h.01"/></svg><div><span>{error}</span>{onRetry && <button type="button" className="btn btn-sm" onClick={onRetry}>Try again</button>}</div></div>
 }
 export function HomeCollections({ dashboards, widgets, head, onCreate, loading = false, failed = false, payloadError, onRetry, renderExtend, renderDelete }: { dashboards: HomeDashboard[]; widgets: unknown[][]; head?: number; onCreate(): void; loading?: boolean; failed?: boolean; payloadError?: string; onRetry?(): void; renderExtend?(key: string): ReactNode; renderDelete?(key: string): ReactNode }) {
+ const covers = useCoverPayloads(dashboards)
  const settled = !loading && !failed
  return <>
   <section className={h.section} aria-labelledby="home-dashboards">
    <SectionHead id="home-dashboards" title="My dashboards" count={settled ? dashboards.length : undefined} sub="Public pages of live charts. Anyone with the link can open them."
     actions={<button type="button" className="btn btn-primary" onClick={onCreate}><PlusIcon/>New dashboard</button>}/>
    {settled && !dashboards.length ? <EmptyState icon="dashboard" title="Create your first dashboard" body="A dashboard is a public page of live charts. Create one, then add your widgets or any public widget to it." actions={<button type="button" className="btn btn-primary" onClick={onCreate}><PlusIcon/>New dashboard</button>}/>
-    : <div className={h.dashGrid}>{dashboards.map(item => <DashboardCard key={item.key} item={item} head={head}/>)}{loading && !failed && !dashboards.length && <SkeletonCards count={3} label="Loading your dashboards…"/>}</div>}
+    : <div className={h.dashGrid}>{dashboards.map(item => <DashboardCard key={item.key} item={item} head={head} coverPayload={covers ? covers.get(item.cover ?? "") ?? null : undefined}/>)}{loading && !failed && !dashboards.length && <SkeletonCards count={3} label="Loading your dashboards…"/>}</div>}
   </section>
   <section className={h.section} aria-labelledby="home-widgets">
    <SectionHead id="home-widgets" title="My widgets" count={settled ? widgets.length : undefined} sub="Saved SQL queries with a chart. Extend them before they expire."

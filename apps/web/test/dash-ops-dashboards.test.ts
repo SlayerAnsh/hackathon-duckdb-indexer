@@ -108,3 +108,35 @@ test('dashboard reads and writes wait for their queue slot', async () => {
   release(); await held; await pending
   expect(f.queries).toHaveLength(1); expect(f.calls).toHaveLength(1)
 })
+
+test('cover only patch uses key type, preserves all untouched dashboard attributes, and unchanged cover skips patch', async () => {
+ const row = dashboardRow({ expiresAt: target })
+ row.attributes!.push({ name: 'slug', value: 'example', type: 'str' })
+ const l = linkRow({ key: L1, expiresAt: target })
+ const f = fakeChain([row, l, widgetRow()])
+ await organizeDashboard(f.deps, S, D, { cover: K, items: [{ link: L1, widget: K, size: 'md' }] })
+ const patches = f.calls[0].data.patches
+ expect(patches).toEqual([{ entityKey: D, set: { cover: key(K) } }])
+ // SDK set merges these named attributes, so only cover changes.
+ const retained = Object.fromEntries(row.attributes!.map(a => [a.name, a.value]))
+ expect({ ...retained, ...patches[0].set }).toMatchObject({ type: 'dashboard', project: 'arkiv-sql-indexer-dash', user: U, login: 'google', title: 'Overview', slug: 'example', cover: key(K) })
+ row.attributes!.push({ name: 'cover', value: K, type: 'key' })
+ const g = fakeChain([row, l, widgetRow()])
+ await organizeDashboard(g.deps, S, D, { cover: K, items: [{ link: L1, widget: K, size: 'md' }] })
+ expect(g.calls).toEqual([])
+ for (const input of [{ cover: null, items: [{ link: L1, widget: K, size: 'md' as const }] }, { items: [] }]) {
+  const h = fakeChain([row, l, widgetRow()])
+  await organizeDashboard(h.deps, S, D, input)
+  expect(h.calls[0].data.patches).toEqual([{ entityKey: D, set: {}, unset: ['cover'] }])
+ }
+})
+
+test('cover outside final layout or without a live trusted widget is dropped', async () => {
+ for (const row of [widgetRow({ creator: OTHER }), widgetRow({ expiresAt: 1000 }), widgetRow()]) {
+  const f = fakeChain([dashboardRow({ expiresAt: target }), linkRow({ key: L1, expiresAt: target }), row])
+  await organizeDashboard(f.deps, S, D, { cover: row.creator === W && Number(BigInt(row.expiresAt!)) > 1000 ? W2 : K, items: [{ link: L1, widget: K, size: 'md' }] })
+  expect(f.calls).toEqual([])
+ }
+ expect(parseOrganizeInput({ cover: 'bad', items: [] }).ok).toBe(false)
+ expect(parseOrganizeInput({ cover: null, items: [] })).toEqual({ ok: true, value: { cover: null, items: [] } })
+})

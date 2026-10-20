@@ -142,3 +142,6 @@ export function parseLinkPayload(input: unknown): Parsed<LinkPayload> {
     return { v: choice(p.v, [1] as const, 'v'), size: choice(p.size, SIZES, 'size'), position: integer(p.position, 'position'), name: name(p.name, 'name') }
   })
 }
+
+export type OrganizeItem = { link: string | null; widget: string; size: Size }
+export type OrganizeInput = { title?: string; cover?: string | null; items: OrganizeItem[] }

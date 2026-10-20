@@ -14,7 +14,7 @@ const initial = () => draftFromDashboard(dashboard, slots)
 const candidate = (key: string, chart: ImportCandidate['chart'] = 'counter'): ImportCandidate => ({ key, name: key, chart, owner: 'holder', user: 'owner', expiresAt: 456, lifetimeDays: 30 })
 
 test('draft preserves slot order, stored names, link ids and unavailable widget metadata', () => {
- expect(initial()).toEqual({ title: 'Top creators', items: [
+ expect(initial()).toEqual({ title: 'Top creators', cover: null, items: [
   { id: 'l1', link: 'l1', widget: 'w1', name: 'Stored name', chart: 'hbar', size: 'xl', imported: true, owner: 'holder', expiresAt: 123, lifetimeDays: 7, expired: false, flash: false },
   { id: 'l2', link: 'l2', widget: 'w2', name: 'Gone', chart: null, size: 'xs', imported: false, owner: null, expiresAt: null, lifetimeDays: null, expired: true, flash: false },
  ] })

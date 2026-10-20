@@ -16,7 +16,7 @@ export type DashApi = {
   createDashboard(body: { title: string; description?: string }): Promise<WriteResult>
   updateDashboard(key: string, body: { title: string; description?: string }): Promise<WriteResult>
   deleteDashboard(key: string): Promise<WriteResult>
-  organize(key: string, body: { title?: string; items: { link: string | null; widget: string; size: Size }[] }): Promise<WriteResult>
+  organize(key: string, body: { title?: string; cover?: string | null; items: { link: string | null; widget: string; size: Size }[] }): Promise<WriteResult>
   addLink(key: string, body: { widget: string; size: Size }): Promise<WriteResult>
 }
 

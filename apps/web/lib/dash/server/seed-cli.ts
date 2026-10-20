@@ -1,12 +1,12 @@
 import { OFFICIAL_DASHBOARDS } from '../official-defs'
 import type { OpsDeps } from './operations'
-import { keepOfficialAlive, officialDashboardExists, readOfficialEnv, seedOfficial, validateOfficialDefinitions } from './official'
+import { keepOfficialAlive, setOfficialCovers, officialDashboardExists, readOfficialEnv, seedOfficial, validateOfficialDefinitions } from './official'
 
 export async function runSeedCli(argv: string[], env: Record<string, string | undefined>, io: {
   makeOps(cfg: { privateKey: `0x${string}`; rpcUrl: string }): OpsDeps; log(line: string): void
 }): Promise<number> {
-  if (argv.length > 1 || argv.some(arg => arg !== '--dry-run' && arg !== '--keepalive')) {
-    io.log('Usage: seed-official.ts [--dry-run | --keepalive]')
+  if (new Set(argv).size !== argv.length || argv.some(arg => !['--dry-run', '--keepalive', '--set-covers'].includes(arg)) || (argv.includes('--keepalive') && argv.length > 1)) {
+    io.log('Usage: seed-official.ts [--dry-run] [--set-covers] | --keepalive')
     return 2
   }
   const cfg = readOfficialEnv(env)
@@ -14,7 +14,10 @@ export async function runSeedCli(argv: string[], env: Record<string, string | un
   try {
     const defs = validateOfficialDefinitions(OFFICIAL_DASHBOARDS)
     const deps = io.makeOps(cfg)
-    if (argv[0] === '--dry-run') {
+    if (argv.includes('--set-covers')) {
+      const count = await setOfficialCovers(deps, { dryRun: argv.includes('--dry-run') })
+      io.log(`Official covers ${argv.includes('--dry-run') ? 'would update' : 'updated'} ${count} dashboards`)
+    } else if (argv.includes('--dry-run')) {
       for (const def of defs) {
         const exists = await deps.queue.run(() => officialDashboardExists(deps, def.slug))
         io.log(`${def.slug}: ${exists ? 'exists' : 'would create'}`)

@@ -79,7 +79,7 @@ test('official landing band covers disabled, loading, populated and empty states
  const loading = render(<OfficialDashboardsView enabled items={null}/>)
  expect(loading).toContain('aria-busy="true"')
  expect(loading.match(/data-skeleton="true"/g)).toHaveLength(3)
- const items = ['First report', 'Second report'].map((title,i) => ({ key: 'key'+i, title, user: 'wallet', official: true, widgets: 2, charts: [] as [], createdAt: 1, updatedAt: 1, expiresAt: 100 }))
+ const items = ['First report', 'Second report'].map((title,i) => ({ cover: null, key: 'key'+i, title, user: 'wallet', official: true, widgets: 2, charts: [] as [], createdAt: 1, updatedAt: 1, expiresAt: 100 }))
  const html = render(<OfficialDashboardsView enabled items={items} descriptions={new Map([['key0','Network description']])}/>)
  for (const text of ['Featured dashboards','Live network reports kept on Arkiv by this app. Open one to see every chart and its SQL.','All dashboards','href="/explore"','Network description']) expect(html).toContain(text)
  expect(html.indexOf('First report')).toBeLessThan(html.indexOf('Second report'))
