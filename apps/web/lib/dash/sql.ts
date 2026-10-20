@@ -148,6 +148,13 @@ export function recentSql(wallet: string, user: string): string {
 }
 
 export type DashboardListQuery = { search: string; sort: 'newest' | 'oldest' | 'widgets' | 'expiring'; official: boolean; limit: number; offset: number }
+// DuckDB WASM returns LIST columns as Arrow vectors, not plain arrays.
+export function listValue(value: unknown): unknown[] {
+ if (Array.isArray(value)) return value
+ if (value && typeof (value as { toArray?: unknown }).toArray === 'function') return Array.from((value as { toArray(): ArrayLike<unknown> }).toArray())
+ if (value && typeof (value as Iterable<unknown>)[Symbol.iterator] === 'function' && typeof value !== 'string') return Array.from(value as Iterable<unknown>)
+ return []
+}
 export type DashboardListItem = { key: string; title: string; user: string; official: boolean; widgets: number; charts: import('./schema').ChartType[]; createdAt: number; updatedAt: number; expiresAt: number }
 function dashboardFilters(wallet: string, q: Pick<DashboardListQuery, 'search' | 'official'>): string {
  const filters = ["d.type = 'dashboard'"]
@@ -178,7 +185,7 @@ export function dashboardCountSql(wallet: string, q: Pick<DashboardListQuery, 's
  return `${dashCte(wallet)} SELECT count(*) AS n FROM dash d WHERE ${dashboardFilters(wallet, q)}`
 }
 export function toDashboardItems(rows: unknown[][]): DashboardListItem[] {
- return rows.map(([key, title, user, official, widgets, charts, createdAt, updatedAt, expiresAt]) => ({ key: String(key).toLowerCase(), title: String(title), user: String(user).toLowerCase(), official: official === true || official === 1 || official === BigInt(1) || official === 'true', widgets: Number(widgets), charts: Array.isArray(charts) ? charts as DashboardListItem['charts'] : [], createdAt: Number(createdAt), updatedAt: Number(updatedAt), expiresAt: Number(expiresAt) }))
+ return rows.map(([key, title, user, official, widgets, charts, createdAt, updatedAt, expiresAt]) => ({ key: String(key).toLowerCase(), title: String(title), user: String(user).toLowerCase(), official: official === true || official === 1 || official === BigInt(1) || official === 'true', widgets: Number(widgets), charts: listValue(charts).map(String) as DashboardListItem['charts'], createdAt: Number(createdAt), updatedAt: Number(updatedAt), expiresAt: Number(expiresAt) }))
 }
 
 export function widgetDashboardsSql(wallet: string, widgetKey: string, limit: number): string {

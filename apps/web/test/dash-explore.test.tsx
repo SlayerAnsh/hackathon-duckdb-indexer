@@ -108,3 +108,10 @@ test('explorer widget card does not mark transferred official authorship as Offi
  expect(html).not.toContain('Official')
  expect(readFileSync(new URL('../components/widgets/ExplorerGrid.tsx',import.meta.url),'utf8')).toContain('isOfficialOwned(item.user, item.owner,')
 })
+
+test('dashboard rows accept Arrow list vectors for chart types', () => {
+  const vector = { toArray: () => ['counter', 'table'] }
+  const [item] = toDashboardItems([['0xAB', 'T', '0x1', false, 2, vector, 1, 2, 3]])
+  expect(item!.charts).toEqual(['counter', 'table'])
+  expect(toDashboardItems([['0xAB', 'T', '0x1', false, 0, null, 1, 2, 3]])[0]!.charts).toEqual([])
+})
