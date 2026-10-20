@@ -1,0 +1,58 @@
+/* Header account controls: theme toggle, Log in, account trigger and the
+   account popover. Every header control is var(--h-md) (34px) tall with the
+   same outline, so the row reads as one set. Phones and touch screens get
+   44px from the touch rules in theme.css. */
+
+.control{position:relative;display:flex;align-items:center}
+
+:global(.ib).theme{width:var(--h-md);height:var(--h-md);border-color:var(--border-strong);color:var(--text-2)}
+:global(.ib).theme:hover{border-color:var(--ui-edge);color:var(--text)}
+
+.login{height:var(--h-md)}
+
+.trigger{display:inline-flex;align-items:center;gap:8px;height:var(--h-md);padding:0 8px 0 4px;border:1px solid var(--border-strong);border-radius:var(--r-md);background:transparent;color:var(--text);font:var(--fs-sm) var(--font-mono);cursor:pointer;transition:background-color var(--dur-fast),border-color var(--dur-fast)}
+.trigger:hover{background:var(--card-2);border-color:var(--ui-edge)}
+.trigger[aria-expanded="true"]{background:var(--card-2);border-color:var(--ui-edge)}
+.chev{color:var(--text-3b);transition:transform var(--dur)}
+.trigger[aria-expanded="true"] .chev{transform:rotate(180deg)}
+
+.dot{display:grid;place-items:center;flex:none;width:24px;height:24px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font:600 11px/1 var(--font-ui)}
+.dotLg{width:36px;height:36px;font-size:14px}
+
+.error{position:absolute;right:0;top:calc(100% + 8px);z-index:50;width:280px;max-width:calc(100vw - 32px);box-shadow:var(--shadow-pop)}
+
+/* Popover */
+.pop,:global(.popover).pop{position:absolute;right:0;top:calc(100% + 8px);z-index:50;width:320px;max-width:calc(100vw - 32px);padding:0;font:var(--fs-base)/1.5 var(--font-ui);text-align:left}
+.sec{padding:var(--sp-3) var(--sp-4)}
+.sec+.sec{border-top:1px solid var(--border)}
+.ident{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-4)}
+.identText{display:grid;gap:2px;min-width:0;flex:1}
+.provider{font-size:var(--fs-sm);color:var(--text-2)}
+.addrRow{display:flex;align-items:center;gap:2px;min-width:0}
+.addr{flex:1;min-width:0;font:var(--fs-sm) var(--font-mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.addrRow :global(.ib){width:28px;height:28px;min-width:28px;min-height:28px}
+
+.balRow{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-3)}
+.label{font:500 var(--fs-xs) var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--text-3b)}
+.glm{font:600 var(--fs-md) var(--font-mono);font-variant-numeric:tabular-nums;color:var(--text)}
+.unknown{font-size:var(--fs-sm);color:var(--text-3b)}
+.net{margin:2px 0 0;font-size:var(--fs-xs);color:var(--text-3b)}
+.note{display:flex;gap:6px;margin:var(--sp-2) 0 0;font-size:var(--fs-sm);line-height:1.45}
+.note svg{flex:none;margin-top:2px}
+.warn{color:var(--warn)}
+.bad{color:var(--bad)}
+
+.links{display:grid;gap:2px;padding:4px}
+.links :global(.mi){min-height:36px}
+.logout{color:var(--text-2)}
+
+/* Inside the phone nav sheet the popover becomes an inline panel. */
+.sheetActions{flex-wrap:wrap}
+.sheetActions .control{flex-wrap:wrap}
+.sheetActions .control:has(.pop){flex:1 1 100%;order:2}
+.sheetActions .popWrap{flex:1 1 100%}
+.sheetActions .pop{position:static;width:100%;max-width:none;margin-top:var(--sp-2);box-shadow:none;animation:none}
+.sheetActions .error{position:static;width:100%;max-width:none;margin-top:var(--sp-2);box-shadow:none}
+
+@media(hover:none){.trigger,.login{height:var(--h-touch)}:global(.ib).theme{width:var(--h-touch);height:var(--h-touch)}.links :global(.mi){min-height:var(--h-touch)}.addrRow :global(.ib){width:var(--h-touch);height:var(--h-touch)}}
+@media(max-width:719px){.trigger,.login{height:var(--h-touch)}:global(.ib).theme{width:var(--h-touch);height:var(--h-touch)}.links :global(.mi){min-height:var(--h-touch)}}

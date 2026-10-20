@@ -42,8 +42,8 @@ test('extend state machine keeps failures in the dialog', () => {
 test('extend dialog copy and progress', () => {
  const props = { name: 'Top 10 creators', expiresAt: 7 * DAY, head: 0, lifetimeDays: 7 as const, onCancel() {}, onConfirm() {} }
  const html = render(<ExtendDialog {...props} phase="confirm"/> )
- for (const text of ['role="dialog"', 'aria-modal="true"', 'Extend “Top 10 creators”?', 'Adds 7 days', 'New expiry: in 14d 0h.', 'Your wallet signs and pays a small network fee.', '>Cancel<', '>Extend<']) expect(html).toContain(text)
- expect(render(<ExtendDialog {...props} lifetimeDays={1} phase="confirm"/>)).toContain('Adds 1 day.')
+ for (const text of ['role="dialog"', 'aria-modal="true"', 'Extend “Top 10 creators”?', '<dt>Adds</dt><dd>7 days</dd>', '<dt>New expiry</dt><dd>in 14d 0h</dd>', 'Your wallet signs and pays a small network fee.', '>Cancel<', '>Extend<']) expect(html).toContain(text)
+ expect(render(<ExtendDialog {...props} lifetimeDays={1} phase="confirm"/>)).toContain('<dd>1 day</dd>')
  expect(render(<ExtendDialog {...props} phase="extending"/>)).toContain('Waiting for wallet…')
  expect(render(<ExtendDialog {...props} phase="error"/>)).toContain('Your wallet couldn&#x27;t sign. Try again.')
 })

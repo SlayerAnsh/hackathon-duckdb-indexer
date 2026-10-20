@@ -1,41 +1,28 @@
 'use client'
-import { useEffect, useId, useRef } from 'react'
 import { BLOCKS_PER_DAY, MAX_REMAINING_DAYS, type LifetimeDays } from '../../lib/dash/schema'
 import { extendPreview, timeLeftLabel } from '../../lib/dash/time'
+import { Dialog } from '../ui/Dialog'
 import type { ExtendPhase } from './ExtendButton'
+import a from './actions.module.css'
 
 export function ExtendDialog({ name, expiresAt, head, lifetimeDays, phase, error, onCancel, onConfirm }: {
  name?: string; expiresAt: number; head: number; lifetimeDays: LifetimeDays; phase: ExtendPhase; error?: string | null; onCancel(): void; onConfirm(): void
 }) {
- const dialog = useRef<HTMLDivElement>(null)
- const title = useId()
- const body = useId()
  const busy = phase === 'extending'
  const preview = extendPreview(expiresAt, head, lifetimeDays)
  const target = Math.min(expiresAt + lifetimeDays * BLOCKS_PER_DAY, head + MAX_REMAINING_DAYS * BLOCKS_PER_DAY)
  const expiry = timeLeftLabel(target, head).text.replace(/ left$/, '').replace(/^Expires in /, '')
- useEffect(() => {
-  const previous = document.activeElement as HTMLElement | null
-  dialog.current?.querySelector<HTMLButtonElement>('button')?.focus()
-  return () => previous?.focus()
- }, [])
- return <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'grid', placeItems: 'center', background: 'color-mix(in srgb, var(--surface) 70%, transparent)' }}>
-  <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby={title} aria-describedby={body} aria-busy={busy} tabIndex={-1} style={{ width: 'calc(100% - 32px)', maxWidth: 380, padding: 24, background: 'var(--card)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-lg)', boxShadow: 'var(--shadow-pop)' }} onKeyDown={event => {
-   if (event.key === 'Escape') { event.preventDefault(); if (!busy) onCancel() }
-   if (event.key !== 'Tab') return
-   const buttons = Array.from(dialog.current!.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'))
-   event.preventDefault()
-   if (!buttons.length) { dialog.current?.focus(); return }
-   const index = buttons.indexOf(document.activeElement as HTMLButtonElement)
-   buttons[(index + (event.shiftKey ? buttons.length - 1 : 1)) % buttons.length]?.focus()
-  }}>
-   <h2 id={title}>{name ? `Extend “${name}”?` : 'Extend widget?'}</h2>
-   <p id={body}>Adds {preview.daysAdded} {preview.daysAdded === 1 ? 'day' : 'days'}. New expiry: in {expiry}. Your wallet signs and pays a small network fee.</p>
-   {phase === 'error' && <p className="error" role="alert">{error ?? "Your wallet couldn't sign. Try again."}</p>}
-   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-    <button type="button" className="btn" disabled={busy} onClick={onCancel}>Cancel</button>
-    <button type="button" className="btn btn-primary" disabled={busy || preview.atCap} onClick={onConfirm}>{busy ? 'Waiting for wallet…' : 'Extend'}</button>
-   </div>
-  </div>
- </div>
+ return <Dialog open onClose={onCancel} size="sm" dismissible={!busy} title={name ? `Extend “${name}”?` : 'Extend widget?'}
+  description="Your wallet signs and pays a small network fee."
+  footer={<>
+   <button type="button" className="btn" disabled={busy} onClick={onCancel}>Cancel</button>
+   <button type="button" className="btn btn-primary" disabled={busy || preview.atCap} aria-busy={busy || undefined} onClick={onConfirm}>{busy ? <><span className="spinner" aria-hidden="true"/>Waiting for wallet…</> : 'Extend'}</button>
+  </>}>
+  <dl className={a.summary} aria-busy={busy || undefined}>
+   <div><dt>Adds</dt><dd>{preview.daysAdded} {preview.daysAdded === 1 ? 'day' : 'days'}</dd></div>
+   <div><dt>New expiry</dt><dd>in {expiry}</dd></div>
+  </dl>
+  {preview.atCap && <div className="notice notice-warn"><div><p>Already at the {MAX_REMAINING_DAYS} day maximum. Extend again once some time has passed.</p></div></div>}
+  {phase === 'error' && <p className="notice notice-bad" role="alert">{error ?? "Your wallet couldn't sign. Try again."}</p>}
+ </Dialog>
 }

@@ -17,5 +17,13 @@ export function BalanceNotice({ address, wei, level, initialCopied = false }: { 
  async function copy() {
   try { await navigator.clipboard.writeText(address); setCopied(true) } catch { /* Leave the label available for retry. */ }
  }
- return <div className="state state-behind" role="status"><span>{level === 'empty' ? 'Your wallet has no GLM.' : `Low balance: ${formatGlm(wei ?? BigInt(0))}.`} Extending, transferring or deleting needs at least 0.1 GLM on Tiramisu. Fund {shortHex(address)}.</span> <button type="button" className="btn btn-quiet" onClick={() => void copy()}>{copied ? '✓ Copied' : 'Copy address'}</button></div>
+ const empty = level === 'empty'
+ return <div className={`notice ${empty ? 'notice-bad' : 'notice-warn'}`} role="status">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 1.75 14.5 13.5h-13Z"/><path d="M8 6.25V9M8 11.25h.01"/></svg>
+  <div>
+   <p className="notice-title">{empty ? 'Your wallet has no GLM.' : `Low balance: ${formatGlm(wei ?? BigInt(0))}.`}</p>
+   <p>Extending, transferring or deleting needs at least 0.1 GLM on Tiramisu. Fund <span className="mono">{shortHex(address)}</span>.</p>
+  </div>
+  <button type="button" className="btn btn-sm" onClick={() => void copy()}>{copied ? '✓ Copied' : 'Copy address'}</button>
+ </div>
 }

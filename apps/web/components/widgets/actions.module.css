@@ -1,0 +1,9 @@
+/* Wallet action dialogs (extend, delete, transfer). Built on components/ui/Dialog. */
+.summary{display:grid;margin:0;border:1px solid var(--border);border-radius:var(--r-md);background:var(--inset)}
+.summary>div{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-3);padding:10px var(--sp-3)}
+.summary>div+div{border-top:1px solid var(--border-faint)}
+.summary dt{font-size:var(--fs-sm);color:var(--text-2)}
+.summary dd{margin:0;font:600 var(--fs-base) var(--font-mono);font-variant-numeric:tabular-nums;color:var(--text);text-align:right}
+.name{font-weight:600;color:var(--text);overflow-wrap:anywhere}
+.fee{display:flex;align-items:center;gap:6px;margin:0;font-size:var(--fs-sm);color:var(--text-3b)}
+.fee svg{flex:none}

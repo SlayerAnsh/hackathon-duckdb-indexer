@@ -6,6 +6,7 @@ import { addressUrl } from '../../lib/explorer'
 import { formatGlm, type BalanceLevel } from '../../lib/dash/wallet'
 import { useWalletBalance } from '../../lib/dash/use-balance'
 import { useDashAuth } from '../auth/DashAuthProvider'
+import a from './account.module.css'
 
 export const PROVIDER_LABELS: Record<Login, string> = { google: 'Google', discord: 'Discord', x: 'X', telegram: 'Telegram' }
 export const PROVIDER_GLYPHS: Record<Login, string> = { google: 'G', discord: '◉', x: '𝕏', telegram: '➤' }
@@ -18,6 +19,7 @@ export function menuIndex(key: string, index: number, count: number): number {
  return index
 }
 const icon = { width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const
+const Warn = () => <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 1.75 14.5 13.5h-13Z"/><path d="M8 6.25V9M8 11.25h.01"/></svg>
 const LINKS = [
  { href: '/me', label: 'My home', path: <><path d="M2.5 7 8 2.5 13.5 7"/><path d="M4 6v7.5h8V6"/></> },
  { href: '/widgets/new', label: 'New widget', path: <path d="M8 3v10M3 8h10"/> },
@@ -28,30 +30,31 @@ export function AccountPopoverView({ address, login, balance, copied, onCopy, on
  address: string; login: Login; balance: { wei: bigint | null; level: BalanceLevel }; copied: boolean; onCopy(): void; onClose(): void; onLogout(): void; id?: string
 }) {
  const explorer = addressUrl(address)
- return <div id={id} className="acct-pop" role="dialog" aria-label="Account">
-  <div className="acct-sec acct-id">
-   <span className="avatar-dot avatar-dot-lg" aria-hidden="true">{PROVIDER_GLYPHS[login]}</span>
-   <div className="acct-id-text">
-    <span className="acct-provider">Signed in with {PROVIDER_LABELS[login]}</span>
-    <span className="acct-addr-row"><span className="mono acct-addr" title={address}>{address.slice(0, 10)}…{address.slice(-8)}</span>
-     <button type="button" className="ib acct-ib has-tip" data-tip={copied ? 'Copied' : 'Copy address'} aria-label={copied ? 'Copied' : 'Copy address'} data-autofocus="true" onClick={onCopy}>
+ return <div id={id} className={`popover ${a.pop}`} role="dialog" aria-label="Account">
+  <div className={`${a.sec} ${a.ident}`}>
+   <span className={`${a.dot} ${a.dotLg}`} aria-hidden="true">{PROVIDER_GLYPHS[login]}</span>
+   <div className={a.identText}>
+    <span className={a.provider}>Signed in with {PROVIDER_LABELS[login]}</span>
+    <span className={a.addrRow}><span className={a.addr} title={address}>{address.slice(0, 8)}…{address.slice(-6)}</span>
+     <button type="button" className="ib ib-sm has-tip" data-tip={copied ? 'Copied' : 'Copy address'} aria-label={copied ? 'Copied' : 'Copy address'} data-autofocus="true" onClick={onCopy}>
       {copied ? <svg {...icon}><path d="m3 8.5 3 3 7-7"/></svg> : <svg {...icon}><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5v-.5A1.5 1.5 0 0 0 9 1.5H3A1.5 1.5 0 0 0 1.5 3v6A1.5 1.5 0 0 0 3 10.5h.5"/></svg>}
      </button>
-     {explorer && <a className="ib acct-ib has-tip" data-tip="View on explorer" aria-label="View on explorer" href={explorer} target="_blank" rel="noreferrer"><svg {...icon}><path d="M9 2.5h4.5V7M13.5 2.5 7 9M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3"/></svg></a>}
+     {explorer && <a className="ib ib-sm has-tip" data-tip="View on explorer" aria-label="View on explorer" href={explorer} target="_blank" rel="noreferrer"><svg {...icon}><path d="M9 2.5h4.5V7M13.5 2.5 7 9M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3"/></svg></a>}
     </span>
     <span className="sr-only" aria-live="polite">{copied ? 'Address copied' : ''}</span>
    </div>
   </div>
-  <div className="acct-sec acct-bal">
-   <div className="acct-bal-row"><span className="acct-label">Balance</span>{balance.wei === null ? <span className="acct-unknown">Balance unavailable</span> : <span className="mono acct-glm">{formatGlm(balance.wei)}</span>}</div>
-   {balance.wei !== null && balance.level === 'low' && <p className="acct-note acct-warn">Below 0.1 GLM. Extending and deleting widgets may fail.</p>}
-   {balance.wei !== null && balance.level === 'empty' && <p className="acct-note acct-bad">No GLM. Fund this address to extend or delete widgets.</p>}
+  <div className={a.sec}>
+   <div className={a.balRow}><span className={a.label}>Balance</span>{balance.wei === null ? <span className={a.unknown}>Balance unavailable</span> : <span className={a.glm}>{formatGlm(balance.wei)}</span>}</div>
+   <p className={a.net}>Tiramisu testnet. Pays for extend, transfer and delete.</p>
+   {balance.wei !== null && balance.level === 'low' && <p className={`${a.note} ${a.warn}`}><Warn/>Below 0.1 GLM. Extending and deleting widgets may fail.</p>}
+   {balance.wei !== null && balance.level === 'empty' && <p className={`${a.note} ${a.bad}`}><Warn/>No GLM. Fund this address to extend or delete widgets.</p>}
   </div>
-  <div className="acct-sec acct-links">
+  <div className={`${a.sec} ${a.links}`}>
    {LINKS.map(link => <Link key={link.href} href={link.href} className="mi" data-menu-item="true" onClick={onClose}><svg {...icon}>{link.path}</svg>{link.label}</Link>)}
   </div>
-  <div className="acct-sec acct-links">
-   <button type="button" className="mi acct-logout" data-menu-item="true" onClick={onLogout}><svg {...icon}><path d="M6 2.5H3.5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1H6M10.5 11 13.5 8l-3-3M13.5 8H6"/></svg>Log out</button>
+  <div className={`${a.sec} ${a.links}`}>
+   <button type="button" className={`mi ${a.logout}`} data-menu-item="true" onClick={onLogout}><svg {...icon}><path d="M6 2.5H3.5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1H6M10.5 11 13.5 8l-3-3M13.5 8H6"/></svg>Log out</button>
   </div>
  </div>
 }
@@ -74,7 +77,7 @@ export function AccountPopover({ address, login, onClose, onLogout, id }: { addr
   const timer = setTimeout(() => setCopied(false), 1500)
   return () => clearTimeout(timer)
  }, [copied])
- return <div ref={root} className="acct-pop-wrap" onKeyDown={event => {
+ return <div ref={root} className={a.popWrap} onKeyDown={event => {
   if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose(); return }
   if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
   event.preventDefault()

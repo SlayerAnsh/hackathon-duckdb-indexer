@@ -1,5 +1,7 @@
 'use client'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
+import { Dialog } from '../ui/Dialog'
+import { Field } from '../ui/Field'
 import { useDashAuth } from '../auth/DashAuthProvider'
 import { deleteWidgetDirect, transferWidgetDirect, transferAddressError, walletErrorKind, walletErrorMessage, type DirectResult } from '../../lib/dash/widget-actions'
 
@@ -21,39 +23,31 @@ export function actionStep(phase: ActionPhase, event: ActionEvent): ActionPhase 
 export function WidgetActionDialog({ kind, name, phase, error, address = '', onCancel, onConfirm }: {
  kind: 'delete' | 'transfer'; name: string; phase: Exclude<ActionPhase, 'idle'>; error?: string | null; address?: string; onCancel(): void; onConfirm(to?: string): void
 }) {
- const dialog = useRef<HTMLDivElement>(null)
- const title = useId(), body = useId(), input = useId(), feedback = useId()
+ const formId = useId()
  const [to, setTo] = useState(''), [attempted, setAttempted] = useState(false)
  const busy = phase === 'signing', label = kind === 'delete' ? 'Delete' : 'Transfer'
  const inputError = kind === 'transfer' && attempted ? transferAddressError(to, address) : null
- useEffect(() => {
-  const previous = document.activeElement as HTMLElement | null
-  dialog.current?.querySelector<HTMLElement>('input, button')?.focus()
-  return () => previous?.focus()
- }, [])
  function confirm() {
   if (busy) return
   setAttempted(true)
   if (kind === 'transfer' && transferAddressError(to, address)) return
   onConfirm(kind === 'transfer' ? to.trim() : undefined)
  }
- return <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'grid', placeItems: 'center', background: 'color-mix(in srgb, var(--surface) 70%, transparent)' }}>
-  <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby={title} aria-describedby={body} aria-busy={busy} tabIndex={-1} style={{ width: 'calc(100% - 32px)', maxWidth: 380, padding: 24, background: 'var(--card)', border: '1px solid var(--border-strong)', borderRadius: 'var(--r-lg)', boxShadow: 'var(--shadow-pop)' }} onKeyDown={event => {
-   if (event.key === 'Escape') { event.preventDefault(); if (!busy) onCancel() }
-   if (event.key !== 'Tab') return
-   const controls = Array.from(dialog.current!.querySelectorAll<HTMLElement>('input:not(:disabled), button:not(:disabled)'))
-   event.preventDefault()
-   if (!controls.length) { dialog.current?.focus(); return }
-   const index = controls.indexOf(document.activeElement as HTMLElement)
-   controls[(index + (event.shiftKey ? controls.length - 1 : 1)) % controls.length]?.focus()
-  }}>
-   <h2 id={title}>{label} “{name}”?</h2>
-   <p id={body}>{kind === 'delete' ? 'It disappears from Arkiv now. Dashboards that use it show it as expired. Your wallet signs and pays a small network fee.' : 'The new owner can extend, transfer or delete it. You stay the author, but you can no longer delete it or save new versions.'}</p>
-   {kind === 'transfer' && <div><label htmlFor={input}>New owner address</label><input id={input} placeholder="0x…" value={to} onChange={event => setTo(event.target.value)} disabled={busy} aria-invalid={!!inputError} aria-describedby={inputError ? feedback : undefined} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); confirm() } }}/>{inputError && <p id={feedback} className="error" role="alert">{inputError}</p>}</div>}
-   {phase === 'error' && <p className="error" role="alert">{error ?? "Your wallet couldn't sign. Try again."}</p>}
-   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}><button type="button" className="btn" disabled={busy} onClick={onCancel}>Cancel</button><button type="button" className="btn btn-primary" disabled={busy} onClick={confirm}>{busy ? 'Waiting for wallet…' : label}</button></div>
-  </div>
- </div>
+ return <Dialog open onClose={onCancel} size="sm" dismissible={!busy} title={`${label} “${name}”?`}
+  description={kind === 'delete' ? 'It disappears from Arkiv now. Dashboards that use it show it as expired. Your wallet signs and pays a small network fee.' : 'The new owner can extend, transfer or delete it. You stay the author, but you can no longer delete it or save new versions.'}
+  footer={<>
+   <button type="button" className="btn" disabled={busy} onClick={onCancel}>Cancel</button>
+   <button type={kind === 'transfer' ? 'submit' : 'button'} form={kind === 'transfer' ? formId : undefined} className={`btn ${kind === 'delete' ? 'btn-danger' : 'btn-primary'}`} disabled={busy} aria-busy={busy || undefined} onClick={kind === 'delete' ? confirm : undefined}>{busy ? <><span className="spinner" aria-hidden="true"/>Waiting for wallet…</> : label}</button>
+  </>}>
+  {kind === 'transfer' || phase === 'error' ? <>
+  {kind === 'transfer' && <form id={formId} className="field-stack" noValidate onSubmit={event => { event.preventDefault(); confirm() }}>
+   <Field label="New owner address" error={inputError} hint={inputError ? undefined : 'A Tiramisu address starting with 0x. Your wallet signs and pays a small network fee.'}>
+    <input className="input mono" placeholder="0x…" autoComplete="off" spellCheck={false} value={to} onChange={event => setTo(event.target.value)} disabled={busy}/>
+   </Field>
+  </form>}
+  {phase === 'error' && <p className="notice notice-bad" role="alert">{error ?? "Your wallet couldn't sign. Try again."}</p>}
+  </> : null}
+ </Dialog>
 }
 
 // Both owner surfaces share the same signing and error transitions.
@@ -80,5 +74,5 @@ export function WidgetOwnerActions({ widgetKey, name, address, disabledReason, t
   if (kind === 'delete') onDeleted?.(result)
   else onTransferred?.(result, to!)
  }
- return <><button type="button" className="btn btn-quiet" title={disabledReason} disabled={!!disabledReason} onClick={() => open('delete')}>Delete widget</button>{transfer && <button type="button" className="btn btn-quiet" title={disabledReason} disabled={!!disabledReason} onClick={() => open('transfer')}>Transfer</button>}{phase !== 'idle' && <WidgetActionDialog kind={kind} name={name} phase={phase} address={address} error={error} onCancel={() => setPhase(p => actionStep(p, 'cancel'))} onConfirm={to => void confirm(to)}/>}</>
+ return <><button type="button" className="btn btn-quiet btn-danger" title={disabledReason} disabled={!!disabledReason} onClick={() => open('delete')}>Delete widget</button>{transfer && <button type="button" className="btn btn-quiet" title={disabledReason} disabled={!!disabledReason} onClick={() => open('transfer')}>Transfer</button>}{phase !== 'idle' && <WidgetActionDialog kind={kind} name={name} phase={phase} address={address} error={error} onCancel={() => setPhase(p => actionStep(p, 'cancel'))} onConfirm={to => void confirm(to)}/>}</>
 }
