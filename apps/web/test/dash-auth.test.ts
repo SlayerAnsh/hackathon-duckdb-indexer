@@ -94,16 +94,16 @@ test('session verifies bearer, signer, linked wallet and single use nonce', asyn
   identity.login = 'google'; identity.wallets = []
   expect((await handleCreateSession(request('session', 'POST', await signed(deps), { authorization: 'Bearer good' }), deps)).status).toBe(401)
 })
-test('get and delete session reject missing, tampered and expired cookies', async () => {
+test('get session reports missing, tampered and expired cookies as anonymous; delete clears the cookie', async () => {
   const { deps, advance } = fixture()
   const created = await handleCreateSession(request('session', 'POST', await signed(deps), { authorization: 'Bearer good' }), deps)
   const cookie = created.headers.get('set-cookie')!.split(';')[0]
   const get = (value?: string) => handleGetSession(request('session', 'GET', undefined, value ? { cookie: value } : {}), deps)
   expect(await (await get(cookie)).json()).toEqual(info)
-  expect((await get()).status).toBe(401)
-  expect((await get(cookie + 'x')).status).toBe(401)
+  for (const response of [await get(), await get(cookie + 'x')]) { expect(response.status).toBe(200); expect(await response.json()).toEqual({ authenticated: false }) }
   advance(SESSION_TTL_SECONDS * 1000)
-  expect((await get(cookie)).status).toBe(401)
+  const expired = await get(cookie)
+  expect(expired.status).toBe(200); expect(await expired.json()).toEqual({ authenticated: false })
   const deleted = await handleDeleteSession(request('session', 'DELETE'))
   expect(deleted.status).toBe(200); expect(await deleted.json()).toEqual({ ok: true })
   expect(deleted.headers.get('set-cookie')).toContain('dash_session=;')

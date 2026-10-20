@@ -91,6 +91,8 @@
 .panel{flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto}
 .result{flex:1;min-height:0;display:flex;flex-direction:column;transition:opacity var(--dur)}
 .panel[data-running] .result{opacity:.5;pointer-events:none}
+/* A failed run leaves the previous result dimmed and inert under the error notice. */
+.result[data-stale]{opacity:.4;pointer-events:none}
 .result :global(.results){flex:1 1 auto;min-height:0;max-height:none}
 
 .empty{margin:auto;padding:32px 24px;max-width:56ch;text-align:center;font-size:13px;line-height:1.6;color:var(--text-2)}
@@ -118,6 +120,7 @@
 .history button:hover{background:var(--card-2)}
 .history code{font:12px var(--font-mono);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .historyMeta{display:flex;align-items:center;gap:8px;font:11.5px var(--font-mono);font-variant-numeric:tabular-nums;color:var(--text-3b);white-space:nowrap}
+.historyFail{color:var(--bad)}
 .historyMeta span+span::before{content:"";display:inline-block;width:3px;height:3px;margin-right:8px;border-radius:50%;background:currentColor;vertical-align:middle;opacity:.7}
 
 .backdrop{display:none}

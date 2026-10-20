@@ -55,6 +55,8 @@
 .body{flex:1;min-width:0;display:flex;flex-direction:column;padding:14px 0 0}
 .body :global(.state-stale){align-self:center}
 /* Counter figures read as a stat: small label, one large tabular value. */
+/* They keep their natural height: in a row with a tall chart a stretched counter left a hole with the value at the bottom. */
+.figure.counter{align-self:start}
 .counter .caption h3{font:500 var(--fs-sm)/1.4 var(--font-ui);letter-spacing:0;color:var(--text-2)}
 .counter .body{padding-top:8px}
 .counter :global(.stat-value){font:600 32px/1.15 var(--font-ui);letter-spacing:-.02em;font-variant-numeric:tabular-nums}

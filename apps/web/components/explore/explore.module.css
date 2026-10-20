@@ -107,7 +107,14 @@
 .preview{position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:var(--sp-4);background:var(--inset);border-bottom:1px solid var(--border);color:var(--text-3b)}
 .preview :global(.chart-frame){height:100%;width:100%}
 .preview :global(.recharts-cartesian-axis),.preview :global(.chart-key){display:none}
-.previewFill{width:100%;height:100%}
+.previewFill{width:100%;height:100%;min-width:0}
+/* Cover thumbnail: a compact chart (WidgetPreview compact, no axes or legend) filling the cover box. */
+.cover :global(.chart-frame){height:100%;width:100%}
+.cover :global(.chart-key),.cover :global(.legend){display:none}
+/* Donuts in card previews and covers: the ring takes the box height, square, with the legend beside it (card) or alone (cover). */
+.preview :global(.chart-donut),.cover :global(.chart-donut){flex-direction:row;align-items:center;height:100%;min-height:0;gap:var(--sp-4)}
+.preview :global(.chart-donut .chart-frame),.cover :global(.chart-donut .chart-frame){flex:0 0 auto;height:100%;width:auto;aspect-ratio:1}
+.cover :global(.chart-donut){justify-content:center}
 .previewSkel{width:100%;height:100%;border-radius:var(--r-md)}
 .previewNote{display:grid;justify-items:center;gap:6px;font-size:var(--fs-sm);color:var(--text-3b)}
 /* Pick mode checkbox: always visible so the card reads as selectable; sits above preview content (sticky table headers). */

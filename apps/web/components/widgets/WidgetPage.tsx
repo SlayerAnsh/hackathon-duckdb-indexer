@@ -33,6 +33,7 @@ import { SyncChip } from './SyncChip'
 import { AddToDashboardPicker } from './AddToDashboardPicker'
 import { EmptyState } from './EmptyState'
 import { rpcMessage } from '../RowActions'
+import { KeptLive } from '../explore/Chips'
 import s from './widgets.module.css'
 
 export type WidgetPageMode = 'loading' | 'missing' | 'owner' | 'viewer'
@@ -61,7 +62,11 @@ const LinkGlyph = () => <svg width="16" height="16" viewBox="0 0 16 16" fill="no
 const CheckGlyph = () => <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7"/></svg>
 const ShieldGlyph = () => <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true"><path d="M8 1.5 2.5 3.5V8c0 3.2 2.3 5.5 5.5 6.5 3.2-1 5.5-3.3 5.5-6.5V3.5Z"/></svg>
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
-export function KeptLive() { return <span className="quiet-chip">Kept live</span> }
+/** True only once the chain head is known and has passed the expiry block. An unknown head is never expired. */
+export function widgetExpired(expiresAt: number, head: number | undefined): boolean {
+ return head !== undefined && expiresAt <= head
+}
+const CountSkeleton = () => <span className="skel" data-skeleton="true" aria-hidden="true" style={{ display: 'inline-block', width: 96, height: 14, verticalAlign: 'middle', borderRadius: 'var(--r-sm)' }}/>
 /** Placeholder with the real page's outline: title, facts line, chart frame and side panels. */
 export function WidgetSkeleton({ label = LOADING_COPY }: { label?: string }) {
  return <div className={s.page} aria-busy="true">
@@ -86,8 +91,9 @@ export function WidgetPageBody({ state, name, error, onRetry }: { state: ReturnT
  if (state === 'missing') return <MissingWidget/>
  return null
 }
-export function MissingWidget() {
- return <div className={s.state}><EmptyState icon="widget" title="Widget not found" body="This widget has expired. Its query is no longer on Arkiv." actions={<><Link className="btn btn-primary" href="/explore?tab=widgets">Browse widgets</Link><Link className="btn btn-quiet" href="/widgets/new">New widget</Link></>}/></div>
+/** `expired` only when the entity is known to have passed its expiry block; a malformed or unknown key gets the hedged copy. */
+export function MissingWidget({ expired = false }: { expired?: boolean }) {
+ return <div className={s.state}><EmptyState icon="widget" title={expired ? 'Widget expired' : 'Widget not found'} body={expired ? 'This widget has expired. Its query is no longer on Arkiv.' : 'This widget may have expired or the link is wrong.'} actions={<><Link className="btn btn-primary" href="/explore?tab=widgets">Browse widgets</Link><Link className="btn btn-quiet" href="/widgets/new">New widget</Link></>}/></div>
 }
 export function DisabledNotice() {
  return <div className={s.state}><EmptyState icon="widget" title="Dashboards are off" body="Dashboards are not enabled on this deployment." actions={<Link className="btn btn-quiet" href="/playground">Open playground</Link>}/></div>
@@ -104,7 +110,7 @@ function useCopied(): [boolean, () => void] {
  return [copied, () => setCopied(true)]
 }
 export function WidgetHeader({ name, chart, user, official, uses, expiresAt, head, ms, widgetKey, sql, canAdd, onAdd }: {
- name: string; chart: ChartType; user: string; official: boolean; uses: number; expiresAt: number; head?: number; ms?: number; widgetKey: string; sql: string; canAdd: boolean; onAdd?(): void
+ name: string; chart: ChartType; user: string; official: boolean; uses?: number; expiresAt: number; head?: number; ms?: number; widgetKey: string; sql: string; canAdd: boolean; onAdd?(): void
 }) {
  const [copied, markCopied] = useCopied()
  return <header className={s.head}>
@@ -120,15 +126,19 @@ export function WidgetHeader({ name, chart, user, official, uses, expiresAt, hea
   </div>
   <div className={s.facts}>
    <span className={s.by}>{official && <span className="chip chip-official"><ShieldGlyph/>Featured</span>}by <AddressLink address={user}/></span>
-   <span>on {plural(uses, 'dashboard')}</span>
+   <span>{uses === undefined ? <><span className="sr-only">Counting dashboards</span><CountSkeleton/></> : `on ${plural(uses, 'dashboard')}`}</span>
    <span>{official ? <KeptLive/> : <TimeLeft expiresAt={expiresAt} head={head}/>}</span>
    <span className={s.live}><i aria-hidden="true"/>Live, computed in your browser</span>
    {ms !== undefined && <span><RunBadge ms={ms}/></span>}
   </div>
  </header>
 }
-export function UsedOnPanel({ items, total, expanded = false }: { items: ReturnType<typeof toUsedOn>; total: number; expanded?: boolean }) {
+export function UsedOnPanel({ items, total, expanded = false }: { items: ReturnType<typeof toUsedOn>; total?: number; expanded?: boolean }) {
  const [open, setOpen] = useState(expanded)
+ if (total === undefined) return <section className={`card ${s.panel}`} aria-busy="true">
+  <div className="card-h"><h2>Used on dashboards</h2></div>
+  <p className={s.panelEmpty}><span className="sr-only">Counting dashboards</span><CountSkeleton/></p>
+ </section>
  return <section className={`card ${s.panel}`}>
   <div className="card-h"><h2>Used on {plural(total, 'dashboard')}</h2></div>
   {items.length === 0 ? <p className={s.panelEmpty}>Not on any dashboard yet. Add it to one of yours and it shows up here.</p>
@@ -229,7 +239,7 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
  const attempts = attemptState.key === key ? attemptState.count : 0
  const syncing = useRef(false)
  const entity = useWidgetEntity(key, () => syncing.current ? 2000 : false)
- const record = entity.data !== undefined ? {key, widget:entity.data, head:0} : null
+ const record = entity.data !== undefined ? {key, widget:entity.data} : null
  const loadError = entity.error ? {message:entity.error,limited:entity.limited} : null
  useEffect(() => { if(entity.attempts) setAttemptState(previous => ({key,count:previous.key === key ? previous.count + 1 : 1})) }, [key,entity.attempts])
  const [ms, setMs] = useState<number | undefined>(undefined)
@@ -274,14 +284,15 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
  if (loadState === 'missing' && record?.key !== key && isEntityKey(key)) return <WidgetSkeleton/>
  if (loadState !== 'ready') return <WidgetPageBody state={loadState} name={write?.fields?.name === undefined ? undefined : String(write.fields.name)} error={loadError} onRetry={retry}/>
  if (mode === 'loading') return <WidgetSkeleton/>
- const head = Math.max(record?.head ?? 0, state.liveHead ?? 0)
+ // Unknown until the index reports the live head: TimeLeft shows its skeleton and nothing counts as expired.
+ const head = state.liveHead
  if (!widget) return <MissingWidget/>
  const name = String(write?.fields?.name ?? widget.widget.name)
  const expiresAt = Math.max(widget.expiresAt, Number(write?.fields?.expiresAt ?? widget.expiresAt))
- if (expiresAt <= head) return <MissingWidget/>
+ if (widgetExpired(expiresAt, head)) return <MissingWidget expired/>
  const official = widget.official
  const owner = mode === 'owner' && !official
- const uses = Number(usage.data?.rows[0]?.[0] ?? 0)
+ const uses = usage.data ? Number(usage.data.rows[0]?.[0] ?? 0) : undefined
  const panels = <>
   <UsedOnPanel key={`used:${key}`} items={toUsedOn(usedOn.data?.rows ?? [], config.wallet)} total={uses}/>
   <LifetimePanel key={`life:${key}`} name={name} owner={owner} balance={balance} address={auth.address} onSigned={balance.refresh} onDeleted={deleted} onTransferred={transferred} official={official} expiresAt={expiresAt} head={head} lifetimeDays={widget.widget.lifetimeDays} widgetKey={key} canExtend={canExtendWidget({ ...widget, expiresAt }, head, auth.address ?? null, config.wallet)} onExtended={written}/>

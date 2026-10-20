@@ -9,6 +9,7 @@ import { SIZES, type Size } from '../../lib/dash/schema'
 import { timeLeftLabel } from '../../lib/dash/time'
 import { useIndex } from '../../lib/use-index'
 import { ExtendButton } from './ExtendButton'
+import { KeptLive } from '../explore/Chips'
 import s from './organize.module.css'
 
 export const GripIcon = () => <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor" aria-hidden="true"><circle cx="4" cy="4" r="1.2"/><circle cx="8" cy="4" r="1.2"/><circle cx="4" cy="8" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="4" cy="12" r="1.2"/><circle cx="8" cy="12" r="1.2"/></svg>
@@ -60,7 +61,7 @@ export function OrganizeTileFooter({ item, head, onResize, importedUser }: Pick<
    </select>
   </span>
   <span className={s.pill}>
-   {item.expired ? <span className="state state-stale">Expired</span> : official ? <span className="chip">Kept live</span> : item.expiresAt !== null && <TileTimeLeft expiresAt={item.expiresAt} head={head}/>}
+   {item.expired ? <span className="state state-stale">Expired</span> : official ? <KeptLive/> : item.expiresAt !== null && <TileTimeLeft expiresAt={item.expiresAt} head={head}/>}
    {showExtend && <span className={`${s.extend} has-tip`} data-tip="Extend lifetime" data-tip-pos="center"><ExtendButton widgetKey={item.widget} expiresAt={item.expiresAt!} lifetimeDays={item.lifetimeDays!} head={head} canExtend={!!item.owner && !!auth.config && canExtendWidget({ owner: item.owner, expiresAt: item.expiresAt!, official }, head, auth.address ?? null, auth.config.wallet)}/></span>}
   </span>
  </>

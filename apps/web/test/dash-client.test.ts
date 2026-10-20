@@ -20,9 +20,10 @@ test('api sends JSON with same origin credentials and maps errors', async () => 
   expect(seen[0].init?.credentials).toBe('same-origin')
 })
 
-test('session returns null only on 401', async () => {
+test('session returns null for an anonymous answer or 401', async () => {
   const api = (status: number) => createDashApi((async () => Response.json(status === 200 ? session : { error: 'forbidden', message: 'no' }, { status })) as unknown as typeof fetch)
   expect(await api(401).session()).toBeNull()
+  expect(await createDashApi((async () => Response.json({ authenticated: false })) as unknown as typeof fetch).session()).toBeNull()
   expect(await api(200).session()).toEqual(session)
   await expect(api(403).session()).rejects.toMatchObject({ status: 403 })
 })

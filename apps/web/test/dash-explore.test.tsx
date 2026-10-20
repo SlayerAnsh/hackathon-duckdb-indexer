@@ -52,7 +52,7 @@ test('dashboard filters reset pages and label results',()=>{
  expect(dashboardBrowseQuery(more).limit).toBe(24)
  expect(resultsLine(38,s)).toBe('38 dashboards, newest first')
  expect(resultsLine(1,{...s,sort:'widgets'})).toBe('1 dashboard, most widgets first')
- expect(resultsLine(5,{...s,sort:'expiring',official:true})).toBe('5 official dashboards, expiring soonest first')
+ expect(resultsLine(5,{...s,sort:'expiring',official:true})).toBe('5 featured dashboards, expiring soonest first')
 })
 const item = {owner:W,cover:null,key:key(1),title:'Overview',user:W,official:true,widgets:8,charts:['bar','donut'] as ('bar'|'donut')[],createdAt:1,updatedAt:2,expiresAt:100}
 test('dashboard card authors, lifetime, chart icons and empty thumbnails',()=>{

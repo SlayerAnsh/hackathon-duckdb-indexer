@@ -39,3 +39,21 @@ export function matchSnippet(groups: SnippetGroup[], sql: string): string | null
  for (const g of groups) for (const s of g.snippets) if (s.sql.trim() === wanted) return s.id
  return null
 }
+
+const tokens = (sql: string) => new Set(sql.toLowerCase().match(/[a-z_][a-z0-9_]*|\d+/g) ?? [])
+/**
+ * Snippet the editor still shows. An exact match wins (also for a different snippet). Otherwise the last
+ * picked snippet stays, marked edited, while at least half of its words remain; once the text is mostly
+ * replaced the editor holds a custom query and this returns null.
+ */
+export function activeSnippet(groups: SnippetGroup[], activeId: string | null, sql: string): string | null {
+ const exact = matchSnippet(groups, sql)
+ if (exact || !activeId) return exact
+ const picked = groups.flatMap(g => g.snippets).find(s => s.id === activeId)
+ if (!picked) return null
+ const want = tokens(picked.sql), have = tokens(sql)
+ if (!want.size || !have.size) return null
+ let kept = 0
+ for (const t of want) if (have.has(t)) kept++
+ return kept / want.size >= 0.5 ? activeId : null
+}

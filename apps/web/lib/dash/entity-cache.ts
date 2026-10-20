@@ -110,6 +110,11 @@ export function useWidgetEntity(key: string | null, interval?: () => number | fa
  const result = useEntities<WidgetEntity>('widget',key ? [key] : [],undefined,true,interval)
  return {...result,data:key ? result.data?.get(key.toLowerCase()) : null}
 }
+/** Dashboard page status. A malformed key never queries, so it is missing as soon as dashboards are enabled. */
+export function bundleStatus({enabled,key,found,error}: {enabled: boolean; key: string | null; found?: boolean; error?: string}): 'loading' | 'missing' | 'ready' | 'error' {
+ if (enabled && key !== null && !isEntityKey(key)) return 'missing'
+ return found !== undefined ? found ? 'ready' : 'missing' : error ? 'error' : 'loading'
+}
 export function useDashboardBundle(key: string | null) {
  const {config} = useDashAuth()
  const query = useQuery({...entityDefaults,queryKey:entityKeys.bundle(config?.wallet ?? '',key ?? ''),enabled:!!config?.enabled && !!key && isEntityKey(key),staleTime:30000,
@@ -119,7 +124,7 @@ export function useDashboardBundle(key: string | null) {
  const revs = new Map((rows.data?.rows ?? []).map(([k,updatedAt,expiresAt,owner])=>[String(k).toLowerCase(),entityRev({updatedAt:Number(updatedAt),expiresAt:Number(expiresAt),owner:String(owner)})]))
  const widgets = useWidgetEntities(query.data?.links.map(l=>l.widgetKey) ?? [],revs)
  const error = query.error ? rpcMessage(query.error) : widgets.error
- return {status: query.data ? query.data.dashboard ? 'ready' as const : 'missing' as const : error ? 'error' as const : 'loading' as const,
+ return {status: bundleStatus({enabled:!!config?.enabled,key,found:query.data ? !!query.data.dashboard : undefined,error}),
   head:query.data?.head,dashboard:query.data?.dashboard ?? null,links:query.data?.links ?? [],widgets:widgets.data ? new Map([...widgets.data].filter((pair): pair is [string,WidgetEntity]=>pair[1] !== null)) : null,error,
   refetch:()=>{void query.refetch();widgets.refetch()}}
 }

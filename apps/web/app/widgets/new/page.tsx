@@ -17,7 +17,7 @@ export function NewWidgetBody() {
  const auth = useDashAuth()
  if (auth.status === 'disabled') return <p>Dashboards are not enabled on this deployment.</p>
  if (auth.status === 'loading') return null
- if (auth.status !== 'authenticated') return <LoginGate/>
+ if (auth.status !== 'authenticated') return <LoginGate title="Log in to save widgets"/>
  return <Suspense fallback={null}><CreateEditor/></Suspense>
 }
 export default function NewWidgetPage() {

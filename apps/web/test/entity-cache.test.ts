@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
-import { createEntityLoader, entityKeys, entityRev, invalidateEntity, shouldPersistEntity } from '../lib/dash/entity-cache'
+import { bundleStatus, createEntityLoader, entityKeys, entityRev, invalidateEntity, shouldPersistEntity } from '../lib/dash/entity-cache'
 import { createIdbPersister } from '../lib/dash/query-persist'
 test('batches overlapping reads, caches missing values and invalidates', async () => {
  const client = new QueryClient(); const calls: string[][] = []; const scheduled: (() => void)[] = []
@@ -61,4 +61,15 @@ test('stale replicas cannot undo an optimistic transfer or deletion', async () =
  client.setQueryData(key,{value:null,afterBlock:5,deleted:true})
  await invalidateEntity(client,'w','widget','a')
  expect((await loader.load(['a'])).get('a')).toBeNull(); client.clear()
+})
+
+test('a malformed dashboard key is missing, not loading forever', () => {
+ const good = '0x' + 'ab'.repeat(32)
+ expect(bundleStatus({ enabled: true, key: 'notakey' })).toBe('missing')
+ expect(bundleStatus({ enabled: true, key: '0x1234' })).toBe('missing')
+ expect(bundleStatus({ enabled: false, key: 'notakey' })).toBe('loading')
+ expect(bundleStatus({ enabled: true, key: good })).toBe('loading')
+ expect(bundleStatus({ enabled: true, key: good, found: true })).toBe('ready')
+ expect(bundleStatus({ enabled: true, key: good, found: false })).toBe('missing')
+ expect(bundleStatus({ enabled: true, key: good, error: 'offline' })).toBe('error')
 })

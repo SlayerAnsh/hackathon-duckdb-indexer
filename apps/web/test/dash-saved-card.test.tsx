@@ -64,7 +64,9 @@ test('report figures have captions, lifetime and accessible actions', () => {
  expect(readFileSync(new URL('../components/widgets/SavedWidgetCard.tsx', import.meta.url), 'utf8')).toContain('r.figure')
  const html = render(<SavedWidgetCard {...base} subtitle="Imported from someone"/>)
  for (const text of ['Figure 2', 'Stored name', 'Imported from someone', 'Open widget Stored name', 'Actions for Stored name', 'aria-expanded="false"', '1d']) expect(html).toContain(text)
- expect(render(<SavedWidgetCard {...base} official/>)).toContain('Kept live')
+ const kept = render(<SavedWidgetCard {...base} official/>)
+ // The one shared KeptLive chip from Explore: green with the clock icon, no glyph characters.
+ expect(kept).toContain('chip chip-ok'); expect(kept).toContain('Kept live'); expect(kept).not.toContain('⛨'); expect(kept).not.toContain('chip-official')
  expect(render(<SavedWidgetCard {...base} initialActionsOpen/>)).toContain('data-actions-open="true"')
  expect(render(<SavedWidgetCard {...base} payload={{ ...payload, chart: 'counter' }}/>)).not.toContain('Figure 2')
 })

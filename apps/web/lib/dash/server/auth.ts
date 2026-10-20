@@ -65,9 +65,13 @@ export async function readJson(req: Request): Promise<unknown> {
   } catch { throw dashErrors.invalid('Invalid JSON body or body exceeds 32 KiB') }
   finally { reader.releaseLock() }
 }
-export function requireSession(req: Request, deps: Pick<AuthDeps, 'config' | 'now'>): Session {
+/** The verified session cookie, or null when it is missing, tampered or expired. */
+export function readSession(req: Request, deps: Pick<AuthDeps, 'config' | 'now'>): Session | null {
   const token = readCookie(req, SESSION_COOKIE)
-  const session = token ? verifySession(token, deps.config.sessionSecret, deps.now() / 1000) : null
+  return token ? verifySession(token, deps.config.sessionSecret, deps.now() / 1000) : null
+}
+export function requireSession(req: Request, deps: Pick<AuthDeps, 'config' | 'now'>): Session {
+  const session = readSession(req, deps)
   if (!session) throw dashErrors.unauthenticated()
   return session
 }
@@ -100,10 +104,12 @@ export async function handleCreateSession(req: Request, deps: AuthDeps): Promise
     return json(info, { headers: { 'Set-Cookie': sessionCookie(token, isSecure(req)) } })
   } catch (e) { return errorResponse(e) }
 }
+/** Reading the session is not an auth failure: a missing, tampered or expired cookie answers 200 `{ authenticated: false }`, so anonymous page loads log no 401. Write endpoints keep 401 through requireSession. */
 export async function handleGetSession(req: Request, deps: AuthDeps): Promise<Response> {
   try {
-    const { address, login } = requireSession(req, deps)
-    return json({ address, login })
+    const session = readSession(req, deps)
+    if (!session) return json({ authenticated: false })
+    return json({ address: session.address, login: session.login })
   } catch (e) { return errorResponse(e) }
 }
 export async function handleDeleteSession(req: Request): Promise<Response> {

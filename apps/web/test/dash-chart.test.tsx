@@ -4,7 +4,7 @@ import { emptyWidget, type ChartType } from '../lib/dash/schema'
 import { toChartWidget, formatNumber, autoChart, sortRows, counterSummary } from '../lib/dash/chart'
 import { WidgetPreview } from '../components/widgets/WidgetPreview'
 import { CounterBody } from '../components/widgets/CounterBody'
-import { QueryChart } from '../components/dash/AreaChart'
+import { QueryChart, categoryTick, integerSeries } from '../components/dash/AreaChart'
 test('toChartWidget maps chart types per the UI doc table', () => {
   const base = emptyWidget()
   const kind = (chart: ChartType, mapping = {}) => toChartWidget({ ...base, chart, mapping: { ...base.mapping, x: 'x', y: ['n'], ...mapping } }, 'w').kind
@@ -98,4 +98,15 @@ test('histogram bins numeric finite values and includes the maximum', async () =
  const query = { loading: false, data: data([1, 2, 3]), ms: 1 }
  expect(renderToStaticMarkup(<WidgetPreview payload={{ ...base, chart: 'histogram', mapping: { ...base.mapping, x: 'n' } }} query={query} id="h"/>)).toContain('Binned from 3 rows')
  expect(renderToStaticMarkup(<WidgetPreview payload={{ ...base, chart: 'stacked-bar' }} query={query} id="s"/>)).toContain('Pick a Group by column or a second Y column to stack.')
+})
+
+test('category ticks format block numbers with separators and shorten only hex', () => {
+ expect(categoryTick('715426')).toBe('715,426')
+ expect(categoryTick(3279)).toBe('3279')
+ expect(categoryTick('2026')).toBe('2026')
+ expect(categoryTick('0x' + 'ab'.repeat(32))).toBe('0xabab…abab')
+ expect(categoryTick('-300m')).toBe('-300m')
+ expect(integerSeries([{ x: 'a', n: 1 }, { x: 'b', n: 3 }], ['n'])).toBe(true)
+ expect(integerSeries([{ x: 'a', n: 1.5 }], ['n'])).toBe(false)
+ expect(integerSeries([], ['n'])).toBe(false)
 })

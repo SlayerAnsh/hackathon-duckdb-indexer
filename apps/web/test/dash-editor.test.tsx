@@ -55,7 +55,7 @@ test('dashboard size follows chart defaults until explicitly changed', () => {
 test('new widget body requires a session', () => {
  const auth: DashAuth = { config: { enabled: true, privyAppId: 'app', wallet: '0x' + 'ab'.repeat(20), rpcUrl: 'https://offline.test' }, status: 'anonymous', confirming: false, error: null, sign: async () => { throw Error('unused') }, requestLogin: async () => false, logout: async () => {}, refresh: async () => {} }
  const html = renderToStaticMarkup(<DashAuthContext.Provider value={auth}><NewWidgetBody/></DashAuthContext.Provider>)
- expect(html).toContain('Log in to build dashboards')
+ expect(html).toContain('Log in to save widgets')
  expect(html).toContain('Use Google, Discord, X or Telegram.')
  expect(html).not.toContain('Save to Arkiv')
 })

@@ -5,7 +5,8 @@ import { VIEWS, DEFAULT_SQL } from '../../lib/views'
 import { encodeSqlHash, readHash, writeHash } from '../../lib/hash-state'
 import { IndexUnavailable, QueryCancelled, type IndexDb } from '../../lib/indexdb'
 import { ResultsGrid, type QueryResult } from '../dash/ResultsGrid'
-import { buildSnippets, matchSnippet, type Snippet } from './snippets'
+import { activeSnippet, buildSnippets, matchSnippet, type Snippet } from './snippets'
+import { parseQueryError, queryErrorTitle } from '../../lib/query-error'
 import { SnippetSidebar } from './SnippetSidebar'
 import { HistoryList, type HistoryEntry } from './HistoryList'
 import { useDocumentTheme, useSqlEditor } from './useSqlEditor'
@@ -35,7 +36,10 @@ export function Playground({ db, rpcUrl, head }: { db: IndexDb | null; rpcUrl: s
  const [result, setResult] = useState<{ data: QueryResult; sql: string; ms: number; head?: number; id: number }>()
  const editor = useRef<ReactCodeMirrorRef>(null)
  const sqlRef = useRef(sql)
- useEffect(() => { sqlRef.current = sql })
+ // The run callback reads the head when the query finishes, so the first run (started before the index knew it) still gets a block.
+ const headRef = useRef(head)
+ useEffect(() => { sqlRef.current = sql; headRef.current = head })
+ useEffect(() => { if (head !== undefined) setResult(prev => prev && prev.head === undefined ? { ...prev, head } : prev) }, [head])
 
  const load = useCallback((next: string, id: string | null) => { setSql(next); setActiveId(id) }, [])
  useEffect(() => {
@@ -68,20 +72,25 @@ export function Playground({ db, rpcUrl, head }: { db: IndexDb | null; rpcUrl: s
   const controller = new AbortController()
   runAbort.current = controller
   setPhase('running'); setError(null); setTab('results'); writeHash(query)
+  const started = performance.now()
   try {
    const data = await db.run(query, undefined, { signal: controller.signal, onWaiting: () => setPhase('waiting'), onRunning: () => setPhase('running') })
-   setResult(prev => ({ data, sql: query, ms: data.elapsedMs, head, id: (prev?.id ?? 0) + 1 }))
+   setResult(prev => ({ data, sql: query, ms: data.elapsedMs, head: headRef.current, id: (prev?.id ?? 0) + 1 }))
    setHistory(prev => [{ sql: query, ms: data.elapsedMs, rows: data.rows.length }, ...prev.filter(h => h.sql !== query)].slice(0, 30))
   } catch (e) {
    const text = e instanceof Error ? e.message : String(e)
    if (e instanceof QueryCancelled) setError(null)
    else if (e instanceof IndexUnavailable) setError({ title: 'Index not loaded', text: text + '\nPress Run to try again.' })
-   else setError({ title: 'Query failed', text })
+   else {
+    const parsed = parseQueryError(text), title = queryErrorTitle(parsed)
+    setError({ title, text: parsed.message })
+    setHistory(prev => [{ sql: query, ms: performance.now() - started, rows: 0, error: title }, ...prev.filter(h => h.sql !== query)].slice(0, 30))
+   }
   } finally {
    if (runAbort.current === controller) runAbort.current = null
    setPhase('idle')
   }
- }, [db, running, head])
+ }, [db, running])
  const cancel = useCallback(() => {
   const waiting = phase === 'waiting'
   runAbort.current?.abort()
@@ -100,12 +109,14 @@ export function Playground({ db, rpcUrl, head }: { db: IndexDb | null; rpcUrl: s
   try { await navigator.clipboard.writeText(`${location.origin}${location.pathname}#${encodeSqlHash(sql)}`); setCopied(true); setTimeout(() => setCopied(false), 1800) } catch { setCopied(false) }
  }
 
- const active = activeId ? SNIPPETS.get(activeId) : undefined
+ // Fully replaced text is a custom query, not an edited snippet.
+ const shownId = useMemo(() => activeSnippet(GROUPS, activeId, sql), [activeId, sql])
+ const active = shownId ? SNIPPETS.get(shownId) : undefined
  const edited = !!active && active.sql.trim() !== sql.trim()
  const label = useMemo(() => active ? active.title : 'Custom query', [active])
 
  return <div className={s.shell}>
-  <SnippetSidebar id="pg-snippets" groups={GROUPS} activeId={activeId} edited={edited} schema={schema} open={drawer} onClose={() => setDrawer(false)} onPick={pick} onInsert={insert}/>
+  <SnippetSidebar id="pg-snippets" groups={GROUPS} activeId={shownId} edited={edited} schema={schema} open={drawer} onClose={() => setDrawer(false)} onPick={pick} onInsert={insert}/>
   {drawer && <div className={s.backdrop} onClick={() => setDrawer(false)} aria-hidden="true"/>}
   <main id="main" className={s.main}>
    <header className={s.head}>
@@ -147,7 +158,7 @@ export function Playground({ db, rpcUrl, head }: { db: IndexDb | null; rpcUrl: s
       ? <HistoryList entries={history} onSelect={next => { load(next, matchSnippet(GROUPS, next)); editor.current?.view?.focus() }}/>
       : <>
        {error && <div className={cx('notice', 'notice-bad', s.error)} role="alert"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 4.75v3.75M8 11h.01"/></svg><div><p className="notice-title">{error.title}</p><pre className={s.errorText}>{error.text}</pre></div></div>}
-       {db && result ? <div className={s.result}><ResultsGrid key={result.id} result={result.data} db={db} sql={result.sql} rpcUrl={rpcUrl} ms={result.ms} head={result.head}/></div>
+       {db && result ? <div className={s.result} data-stale={error ? true : undefined} inert={!!error}><ResultsGrid key={result.id} result={result.data} db={db} sql={result.sql} rpcUrl={rpcUrl} ms={result.ms} head={result.head}/></div>
         : !error && (db
          ? <div className={s.empty}><p className={s.emptyTitle}>No results yet</p><p>Pick a snippet or write your own SQL, then press <b>Run</b> or <kbd>{mod}</kbd> <kbd>Enter</kbd>.</p></div>
          : <div className={s.loadingState} role="status"><div className={s.skelTable} aria-hidden="true">{Array.from({ length: 6 }, (_, i) => <span key={i} className={s.skelRow}><span className="skel"/><span className="skel"/><span className="skel"/><span className="skel"/></span>)}</div><p>Loading the index into your browser…</p></div>)}

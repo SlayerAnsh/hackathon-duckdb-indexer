@@ -12,6 +12,17 @@ export type ChartProps = { widget: Widget; data: TableData }
 const numeric = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
 const TICK = { fill: 'var(--text-3b)', fontSize: 11, fontFamily: 'var(--font-mono)' }
 const MARGIN = { top: 8, right: 16, bottom: 0, left: 0 }
+const COMPACT_MARGIN = { top: 2, right: 2, bottom: 2, left: 2 }
+/** Category axis tick: numeric categories (block numbers) get thousands separators from five digits up, so years stay plain; hex keys are shortened. */
+export function categoryTick(v: unknown): string {
+ const text = String(v ?? '')
+ if (/^-?\d+(\.\d+)?$/.test(text)) { const n = Number(text); return Math.abs(n) >= 10000 ? n.toLocaleString('en-US', { maximumFractionDigits: 2 }) : text }
+ return shortHex(text)
+}
+/** Whole number series: the value axis must not place fractional ticks, which a rounding formatter shows as duplicates (0 1 2 2 3). */
+export function integerSeries(rows: Record<string, string | number>[], keys: string[]): boolean {
+ return rows.length > 0 && keys.every(k => rows.every(r => r[k] === undefined || Number.isInteger(numeric(r[k]))))
+}
 
 type TipEntry = { name?: string | number; value?: unknown; color?: string; fill?: string; dataKey?: unknown; payload?: Record<string, unknown> }
 /** Tooltip body in the shared `.tip` box: category on top, one row per series. */
@@ -52,7 +63,10 @@ export function QueryChart({ widget, data }: ChartProps) {
  const percent = widget.stacking === 'percent'
  const tickFormatter = percent ? (v: unknown) => formatNumber(v, '0.00%') : widget.numberFormat ? (v: unknown) => formatNumber(v, widget.numberFormat!) : (v: unknown) => compact(numeric(v))
  const valueText = (v: unknown) => widget.numberFormat ? formatNumber(v, widget.numberFormat) : typeof v === 'number' ? v.toLocaleString('en-US', { maximumFractionDigits: 2 }) : String(v ?? '')
- const valueLabel = widget.labels ? <LabelList formatter={v => widget.numberFormat ? formatNumber(v, widget.numberFormat) : String(v ?? '')}/> : undefined
+ const valueLabel = widget.labels && !widget.compact ? <LabelList formatter={v => widget.numberFormat ? formatNumber(v, widget.numberFormat) : String(v ?? '')}/> : undefined
+ const compactView = !!widget.compact
+ const margin = compactView ? COMPACT_MARGIN : MARGIN
+ const allowDecimals = percent || !integerSeries(rows, keys)
  const total = rows.reduce((sum, row) => sum + numeric(row[y[0]]), 0)
  const tip = (cursor: object | false, title?: string) => <Tooltip isAnimationActive={false} cursor={cursor} wrapperStyle={{ outline: 'none' }} content={p => <ChartTip active={p.active} payload={stackId && p.payload ? [...(p.payload as readonly TipEntry[])].reverse() : p.payload as readonly TipEntry[] | undefined} label={p.label} format={valueText} title={title}/>}/>
  const lineCursor = { stroke: 'var(--border-strong)', strokeWidth: 1 }
@@ -61,8 +75,8 @@ export function QueryChart({ widget, data }: ChartProps) {
  const yTitle = widget.yTitle ? { value: widget.yTitle, angle: -90, position: 'insideLeft' as const, style: { textAnchor: 'middle' as const } } : undefined
  const axes = <>
   <CartesianGrid stroke="var(--grid)" vertical={false}/>
-  <XAxis dataKey={x} tick={TICK} tickFormatter={v => shortHex(String(v))} tickLine={false} axisLine={{ stroke: 'var(--border-strong)' }} tickMargin={8} minTickGap={16} interval="preserveStartEnd" height={xTitle ? 44 : 28} label={xTitle}/>
-  <YAxis tick={TICK} tickLine={false} axisLine={false} width={yTitle ? 56 : 44} tickMargin={6} tickCount={5} tickFormatter={tickFormatter} label={yTitle}/>
+  <XAxis hide={compactView} dataKey={x} tick={TICK} tickFormatter={categoryTick} tickLine={false} axisLine={{ stroke: 'var(--border-strong)' }} tickMargin={8} minTickGap={16} interval="preserveStartEnd" height={xTitle ? 44 : 28} label={xTitle}/>
+  <YAxis hide={compactView} allowDecimals={allowDecimals} tick={TICK} tickLine={false} axisLine={false} width={yTitle ? 56 : 44} tickMargin={6} tickCount={5} tickFormatter={tickFormatter} label={yTitle}/>
  </>
  const frame = (
   <div className={cx('chart-frame', s.frame)} role="img" aria-label={widget.title}>
@@ -70,39 +84,39 @@ export function QueryChart({ widget, data }: ChartProps) {
     {widget.kind === 'donut' ? <PieChart>
      <Pie data={rows} nameKey={x} dataKey={y[0]} innerRadius="62%" outerRadius="88%" paddingAngle={1.5} stroke="var(--card)" strokeWidth={1} isAnimationActive={false}>
       {rows.map((_, i) => <Cell key={i} fill={color(String(rows[i][x]), i)}/>)}
-      <Label position="center" content={props => {
+      {!compactView && <Label position="center" content={props => {
        const { x: cx, y: cy } = props as { x?: number | string; y?: number | string }
        if (cx === undefined || cy === undefined) return null
        return <g className={s.center}>
         <text x={cx} y={Number(cy) - 2} textAnchor="middle" className={s.centerValue}>{widget.numberFormat ? formatNumber(total, widget.numberFormat) : compact(total)}</text>
         <text x={cx} y={Number(cy) + 15} textAnchor="middle" className={s.centerLabel}>total</text>
        </g>
-      }}/>
-     </Pie>{tip(false)}
-    </PieChart> : widget.kind === 'line' ? <LineChart data={rows} margin={MARGIN}>
+      }}/>}
+     </Pie>{!compactView && tip(false)}
+    </PieChart> : widget.kind === 'line' ? <LineChart data={rows} margin={margin}>
      {axes}{keys.map((k, i) => <Line key={k} type="monotone" dataKey={k} stroke={color(k, i)} strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--card)' }} isAnimationActive={false}>{valueLabel}</Line>)}{tip(lineCursor)}
-    </LineChart> : widget.kind === 'area' ? <AreaPlot stackOffset={percent ? 'expand' : undefined} data={rows} margin={MARGIN}>
+    </LineChart> : widget.kind === 'area' ? <AreaPlot stackOffset={percent ? 'expand' : undefined} data={rows} margin={margin}>
      {axes}{keys.map((k, i) => <Area key={k} type="monotone" dataKey={k} stackId={stackId} stroke={color(k, i)} strokeWidth={1.75} fill={color(k, i)} fillOpacity={keys.length > 1 ? .22 : .14} activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--card)' }} isAnimationActive={false}/>)}{tip(lineCursor)}
-    </AreaPlot> : widget.kind === 'bar' ? <BarChart stackOffset={percent ? 'expand' : undefined} data={rows} layout="vertical" margin={{ top: 0, right: 16, bottom: 0, left: 0 }} barCategoryGap="24%">
+    </AreaPlot> : widget.kind === 'bar' ? <BarChart stackOffset={percent ? 'expand' : undefined} data={rows} layout="vertical" margin={compactView ? COMPACT_MARGIN : { top: 0, right: 16, bottom: 0, left: 0 }} barCategoryGap="24%">
      <CartesianGrid stroke="var(--grid)" horizontal={false}/>
-     <XAxis type="number" tick={TICK} tickFormatter={tickFormatter} tickLine={false} axisLine={false} tickMargin={6} tickCount={5} minTickGap={16} height={xTitle ? 44 : 24} label={xTitle}/>
-     <YAxis dataKey={x} type="category" tick={{ ...TICK, fill: 'var(--text-2)' }} width={104} tickLine={false} axisLine={{ stroke: 'var(--border-strong)' }} tickMargin={8} interval={0} tickFormatter={v => { const t = shortHex(String(v)); return t.length > 14 ? t.slice(0, 13) + '…' : t }} label={yTitle}/>
+     <XAxis hide={compactView} type="number" allowDecimals={allowDecimals} tick={TICK} tickFormatter={tickFormatter} tickLine={false} axisLine={false} tickMargin={6} tickCount={5} minTickGap={16} height={xTitle ? 44 : 24} label={xTitle}/>
+     <YAxis hide={compactView} dataKey={x} type="category" tick={{ ...TICK, fill: 'var(--text-2)' }} width={104} tickLine={false} axisLine={{ stroke: 'var(--border-strong)' }} tickMargin={8} interval={0} tickFormatter={v => { const t = shortHex(String(v)); return t.length > 14 ? t.slice(0, 13) + '…' : t }} label={yTitle}/>
      {keys.map((k, i) => <Bar key={k} dataKey={k} stackId={stackId} fill={color(k, i)} maxBarSize={22} radius={stackId && i < keys.length - 1 ? 0 : [0, 3, 3, 0]} isAnimationActive={false}>{valueLabel}</Bar>)}{tip(barCursor)}
-    </BarChart> : <BarChart barCategoryGap={widget.binned ? 1 : '24%'} stackOffset={percent ? 'expand' : undefined} data={rows} margin={MARGIN}>
+    </BarChart> : <BarChart barCategoryGap={widget.binned ? 1 : '24%'} stackOffset={percent ? 'expand' : undefined} data={rows} margin={margin}>
      {axes}{keys.map((k, i) => <Bar key={k} dataKey={k} stackId={stackId} fill={color(k, i)} maxBarSize={widget.binned ? undefined : 40} radius={stackId && i < keys.length - 1 ? 0 : widget.binned ? [2, 2, 0, 0] : [3, 3, 0, 0]} isAnimationActive={false}>{valueLabel}</Bar>)}{tip(barCursor)}
     </BarChart>}
    </ResponsiveContainer>
   </div>
  )
- if (widget.kind === 'donut') return <div className={s.donut}>
+ if (widget.kind === 'donut') return <div className={cx('chart-donut', s.donut)}>
   {frame}
-  {(widget.legend ?? true) && <ul className={cx('legend', 'legend-col', s.legend)}>
+  {(widget.legend ?? true) && !compactView && <ul className={cx('legend', 'legend-col', s.legend)}>
    {rows.map((r, i) => <li key={i}><i className={s.swatch} style={{ background: color(String(r[x]), i) }}/><span className={s.lgName} title={String(r[x])}>{shortHex(String(r[x]))}</span><span className={s.lgValue}>{widget.numberFormat ? formatNumber(numeric(r[y[0]]), widget.numberFormat) : compact(numeric(r[y[0]]))}</span><span className={s.lgShare}>{total ? (numeric(r[y[0]]) / total * 100).toFixed(1) : '0.0'}%</span></li>)}
   </ul>}
  </div>
  return <>
   {frame}
-  {(widget.legend ?? true) && keys.length >= 2 && <div className={cx('chart-key', s.key)}>
+  {(widget.legend ?? true) && !compactView && keys.length >= 2 && <div className={cx('chart-key', s.key)}>
    {keys.map((k, i) => <span key={k} title={k}><i className={s.swatch} style={{ background: color(k, i) }}/>{shortHex(k)}</span>)}
   </div>}
  </>

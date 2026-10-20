@@ -40,7 +40,8 @@ export function createDashApi(fetchImpl: typeof fetch = fetch, base = ''): DashA
   const dashboardPath = (key: string) => `dashboards/${encodeURIComponent(key)}`
   return {
     async session() {
-      try { return await request<SessionInfo>('auth/session', 'GET') }
+      // The server answers 200 { authenticated: false } without a session; 401 is still read as anonymous for older servers.
+      try { const value = await request<SessionInfo | { authenticated: false }>('auth/session', 'GET'); return value && 'address' in value ? value : null }
       catch (error) { if (error instanceof DashApiError && error.status === 401) return null; throw error }
     },
     nonce: () => request('auth/nonce', 'POST'),

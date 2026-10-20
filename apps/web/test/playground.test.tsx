@@ -15,7 +15,9 @@ test('decodeSqlHash tolerates a leading hash and rejects garbage', () => {
  expect(decodeSqlHash('')).toBeNull()
 })
 
-import { buildSnippets, filterSnippets, matchSnippet, sqlPreview, snippetCount } from '../components/playground/snippets'
+import { activeSnippet, buildSnippets, filterSnippets, matchSnippet, sqlPreview, snippetCount } from '../components/playground/snippets'
+import { parseQueryError, queryErrorTitle } from '../lib/query-error'
+import { HistoryList } from '../components/playground/HistoryList'
 import { VIEWS, DEFAULT_SQL } from '../lib/views'
 
 test('buildSnippets puts the default query first, then one group per view with every widget', () => {
@@ -76,4 +78,32 @@ test('playground renders before the index loads', async () => {
  const html = renderToStaticMarkup(<Playground db={null} rpcUrl="http://rpc"/>)
  expect(html).toContain('SQL playground'); expect(html).toContain('Loading the index into your browser')
  expect(html).toContain('Most placed widgets')
+})
+
+test('parseQueryError turns DuckDB JSON errors into a type and a message with real newlines', () => {
+ const raw = '{"exception_type":"Parser","exception_message":"syntax error at or near \\"selec\\"\\n\\nLINE 1: selec count(* from entities\\n        ^","error_subtype":"SYNTAX_ERROR"}'
+ const parsed = parseQueryError(raw)
+ expect(parsed.type).toBe('Parser')
+ expect(parsed.message).toBe('syntax error at or near "selec"\n\nLINE 1: selec count(* from entities\n        ^')
+ expect(parsed.message).not.toContain('\\n')
+ expect(queryErrorTitle(parsed)).toBe('Parser error')
+ expect(parseQueryError('Error: ' + raw).type).toBe('Parser')
+ expect(parseQueryError('Catalog Error: Table x does not exist')).toEqual({ message: 'Catalog Error: Table x does not exist' })
+ expect(parseQueryError('{not json')).toEqual({ message: '{not json' })
+ expect(queryErrorTitle({ message: 'x' })).toBe('Query failed')
+})
+test('activeSnippet keeps an edited snippet but calls fully replaced text a custom query', () => {
+ const groups = buildSnippets(VIEWS, DEFAULT_SQL)
+ expect(activeSnippet(groups, 'featured/default', DEFAULT_SQL)).toBe('featured/default')
+ expect(activeSnippet(groups, 'featured/default', DEFAULT_SQL + '\n-- my note')).toBe('featured/default')
+ expect(activeSnippet(groups, 'featured/default', 'selec count(* from entities')).toBeNull()
+ expect(activeSnippet(groups, 'featured/default', '')).toBeNull()
+ const horizon = VIEWS[1].widgets.find(w => w.id === 'horizon')!.sql
+ expect(activeSnippet(groups, 'featured/default', horizon)).toBe('expiry/horizon')
+ expect(activeSnippet(groups, null, 'SELECT 42')).toBeNull()
+})
+test('history lists failed runs with their error', async () => {
+ const { renderToStaticMarkup } = await import('react-dom/server')
+ const html = renderToStaticMarkup(<HistoryList entries={[{ sql: 'selec 1', ms: 3, rows: 0, error: 'Parser error' }, { sql: 'SELECT 1', ms: 2, rows: 1 }]} onSelect={() => {}}/>)
+ expect(html).toContain('Parser error'); expect(html).toContain('1 row'); expect(html).not.toContain('0 rows')
 })

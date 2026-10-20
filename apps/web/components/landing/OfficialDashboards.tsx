@@ -21,7 +21,7 @@ export function OfficialDashboardsView({ enabled, items, descriptions, covers, h
   <div className={s.officialGrid} aria-busy={items === null && !error}>
    {error ? <p role="alert" className="notice notice-bad">{error}</p> : null}
    {items === null
-    ? !error && <SkeletonCards count={3} label="Loading official dashboards…"/>
+    ? !error && <SkeletonCards count={3} label="Loading featured dashboards…"/>
     : items.length === 0
      ? !error && <EmptyState compact icon="official" title="Featured dashboards are on their way" body="Network reports kept live by this app will appear here. Until then, browse what the community built." actions={<Link className="btn btn-sm" href="/explore">Browse community dashboards</Link>}/>
      : items.map(item => <DashboardBrowseCard key={item.key} item={item} head={head} coverPayload={covers ? covers.get(item.cover ?? "") ?? null : undefined} description={descriptions ? descriptions.get(item.key) ?? null : undefined}/>)}

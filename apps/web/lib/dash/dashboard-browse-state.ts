@@ -9,5 +9,5 @@ export function dashboardBrowseReducer(s: DashboardBrowseState, a: Action): Dash
 }
 export function dashboardBrowseQuery(s: DashboardBrowseState): DashboardListQuery { return { search: s.search, sort: s.sort, official: s.official, limit: 12 * s.pages, offset: 0 } }
 export function resultsLine(total: number, s: DashboardBrowseState): string {
- return `${total} ${s.official ? 'official ' : ''}${total === 1 ? 'dashboard' : 'dashboards'}, ${{newest:'newest first', widgets:'most widgets first', expiring:'expiring soonest first'}[s.sort]}`
+ return `${total} ${s.official ? 'featured ' : ''}${total === 1 ? 'dashboard' : 'dashboards'}, ${{newest:'newest first', widgets:'most widgets first', expiring:'expiring soonest first'}[s.sort]}`
 }
