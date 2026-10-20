@@ -39,7 +39,7 @@ test('console tokens include dark defaults and both light fallbacks', () => {
  for (const token of ['--surface:#fbfbfa', '--accent:#0d7a4d', '--border-faint:#e9e9e7']) expect(light).toContain(token)
 })
 test('navbar and phone sheet use the calm navigation and accessible controls', () => {
- const html = renderToStaticMarkup(<TopBarView pathname="/d/0x1" state={{ status: 'loading' }}/>)
+ const html = renderToStaticMarkup(<TopBarView pathname="/widgets/0x1" state={{ status: 'loading' }}/>)
  expect(html.match(/aria-current="page"/g)).toHaveLength(1)
  expect(html).toContain('href="#main"'); expect(html).toContain('Skip to content'); expect(html).toContain('SQL Indexer')
  expect(html).toContain('aria-expanded="false"'); expect(html).toContain('aria-label="Open menu"')

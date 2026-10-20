@@ -59,16 +59,36 @@
 .counter .body{padding-top:8px}
 .counter :global(.stat-value){font:600 32px/1.15 var(--font-ui);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 
-/* Hover action bar: hidden until hover or keyboard focus, never removed from the tab order. */
-.actions{position:absolute;top:10px;right:10px;z-index:2;display:flex;align-items:center;flex-wrap:wrap;gap:2px;max-width:calc(100% - 20px);padding:3px;background:var(--card);border:1px solid var(--border-strong);border-radius:var(--r-md);box-shadow:var(--shadow-pop);opacity:0;pointer-events:none;transform:translateY(-2px);transition:opacity var(--dur-fast),transform var(--dur-fast)}
+/* Hover action bar: floats above the tile's top edge like a tooltip, so it never covers the chart.
+   Hidden until hover or keyboard focus, never removed from the tab order. The ::before bridge keeps
+   the hover alive across the gap; ::after is the arrow pointing at the tile. */
+.actions{position:absolute;right:-1px;bottom:calc(100% + 8px);z-index:12;display:flex;align-items:center;flex-wrap:nowrap;gap:2px;width:max-content;padding:3px;white-space:nowrap;background:var(--card);border:1px solid var(--border-strong);border-radius:var(--r-md);box-shadow:var(--shadow-pop);opacity:0;pointer-events:none;transform:translateY(4px);transition:opacity var(--dur-fast),transform var(--dur-fast)}
+.actions::before{content:"";position:absolute;left:0;right:0;top:100%;height:10px}
+.actions::after{content:"";position:absolute;right:18px;top:100%;width:8px;height:8px;margin-top:-4px;background:var(--card);border:solid var(--border-strong);border-width:0 1px 1px 0;transform:rotate(45deg)}
 .actions :global(.ib){width:28px;height:28px}
 .actions>:global(.chip),.actions>:global(.quiet-chip),.actions>:global(.state){margin:0 4px}
+.figure:hover,.figure:focus-within,.figure[data-actions-open="true"]{z-index:3}
 .figure:hover .actions,.figure:focus-within .actions,.figure[data-actions-open="true"] .actions{opacity:1;pointer-events:auto;transform:none}
 .overflow{position:absolute;top:10px;right:10px;opacity:0;pointer-events:none}
 .figure:focus-within .overflow{opacity:1;pointer-events:auto}
-.figure:focus-within .actions{right:48px}
-.sql{margin-top:14px;overflow:hidden;background:var(--inset);border:1px solid var(--border);border-radius:var(--r-md)}
-.sql :global(.sqlpane){margin:0;border:0}
+
+/* Edit mode (Organize): the same figure with a selectable outline, drag and arrival states. */
+.editing{cursor:default;container-type:inline-size}
+/* Edit strips: the header strip floats above the tile (grip, remove), the footer strip below it
+   (size, lifetime). Both stay inside the tile's width, sit in the grid gap and never cover content. */
+.strip{position:absolute;left:-1px;right:-1px;z-index:12;display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0;opacity:0;pointer-events:none;transition:opacity var(--dur-fast),transform var(--dur-fast)}
+.stripHead{bottom:calc(100% + 6px);transform:translateY(3px)}
+.stripFoot{top:calc(100% + 6px);transform:translateY(-3px)}
+.stripHead::before,.stripFoot::before{content:"";position:absolute;left:0;right:0;height:8px}
+.stripHead::before{top:100%}
+.stripFoot::before{bottom:100%}
+.editing:hover .strip,.editing:focus-within .strip,.editing[data-actions-open="true"] .strip{opacity:1;pointer-events:auto;transform:none}
+.editing:hover{border-color:var(--border-strong)}
+.editing[data-selected]{outline:2px solid var(--accent);outline-offset:2px;border-color:var(--border-strong)}
+.editing[data-dragging]{z-index:6;box-shadow:var(--shadow-pop);border-color:var(--accent);opacity:.92}
+.editing[data-dragging] .strip{opacity:0}
+.editing[data-flash]{animation:arrive 1.6s ease-out}
+@keyframes arrive{from{border-color:var(--accent);outline:4px solid var(--accent-soft);outline-offset:0}to{outline:4px solid transparent;outline-offset:0}}
 /* Saved figure states: a skeleton the size of a plotted chart while the slot loads, and a
    centered expired note when the widget entity is gone. */
 .loading{height:240px;border-radius:var(--r-md)}
@@ -108,15 +128,17 @@
  .actions :global(.ib){width:var(--h-touch);height:var(--h-touch)}
  .share :global(.mi){min-height:var(--h-touch)}
 }
-@media (max-width:700px){.figure{grid-column:span var(--sm,12)}.figure.counter{grid-column:span 6}}
+@media (max-width:700px){.figure{grid-column:span var(--sm,12)}.figure.counter{grid-column:span 6}.figure.editing{grid-column:span 12}}
 @media (max-width:380px){.figure.counter{grid-column:span 12}}
 @media (hover:none){
  .overflow{position:static;flex:none;opacity:1;pointer-events:auto;width:var(--h-touch);height:var(--h-touch);margin:-12px -10px 0 auto}
- .actions{display:none;top:52px;right:8px;transform:none}
+ .actions{display:none;transform:none}
  .figure[data-actions-open="true"] .actions{display:flex;opacity:1;pointer-events:auto}
- .figure:focus-within .actions{right:8px}
+ .editing:not([data-actions-open="true"]) .strip{display:none}
  .actions :global(.ib),.tools :global(.btn){min-width:var(--h-touch);min-height:var(--h-touch)}
  .share :global(.mi){min-height:var(--h-touch)}
 }
-@media (prefers-reduced-motion:reduce){.pulse{animation:none}.figure,.actions{transition:none}}
+/* Phones: the bar must fit above a half width tile, so it drops the time left chip. */
+@media (max-width:720px){.actions>:global(.chip){display:none}}
+@media (prefers-reduced-motion:reduce){.pulse{animation:none}.figure,.actions,.strip{transition:none}.editing[data-flash]{animation:none}}
 @media (forced-colors:active){.figure,.actions{border:1px solid CanvasText}}

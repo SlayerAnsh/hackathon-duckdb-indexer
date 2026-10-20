@@ -11,7 +11,7 @@ import a from '../widgets/account.module.css'
 
 export const NAV_ITEMS: readonly { href: string; label: string; match: readonly string[] }[] = [
  { href: '/', label: 'Home', match: ['/'] },
- { href: '/explore', label: 'Explore', match: ['/explore', '/d', '/widgets'] },
+ { href: '/explore', label: 'Explore', match: ['/explore', '/widgets'] },
  { href: '/playground', label: 'Playground', match: ['/playground'] },
  { href: '/about', label: 'About', match: ['/about'] },
 ]

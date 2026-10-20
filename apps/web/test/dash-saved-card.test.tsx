@@ -48,21 +48,22 @@ test('loading slots show a fixed height skeleton instead of SQL or results', () 
  const html = render(<SavedWidgetCard {...props} status="loading" query={{ loading: false, error: 'Must not show' }}/> )
  expect(html).toContain('aria-busy="true"')
  expect(html).toContain('aria-label="Loading widget"')
- expect(html).toContain('var(--card-2)')
+ expect(html).toContain('class="skel')
  expect(html).not.toContain('Must not show')
  expect(html).not.toContain('SELECT')
 })
 
-test('live cards include timing, expiry, SQL toggle and the widget link', () => {
+test('live cards include timing, expiry and the widget link, without a SQL toggle', () => {
  const html = render(<SavedWidgetCard {...props} status="live" widgetKey="widget-key" expiresAt={43201} head={1} query={{ loading: false, ms: 2, data: { columns: ['n'], rows: [[1]] } }}/> )
- for (const copy of ['class="run"', '1d', 'aria-label="View SQL for Stored name"', 'aria-expanded="false"', 'href="/widgets/widget-key"', 'Open']) expect(html).toContain(copy)
+ for (const copy of ['class="run"', '1d', 'aria-expanded="false"', 'href="/widgets/widget-key"', 'Open']) expect(html).toContain(copy)
+ expect(html).not.toContain('View SQL')
 })
 
 test('report figures have captions, lifetime and accessible actions', () => {
  const base = { ...props, status: 'live' as const, figure: 2, widgetKey: 'widget-key', expiresAt: 43201, head: 1, query: { loading: false } }
  expect(readFileSync(new URL('../components/widgets/SavedWidgetCard.tsx', import.meta.url), 'utf8')).toContain('r.figure')
  const html = render(<SavedWidgetCard {...base} subtitle="Imported from someone"/>)
- for (const text of ['Figure 2', 'Stored name', 'Imported from someone', 'View SQL for Stored name', 'Open widget Stored name', 'Actions for Stored name', 'aria-expanded="false"', '1d']) expect(html).toContain(text)
+ for (const text of ['Figure 2', 'Stored name', 'Imported from someone', 'Open widget Stored name', 'Actions for Stored name', 'aria-expanded="false"', '1d']) expect(html).toContain(text)
  expect(render(<SavedWidgetCard {...base} official/>)).toContain('Kept live')
  expect(render(<SavedWidgetCard {...base} initialActionsOpen/>)).toContain('data-actions-open="true"')
  expect(render(<SavedWidgetCard {...base} payload={{ ...payload, chart: 'counter' }}/>)).not.toContain('Figure 2')

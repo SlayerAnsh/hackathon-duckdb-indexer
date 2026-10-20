@@ -27,7 +27,7 @@ export function ReportHeader({ title, description, user, official, count, owner,
    <li aria-current="page"><span>{title}</span></li>
   </ol></nav>
   <div className={s.top}>
-   <div className={s.eyebrow}>{official ? <><span className="chip chip-official"><ShieldIcon/>Official</span><span>Network report</span></> : 'Dashboard'}</div>
+   <div className={s.eyebrow}>{official ? <><span className="chip chip-official"><ShieldIcon/>Featured</span><span>Dashboard</span></> : 'Dashboard'}</div>
    <div className={s.tools} role="toolbar" aria-label="Dashboard actions">
     {owner && !official && <>
      <Link className="btn btn-sm btn-quiet" aria-label="Organize dashboard" href={'/d/' + dashboardKey + '/edit'}><PencilIcon/><span className={s.toolLabel}>Organize</span></Link>
@@ -40,7 +40,7 @@ export function ReportHeader({ title, description, user, official, count, owner,
   <h1 className={s.title}>{title}</h1>
   {description.trim() && <p className={s.description}>{description}</p>}
   <div className={s.meta}>
-   <span>By {official ? <strong>Arkiv SQL Indexer</strong> : <AddressLink address={user}/>}</span>
+   <span>By <AddressLink address={user}/></span>
    <span>{count} {count === 1 ? 'widget' : 'widgets'}</span>
    <span><i className={s.pulse} aria-hidden="true"/>Live, computed in your browser</span>
    <span>{updatedLabel(updatedAt, head)}</span>
