@@ -52,15 +52,15 @@ test('nav marks exactly the active route', () => {
 
 test('hero figures show placeholders while loading and the pipeline shows the measured time', () => {
  const loading = renderToStaticMarkup(<HeroFigures/>)
- expect(loading).toContain('Live entities'); expect(loading).toContain('…')
+ expect(loading).toContain('Live entities'); expect(loading).toContain('Loading'); expect(loading).toContain('Measuring query time')
  const ready = renderToStaticMarkup(<HeroFigures stats={{ live: 30700, creators: 12, expiring: 0, created: 1500 }} times={{ live: 2.04, creators: 4.4, expiring: 2.6, created: 3.1 }}/>)
- expect(ready).toContain('30.7k'); expect(ready).toContain('12'); expect(ready).toContain('1.5k'); expect(ready).not.toContain('…')
+ expect(ready).toContain('30.7k'); expect(ready).toContain('12'); expect(ready).toContain('1.5k'); expect(ready).not.toContain('Loading')
  expect(ready).toContain('2.0 ms'); expect(ready).toContain('4.4 ms')
  expect(ready).toContain('avg 3.0 ms')
  const pipe = renderToStaticMarkup(<Pipeline ms={3.24}/>)
  for (const step of ['Arkiv chain', 'Public logs', 'Indexer', 'Parquet', 'DuckDB']) expect(pipe).toContain(step)
  expect(pipe).toContain('avg 3.2 ms')
- expect(renderToStaticMarkup(<Pipeline/>)).toContain('…')
+ expect(renderToStaticMarkup(<Pipeline/>)).not.toContain('avg')
 })
 
 
@@ -79,7 +79,8 @@ test('official landing band covers disabled, loading, populated and empty states
  const empty = render(<OfficialDashboardsView enabled items={[]}/>)
  expect(empty).toContain('Official reports are on their way')
  expect(empty).not.toContain('not set up on this deployment')
- for (const text of ['Explore dashboards', 'Open playground', 'href="/playground"', 'role="status"']) expect(empty).toContain(text)
+ for (const text of ['Browse community dashboards', 'href="/explore"', 'role="status"']) expect(empty).toContain(text)
+ expect(empty).not.toContain('href="/playground"')
 })
 
 test('landing hero and Home use the official reports band', async () => {

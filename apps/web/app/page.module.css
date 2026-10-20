@@ -1,11 +1,15 @@
-/* Landing page rhythm. Sections are separated on the 8 px scale: 96 desktop, 64 phone. */
+/* Landing page rhythm. Sections are separated on the 8 px scale: 96 desktop, 64 phone.
+   The activity feed renders global .sec markup; these overrides give its head the same shape as the
+   official dashboards head in components/landing/landing.module.css (title, then the description under it). */
 .main{display:flex;flex-direction:column;gap:96px;padding-bottom:96px;overflow-x:clip}
 .feed :global(.sec){padding:0}
-.feed :global(.sec-h){margin-bottom:24px}
-.feed :global(.sec-h h2){font-size:24px;letter-spacing:-.02em}
-.feed :global(.sec-h p){font-size:14px}
-.feed :global(.ev){padding:12px 24px}
+.feed :global(.sec-h){display:block;margin-bottom:var(--sp-6)}
+.feed :global(.sec-h h2){font-size:var(--fs-2xl);line-height:1.25;letter-spacing:-.02em;font-weight:650}
+.feed :global(.sec-h p){margin:var(--sp-2) 0 0;font-size:14px;line-height:1.55;max-width:80ch}
+.feed :global(.ev){padding:var(--sp-3) var(--sp-6)}
 @media(max-width:720px){
  .main{gap:64px;padding-bottom:64px}
- .feed :global(.ev){padding:12px 16px}
+ .feed :global(.sec-h){margin-bottom:var(--sp-4)}
+ .feed :global(.sec-h h2){font-size:22px}
+ .feed :global(.ev){padding:var(--sp-3) var(--sp-4)}
 }

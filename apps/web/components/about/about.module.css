@@ -2,10 +2,10 @@
 .main{display:flex;flex-direction:column;gap:96px;padding-bottom:96px;overflow-x:clip}
 
 /* Hero: headline left, the real showcase query that motivates the project on the right. */
-.hero{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:64px;align-items:end;padding-top:72px}
-.title{margin:0;font-size:clamp(34px,5vw,62px);line-height:1.03;letter-spacing:-.04em;font-weight:650;max-width:14ch;text-wrap:balance}
+.hero{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:64px;align-items:center;padding-top:72px}
+.title{margin:0;font-size:clamp(38px,4.2vw,56px);line-height:1.04;letter-spacing:-.035em;font-weight:700;max-width:15ch;text-wrap:balance}
 .pitch{margin:24px 0 0;font-size:17px;line-height:1.6;color:var(--text-2);max-width:54ch}
-.ctas{display:flex;gap:16px;flex-wrap:wrap;margin-top:32px}
+.ctas{display:flex;gap:12px;flex-wrap:wrap;margin-top:32px}
 .facts{margin:32px 0 0;font-size:13px;color:var(--text-3b);max-width:60ch}
 .query{margin:0;min-width:0;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--card);overflow:hidden}
 .query pre{margin:0;padding:20px;font:13px/1.75 var(--font-mono);color:var(--text);overflow-x:auto;background:var(--inset)}
@@ -15,7 +15,7 @@
 /* Sections: heading rail on the left, content on the right, separated by a hairline. */
 .section{scroll-margin-top:80px;display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:64px;padding-top:48px;border-top:1px solid var(--border);min-width:0}
 .rail{align-self:start;position:sticky;top:96px}
-.rail h2{margin:0;font-size:26px;line-height:1.2;letter-spacing:-.025em;font-weight:650;text-wrap:balance}
+.rail h2{margin:0;font-size:24px;line-height:1.25;letter-spacing:-.02em;font-weight:650;text-wrap:balance}
 .rail p{margin:16px 0 0;color:var(--text-2);font-size:15px;line-height:1.65;max-width:42ch}
 .body{display:flex;flex-direction:column;gap:40px;min-width:0}
 .prose p{margin:0 0 16px;font-size:15.5px;line-height:1.7;color:var(--text-2);max-width:66ch}
@@ -35,11 +35,11 @@
 .changes b{color:var(--text);font-weight:600}
 
 /* Figures: SVG beside its numbered or listed explanation. */
-.figure{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:40px;align-items:start;margin:0}
+.figure{display:grid;grid-template-columns:minmax(0,6fr) minmax(0,5fr);gap:40px;align-items:start;margin:0}
 .svgWrap{margin:0;padding:16px;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--card);min-width:0}
 .svg{display:block;width:100%;height:auto;max-width:480px;margin:0 auto;overflow:visible}
 .steps{margin:0;padding:0;list-style:none;counter-reset:step;display:grid;gap:18px}
-.steps li{counter-increment:step;display:grid;grid-template-columns:32px minmax(0,1fr);font-size:14.5px;line-height:1.65;color:var(--text-2)}
+.steps li{counter-increment:step;display:grid;grid-template-columns:32px minmax(0,1fr);max-width:72ch;font-size:14.5px;line-height:1.65;color:var(--text-2)}
 .steps li::before{content:counter(step);width:22px;height:22px;margin-top:1px;border-radius:50%;border:1px solid var(--border-strong);display:grid;place-items:center;font:600 11px/1 var(--font-mono);color:var(--text-2)}
 .steps b{color:var(--text);font-weight:600}
 
@@ -61,13 +61,15 @@
 .lane{stroke:var(--accent);stroke-width:1.75;stroke-dasharray:6 6;animation:laneFlow 1.2s linear infinite}
 @keyframes laneFlow{to{stroke-dashoffset:-12}}
 .laneCap{fill:var(--accent);font:600 11.5px var(--font-ui)}
-.pill{fill:var(--surface);stroke:var(--accent);stroke-width:1}
+.pill{fill:var(--card);stroke:var(--accent);stroke-width:1}
 .pillText{fill:var(--text);font:11.5px var(--font-mono)}
 .axis{stroke:var(--border-strong);stroke-width:1}
-.renew{stroke:var(--c1);stroke-width:1.5;stroke-dasharray:3 3}
-.barWidget{fill:color-mix(in srgb,var(--c2) 22%,transparent);stroke:var(--c2)}
+.laneCapBg{fill:var(--card)}
+.gridLine{stroke:var(--grid);stroke-width:1}
+.track{fill:color-mix(in srgb,var(--c2) 14%,transparent);stroke:color-mix(in srgb,var(--c2) 55%,transparent);stroke-width:1}
+.optWidget{fill:var(--c2);stroke:var(--card);stroke-width:2}
 .barDashboard{fill:color-mix(in srgb,var(--c7) 22%,transparent);stroke:var(--c7)}
-.barLink{fill:color-mix(in srgb,var(--c1) 22%,transparent);stroke:var(--c1)}
+.barLink{fill:color-mix(in srgb,var(--c1) 22%,transparent);stroke:var(--c1);stroke-dasharray:4 3}
 .tag{fill:var(--card);stroke:var(--border-strong)}
 .tagBrowser{fill:var(--accent-soft);stroke:var(--accent)}
 .tagText{fill:var(--text-2);font:11px var(--font-ui)}
@@ -123,3 +125,4 @@
  .svgWrap{padding:8px}
  .query pre{font-size:12px;padding:16px}
 }
+@media(max-width:400px){.title{font-size:34px}}

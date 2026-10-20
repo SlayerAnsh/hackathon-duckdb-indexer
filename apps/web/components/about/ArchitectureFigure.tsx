@@ -55,6 +55,7 @@ export function ArchitectureFigure() {
   <Box x={16} y={556} w={408} h={70} title="Your browser: DuckDB WASM" sub="entities and attributes views, SQL, live tail" tone="browser"/>
 
   <line className={s.lane} x1={372} y1={556} x2={372} y2={150} markerEnd="url(#arch-arrow-lane)"/>
+  <rect className={s.laneCapBg} x={316} y={164} width={112} height={20} rx={4}/>
   <text className={s.laneCap} x={372} y={178} textAnchor="middle">direct, no API key</text>
   {LANE.map(p => <g key={p.label}>
    <rect className={s.pill} x={326} y={p.y - 13} width={92} height={24} rx={12}/>
