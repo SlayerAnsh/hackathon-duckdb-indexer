@@ -14,7 +14,7 @@ import { useDebounced } from '../../lib/dash/use-debounced'
 import { DashboardBrowseCard } from './DashboardBrowseCard'
 import { EmptyState, PlusIcon, SkeletonCards } from '../widgets/EmptyState'
 import { LoginIcon } from '../widgets/AccountButton'
-import { SearchField, ToggleChip, Toolbar } from './Toolbar'
+import { CountLine, PrimaryLabel, SearchField, ToggleChip, Toolbar, ToolbarSelect } from './Toolbar'
 import s from './explore.module.css'
 export const NEW_DASHBOARD_HREF = '/me?new=dashboard'
 /** Starts login first when needed, then opens the new dashboard dialog on /me. */
@@ -36,21 +36,21 @@ export function DashboardBrowseView({ state, dispatch, items, total, loading, er
  const loggedIn = auth.status === 'authenticated'
  const empty = !loading && !error && total === 0
  return <section className={s.browse}>
-  <Toolbar count={total ? resultsLine(total,state) : null}>
+  <Toolbar count={total ? <CountLine text={resultsLine(total,state)}/> : null}>
    <SearchField label="Search dashboards by title or creator 0x…" value={search} onChange={setSearch}/>
-   <select className={s.select} aria-label="Sort dashboards" value={state.sort} onChange={e=>dispatch({type:'sort',value:e.target.value as DashboardBrowseState['sort']})}><option value="newest">Newest</option><option value="widgets">Most widgets</option><option value="expiring">Expiring soon</option></select>
+   <ToolbarSelect aria-label="Sort dashboards" value={state.sort} onChange={e=>dispatch({type:'sort',value:e.target.value as DashboardBrowseState['sort']})}><option value="newest">Newest</option><option value="widgets">Most widgets</option><option value="expiring">Expiring soon</option></ToolbarSelect>
    <ToggleChip label="Official only" checked={state.official} onChange={value=>dispatch({type:'official',value})}/>
-   <Link className={`btn btn-primary ${s.primary}`} href={NEW_DASHBOARD_HREF} onClick={e=>goNewDashboard(auth,e,navigate)}><PlusIcon/>New dashboard</Link>
+   <Link className={`btn btn-primary ${s.primary}`} href={NEW_DASHBOARD_HREF} onClick={e=>goNewDashboard(auth,e,navigate)}><PlusIcon/><PrimaryLabel>New dashboard</PrimaryLabel></Link>
   </Toolbar>
   {error && <p role="alert" className="error">{error}</p>}
   {empty ? filtered
-   ? <EmptyState icon="search" title="No matches" body={state.search ? `Nothing matches “${state.search}”.` : 'Nothing matches these filters.'} actions={<button type="button" className="btn" onClick={()=>{setSearch('');dispatch({type:'clear'})}}>Clear filters</button>}/>
+   ? <EmptyState icon="search" title="No matches" body={state.search ? `Nothing matches “${state.search}”.` : 'Nothing matches these filters.'} actions={<button type="button" className="btn btn-outline" onClick={()=>{setSearch('');dispatch({type:'clear'})}}>Clear filters</button>}/>
    : <EmptyState icon="dashboard" title="No dashboards yet" body="Dashboards are public pages of live charts stored on Arkiv. Create one from your widgets or start from an official report." actions={<>
      {loggedIn ? <Link className="btn btn-primary" href={NEW_DASHBOARD_HREF}><PlusIcon/>New dashboard</Link> : <button type="button" className="btn btn-primary" onClick={()=>void auth.requestLogin().then(ok=>{if(ok) navigate(NEW_DASHBOARD_HREF)}).catch(()=>{})}><LoginIcon/>Log in to create</button>}
      {onWidgets ? <button type="button" className="btn btn-quiet" onClick={onWidgets}>Browse widgets</button> : <Link className="btn btn-quiet" href="/explore?tab=widgets">Browse widgets</Link>}
     </>}/>
   : <div className={s.grid} aria-busy={loading}>{loading && !children ? <SkeletonCards count={6} label="Loading dashboards…"/> : <>{items.map(item=><DashboardBrowseCard key={item.key} item={item} head={head} description={descriptions ? descriptions.get(item.key) ?? null : undefined}/>)}{children}</>}</div>}
-  {total !== null && state.pages * 12 < total && <button type="button" className={`btn ${s.more}`} onClick={()=>dispatch({type:'more'})}>Load 12 more</button>}
+  {total !== null && state.pages * 12 < total && <button type="button" className={`btn btn-outline ${s.more}`} onClick={()=>dispatch({type:'more'})}>Load 12 more</button>}
  </section>
 }
 function DashboardResultsPage({ q, version, head }: { q: DashboardListQuery; version: number; head?: number }) {
@@ -77,7 +77,7 @@ export function DashboardBrowse({ onWidgets }: { onWidgets?(): void } = {}) {
  const q=dashboardBrowseQuery(state)
  const count=useTimedQuery(config?.enabled ? dashboardCountSql(config.wallet,q) : '',version,{skip:!config?.enabled})
  if(!config) return <section className={s.browse}><div className={s.grid}><SkeletonCards count={3} label="Loading dashboards…"/></div></section>
- if(!config.enabled) return <p>Dashboards are not enabled on this deployment.</p>
+ if(!config.enabled) return <p className={`notice notice-info ${s.disabled}`}>Dashboards are not enabled on this deployment.</p>
  const scope=JSON.stringify([q.search,q.sort,q.official])
  return <DashboardBrowseView state={state} dispatch={dispatch} items={[]} total={count.data ? Number(count.data.rows[0]?.[0] ?? 0) : null} loading={showLoading({loading:count.loading,data:count.data})} error={count.error} onWidgets={onWidgets}>
   {Array.from({length:state.pages},(_,page)=><DashboardResultsPage key={`${scope}:${page}`} q={{...q,limit:12,offset:page*12}} version={version} head={index.liveHead}/>)}

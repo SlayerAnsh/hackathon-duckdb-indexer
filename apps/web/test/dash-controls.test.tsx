@@ -23,7 +23,7 @@ test('chart picker labels, selection and keyboard navigation', () => {
  expect(pickerIndex('Enter', 3)).toBe(3)
 })
 test('expiry chips use the required tones', () => {
- for (const [expiresAt, text, cls] of [[7 * DAY, '7d 0h left', 'quiet-chip'], [5400, 'Expires in 3h', 'state state-behind'], [1200, 'Expires in 40m', 'state state-behind'], [0, 'Expired', 'state state-stale']] as const) {
+ for (const [expiresAt, text, cls] of [[7 * DAY, '7d 0h left', 'chip'], [5400, 'Expires in 3h', 'chip chip-warn'], [1200, 'Expires in 40m', 'chip chip-warn'], [0, 'Expired', 'chip chip-bad']] as const) {
   const html = render(<TimeLeft expiresAt={expiresAt} head={0}/> )
   expect(html).toContain(text); expect(html).toContain(`class="${cls}"`)
  }

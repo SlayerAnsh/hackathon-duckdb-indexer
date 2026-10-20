@@ -3,7 +3,7 @@ import type { ChartType } from '../../lib/dash/schema'
 export function ChartIcon({ type, size = 16 }: { type: ChartType; size?: number }) {
  const shapes = {
   table: <><rect x="2" y="2" width="12" height="12" rx="1"/><path d="M2 6h12M2 10h12M6 2v12M10 2v12"/></>,
-  counter: <text x="1" y="11" fill="currentColor" stroke="none" fontSize="8">123</text>,
+  counter: <><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M5 6.2 6.4 5v6M9 6a1.5 1.5 0 0 1 2.8.6c0 1.6-2.8 2.6-2.8 4.4h2.9"/></>,
   bar: <path d="M3 14V8h2v6M7 14V3h2v11M11 14V6h2v8"/>,
   'stacked-bar': <><path d="M2 14V6h3v8M7 14V2h3v12M12 14V4h3v10M2 10h3M7 8h3M12 9h3"/></>,
   histogram: <path d="M1 14V9h3V5h3V2h3v5h3v7H1M4 9v5M7 5v9M10 7v7"/>,

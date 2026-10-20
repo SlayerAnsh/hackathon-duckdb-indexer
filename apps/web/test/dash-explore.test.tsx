@@ -78,7 +78,7 @@ test('Explore exposes accessible tabs and dashboard empty states',()=>{
  const loading=render(<DashboardBrowseView {...props} total={null} loading/>)
  expect(loading).toContain('data-skeleton="true"')
  expect(loading).not.toContain('No dashboards yet')
- expect(render(<DashboardBrowseView {...props} total={38}/>)).toContain('38 dashboards, newest first')
+ expect(render(<DashboardBrowseView {...props} total={38}/>)).toContain('<b>38</b> dashboards, newest first')
  expect(readFileSync(new URL('../app/widgets/page.tsx',import.meta.url),'utf8')).toContain("redirect('/explore?tab=widgets')")
 })
 

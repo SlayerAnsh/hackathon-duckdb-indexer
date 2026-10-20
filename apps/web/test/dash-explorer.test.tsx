@@ -33,7 +33,7 @@ test('explorer header, empty copy and login dependent controls', () => {
  expect(filtered).toContain('Clear filters')
  expect(filtered).toContain('Mine only')
  expect(filtered).toContain('type="checkbox"')
- expect(render(214, 12)).toContain('12 widgets')
+ expect(render(214, 12)).toContain('<b>12</b> widgets')
  expect(render(214, 0)).not.toContain('0 widgets')
  const loading = renderToStaticMarkup(<ExplorerView state={initExplorer()} dispatch={() => {}} liveCount={null} total={null} loggedIn={false} loading/>)
  expect(loading).toContain('data-skeleton="true"')

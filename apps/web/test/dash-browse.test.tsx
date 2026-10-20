@@ -43,7 +43,7 @@ const item = { key: key(1), name: 'Top creators', chart: 'bar' as const, user: U
 const props = { item, head: 1, version: 0, variant: 'explorer' as const }
 test('explorer cards show metadata, expiry and actions', () => {
  const html = render(<WidgetBrowseCard {...props} payload={null} visibleOverride/> )
- for (const text of ['Top creators', 'Bar', 'by ', 'on 12 dashboards', '1d', 'Open', 'href="/widgets/' + key(1) + '"', '+ Add to dashboard', 'Preview unavailable', 'height:160px']) expect(html).toContain(text)
+ for (const text of ['Top creators', 'Bar', 'by ', 'on 12 dashboards', '1d', 'Open', 'href="/widgets/' + key(1) + '"', 'Add to dashboard', 'Preview unavailable', 'height:160px']) expect(html).toContain(text)
  expect(render(<WidgetBrowseCard {...props} item={{ ...item, uses: 1 }} payload={null}/>)).toContain('on 1 dashboard')
 })
 test('preview states include loading, offscreen placeholder and muted errors', () => {
