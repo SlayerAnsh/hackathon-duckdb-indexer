@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { WidgetPayloadError } from './WidgetPayloadError'
 import { rpcMessage } from '../RowActions'
 import { showLoading } from '../../lib/dash/loading'
@@ -35,11 +36,11 @@ export function HomeCollections({ dashboards, widgets, head, onCreate, loading =
  return <><section><header className="home-heading"><h2>My dashboards</h2><button type="button" className="btn btn-primary" onClick={onCreate}><PlusIcon/>New dashboard</button></header>
   {!loading && !failed && !dashboards.length ? <EmptyState icon="dashboard" title="Create your first dashboard" body="A dashboard is a public page of live charts. Create one, then add your widgets or any public widget to it." actions={<button type="button" className="btn btn-primary" onClick={onCreate}><PlusIcon/>New dashboard</button>}/>
    : <div className="home-dashboards">{dashboards.map(item => <DashboardCard key={item.key} item={item} head={head}/>)}{loading && !failed && !dashboards.length && <SkeletonCards count={3} label="Loading your dashboards…"/>}</div>}
- </section><section><header className="home-heading"><h2>My widgets</h2><a className="btn" href="/widgets/new"><PlusIcon/>New widget</a></header>
+ </section><section><header className="home-heading"><h2>My widgets</h2><Link className="btn" href="/widgets/new"><PlusIcon/>New widget</Link></header>
   <WidgetPayloadError error={payloadError} onRetry={onRetry}/><div className="home-two">{widgets.map(([key, name, chart, expiry]) => <article className={s.card} key={String(key)}><div className="home-widget">
-   {CHART_TYPES.includes(chart as ChartType) && <ChartIcon type={chart as ChartType}/>}<strong>{String(name)}</strong><TimeLeft expiresAt={Number(expiry)} head={head}/>{renderExtend?.(String(key))}{renderDelete?.(String(key))}<a className="btn btn-quiet" href={`/widgets/${String(key)}`}>Open</a>
+   {CHART_TYPES.includes(chart as ChartType) && <ChartIcon type={chart as ChartType}/>}<strong>{String(name)}</strong><TimeLeft expiresAt={Number(expiry)} head={head}/>{renderExtend?.(String(key))}{renderDelete?.(String(key))}<Link className="btn btn-quiet" href={`/widgets/${String(key)}`}>Open</Link>
   </div></article>)}{loading && !failed && !widgets.length && <SkeletonCards count={2} label="Loading your widgets…"/>}</div>
-  {!loading && !failed && !widgets.length && <EmptyState icon="widget" title="No widgets yet" body="A widget is one SQL query with a chart. Write one in a minute and save it; it runs on the live index in your browser." actions={<a className="btn btn-primary" href="/widgets/new"><PlusIcon/>New widget</a>}/>}
+  {!loading && !failed && !widgets.length && <EmptyState icon="widget" title="No widgets yet" body="A widget is one SQL query with a chart. Write one in a minute and save it; it runs on the live index in your browser." actions={<Link className="btn btn-primary" href="/widgets/new"><PlusIcon/>New widget</Link>}/>}
  </section></>
 }
 export function HomeHeader({ address, balance }: { address: string; balance: { wei: bigint | null; level: BalanceLevel } }) {

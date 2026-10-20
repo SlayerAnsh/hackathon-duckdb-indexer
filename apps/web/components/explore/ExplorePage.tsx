@@ -7,8 +7,6 @@ import { explorerReducer, initExplorer } from '../../lib/dash/explorer-state'
 import { useDashAuth } from '../auth/DashAuthProvider'
 import { useIndex } from '../../lib/use-index'
 import { useTimedQuery } from '../../lib/use-query'
-import { TopBar } from '../dash/TopBar'
-import { Footer } from '../dash/Footer'
 import { ExplorerGrid } from '../widgets/ExplorerGrid'
 import { DashboardBrowse } from './DashboardBrowse'
 import s from './explore.module.css'
@@ -29,7 +27,7 @@ export function ExplorePage() {
  const dashboards=useTimedQuery(config?.enabled?dashboardCountSql(config.wallet,{search:'',official:false}):'',version,{skip:!config?.enabled})
  const widgets=useTimedQuery(config?.enabled?widgetCountSql(config.wallet,{search:'',chart:null,user:null}):'',version,{skip:!config?.enabled})
  const onTab=(next:ExploreTab)=>window.history.replaceState(null,'',window.location.pathname+searchForTab(window.location.search,next)+window.location.hash)
- return <><TopBar/><main id="main" className="wrap"><ExplorePageView tab={tab} onTab={onTab} dashboards={dashboards.data?Number(dashboards.data.rows[0]?.[0]??0):undefined} widgets={widgets.data?Number(widgets.data.rows[0]?.[0]??0):undefined}>
+ return <main id="main" className="wrap"><ExplorePageView tab={tab} onTab={onTab} dashboards={dashboards.data?Number(dashboards.data.rows[0]?.[0]??0):undefined} widgets={widgets.data?Number(widgets.data.rows[0]?.[0]??0):undefined}>
   {tab==='dashboards'?<DashboardBrowse onWidgets={()=>onTab('widgets')}/>:<ExplorerGrid state={explorer} dispatch={dispatch}/>}
- </ExplorePageView></main><Footer/></>
+ </ExplorePageView></main>
 }

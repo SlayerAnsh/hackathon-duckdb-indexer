@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { isOfficialOwned } from '../../lib/dash/official'
 import { WidgetPayloadError } from './WidgetPayloadError'
 import { useDebounced } from '../../lib/dash/use-debounced'
@@ -41,11 +42,11 @@ export function ExplorerView({ state, dispatch, liveCount, total, loggedIn, load
    <SearchField label="Search by name or creator address" value={search} onChange={setSearch}/>
    <select className={e.select} aria-label="Sort widgets" value={state.sort} onChange={ev => dispatch({ type: 'sort', value: ev.target.value as ExplorerState['sort'] })}><option value="newest">Newest</option><option value="used">Most used</option><option value="expiring">Expiring soon</option></select>
    {loggedIn && <ToggleChip label="Mine only" checked={state.mine} onChange={value => dispatch({ type: 'mine', value })}/>}
-   <a className={`btn btn-primary ${e.primary}`} href="/widgets/new"><PlusIcon/>New widget</a>
+   <Link className={`btn btn-primary ${e.primary}`} href="/widgets/new"><PlusIcon/>New widget</Link>
   </Toolbar>
   {error && <p className="error" role="alert">{error}</p>}
   {empty ? (liveCount === 0 && !filtered
-   ? <EmptyState icon="widget" title="No widgets yet" body="A widget is one SQL query with a chart. Write one in a minute; it runs on the live index in your browser." actions={<><a className="btn btn-primary" href="/widgets/new"><PlusIcon/>New widget</a><a className="btn btn-quiet" href="/playground">Open playground</a></>}/>
+   ? <EmptyState icon="widget" title="No widgets yet" body="A widget is one SQL query with a chart. Write one in a minute; it runs on the live index in your browser." actions={<><Link className="btn btn-primary" href="/widgets/new"><PlusIcon/>New widget</Link><Link className="btn btn-quiet" href="/playground">Open playground</Link></>}/>
    : <EmptyState icon="search" title="No matches" body={state.search ? `Nothing matches “${state.search}”.` : 'Nothing matches these filters.'} actions={<button type="button" className="btn" onClick={clear}>Clear filters</button>}/>)
   : <div className={e.widgetGrid} aria-busy={loading}>{loading && !children ? <SkeletonCards count={4} tall label="Loading widgets…"/> : children}</div>}
   {total !== null && state.pages * 12 < total && <button type="button" className={`btn ${e.more}`} onClick={() => dispatch({ type: 'more' })}>Load 12 more</button>}
@@ -61,7 +62,7 @@ function ResultsPage({ q, version, head, onAdd, remember }: { q: WidgetListQuery
  </>
 }
 function PendingCard({ item, write, version, onAdd }: { item: WidgetListItem; write: PendingWrite; version: number; onAdd(): void }) {
- return <article className={s.card}><header className={s.head}><h3>{item.name}</h3><ChartIcon type={item.chart}/></header><div className={s.body}><SyncChip write={write} version={version}/></div><footer className={s.foot}><a className={s.action} href={`/widgets/${item.key}`}>Open</a><button className={`${s.action} ${s.primary}`} onClick={onAdd}>+ Add to dashboard</button></footer></article>
+ return <article className={s.card}><header className={s.head}><h3>{item.name}</h3><ChartIcon type={item.chart}/></header><div className={s.body}><SyncChip write={write} version={version}/></div><footer className={s.foot}><Link className={s.action} href={`/widgets/${item.key}`}>Open</Link><button className={`${s.action} ${s.primary}`} onClick={onAdd}>+ Add to dashboard</button></footer></article>
 }
 function PendingSync({ write, version }: { write: PendingWrite; version: number }) {
  useSynced(write, version)

@@ -68,3 +68,16 @@ test('root layout installs the head script and every shell page has the skip tar
  const css = source('../app/theme.css').replace(/\s+/g, '')
  expect(css.match(/:root\[data-theme="light"\]\{([^}]+)/)![1]).toBe(css.match(/:root:not\(\[data-theme="dark"\]\)\{([^}]+)/)![1])
 })
+test('the persistent shell lives in the root layout and internal links use next/link', () => {
+ const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
+ const layout = source('../app/layout.tsx')
+ expect(layout).toContain('<TopBar/>{children}<Footer/>')
+ for (const path of ['../components/landing/Home.tsx', '../app/playground/page.tsx', '../app/about/page.tsx', '../app/me/page.tsx', '../app/d/[key]/page.tsx', '../app/d/[key]/edit/page.tsx', '../components/explore/ExplorePage.tsx', '../app/widgets/[key]/page.tsx', '../app/widgets/new/page.tsx']) {
+  expect(source(path)).not.toContain('<TopBar')
+  expect(source(path)).not.toContain('<Footer')
+ }
+ for (const path of ['../components/explore/DashboardBrowse.tsx', '../components/widgets/DashboardCard.tsx', '../components/widgets/ExplorerGrid.tsx', '../components/widgets/WidgetEditor.tsx', '../components/widgets/WidgetPage.tsx', '../components/widgets/AddToDashboardPicker.tsx', '../components/widgets/HomePage.tsx', '../components/widgets/ImportModal.tsx', '../components/widgets/ActivityPanel.tsx']) {
+  expect(source(path)).not.toMatch(/<a [^>]*href=(["']\/|\{`\/)/)
+  expect(source(path)).not.toContain('window.location.assign(NEW')
+ }
+})

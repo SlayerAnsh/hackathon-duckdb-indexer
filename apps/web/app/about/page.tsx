@@ -1,7 +1,5 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { TopBar } from '../../components/dash/TopBar'
-import { Footer } from '../../components/dash/Footer'
 import { ArchitectureFigure } from '../../components/about/ArchitectureFigure'
 import { ExpiryFigure } from '../../components/about/ExpiryFigure'
 import { addressUrl } from '../../lib/explorer'
@@ -19,7 +17,6 @@ function Section({ id, title, lead, children }: { id: string; title: string; lea
 
 export default function AboutPage() {
  return <>
-  <TopBar/>
   <main id="main" className={`wrap ${s.main}`}>
    <header className={s.hero}>
     <div>
@@ -136,6 +133,5 @@ export default function AboutPage() {
     <Src files={['README.md', 'apps/web/lib/views.ts', 'apps/web/components/dash/ResultsGrid.tsx', 'apps/web/components/dash/StatusBar.tsx']}/>
    </Section>
   </main>
-  <Footer/>
  </>
 }

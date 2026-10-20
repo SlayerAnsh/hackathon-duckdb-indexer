@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { useDashAuth } from '../auth/DashAuthProvider'
 import { dashApi, DashApiError } from '../../lib/dash/api'
@@ -28,7 +29,7 @@ export function pickerRows(rows: unknown[][], pending: PendingWrite[], widgetKey
 export function PickerList({ rows, phase, onPick, onNew }: { rows: PickerRow[]; phase: Record<string, Phase>; onPick(key: string): void; onNew(): void }) {
  return <>{rows.map(row => <div className={s.pickerRow} key={row.key}>
   <button className="btn btn-quiet" disabled={row.added || !!phase[row.key]} onClick={() => onPick(row.key)}><span>{row.title} <small>{row.widgets} widgets</small></span><span>{phase[row.key] === 'adding' ? 'Adding…' : phase[row.key] === 'done' ? 'Added ✓' : row.added || phase[row.key] === 'conflict' ? 'Already added' : '+'}</span></button>
-  {phase[row.key] === 'done' && <a href={`/d/${row.key}`}>View</a>}
+  {phase[row.key] === 'done' && <Link href={`/d/${row.key}`}>View</Link>}
  </div>)}<button className="btn btn-quiet" onClick={onNew}>+ New dashboard</button></>
 }
 function PendingSync({ write, version }: { write: PendingWrite; version: number }) { useSynced(write, version); return null }

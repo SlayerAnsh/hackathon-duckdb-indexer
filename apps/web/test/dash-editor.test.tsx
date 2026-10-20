@@ -63,7 +63,9 @@ test('new widget body requires a session', () => {
 test('editor renders the required initial controls and preview', () => {
  const auth: DashAuth = { config: { enabled: true, privyAppId: 'app', wallet: '0x' + 'ab'.repeat(20), rpcUrl: 'https://offline.test' }, status: 'authenticated', confirming: false, error: null, sign: async () => { throw Error('unused') }, requestLogin: async () => true, logout: async () => {}, refresh: async () => {} }
  const html = renderToStaticMarkup(<DashAuthContext.Provider value={auth}><WidgetEditor mode="create" initial={initEditor()} onSaved={() => {}}/></DashAuthContext.Provider>)
- for (const text of ['Untitled widget', '1 day', '7 days', '30 days', '90 days', 'Save to Arkiv', 'Run the query to see a preview.', 'role="radiogroup"', 'Chart type']) expect(html).toContain(text)
+ for (const text of ['Untitled widget', '1 day', '7 days', '30 days', '90 days', 'Save to Arkiv', 'Run the query to see a preview', 'role="radiogroup"', 'Chart type', 'Lifetime', 'Visualization', 'Run the query to map columns']) expect(html).toContain(text)
+ expect(html).not.toContain('Add to dashboard')
+ expect(html).not.toContain('<hr')
 })
 
 
@@ -123,4 +125,18 @@ test('editor saves edits as new versions with the readonly note', async () => {
  expect(show('edit')).toContain('Widgets are read only on Arkiv. Saving creates a new version and moves your dashboards to it.')
  expect(show('create')).toContain('Save to Arkiv')
  expect(show('create')).not.toContain('Widgets are read only on Arkiv.')
+})
+
+test('a preselected dashboard shows as a clearable chip, not a select', () => {
+ const auth: DashAuth = { config: { enabled: true, privyAppId: 'app', wallet: '0x' + 'ab'.repeat(20), rpcUrl: 'https://offline.test' }, status: 'authenticated', confirming: false, error: null, sign: async () => { throw Error('unused') }, requestLogin: async () => true, logout: async () => {}, refresh: async () => {} }
+ const html = renderToStaticMarkup(<DashAuthContext.Provider value={auth}><WidgetEditor mode="create" initial={initEditor(null, D)} onSaved={() => {}}/></DashAuthContext.Provider>)
+ expect(html).toContain('Adds to')
+ expect(html).toContain('aria-label="Do not add to a dashboard"')
+ expect(html).not.toContain('<select')
+})
+
+test('counter settings use stacked fields, a decimals select and a compact switch', () => {
+ const html = renderToStaticMarkup(<WidgetSettings state={reduce(run(), { type: 'chart', value: 'counter' })} dispatch={() => {}}/>)
+ for (const text of ['>Data<', '>Format<', 'Compact numbers', 'role="switch"']) expect(html).toContain(text)
+ expect(html).not.toContain('type="number" min="0" max="6"')
 })

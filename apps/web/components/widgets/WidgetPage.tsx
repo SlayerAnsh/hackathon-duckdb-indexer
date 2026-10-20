@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { canExtendWidget, deleteWidgetDirect, walletErrorKind, walletErrorMessage, type DirectResult } from '../../lib/dash/widget-actions'
@@ -50,9 +51,9 @@ export function WidgetPageBody({ state, name }: { state: ReturnType<typeof widge
  if (state === 'missing') return <MissingWidget/>
  return null
 }
-export function MissingWidget() { return <section><p>This widget has expired. Its query is no longer on Arkiv.</p><a href="/explore?tab=widgets">Browse widgets</a></section> }
+export function MissingWidget() { return <section><p>This widget has expired. Its query is no longer on Arkiv.</p><Link href="/explore?tab=widgets">Browse widgets</Link></section> }
 export function ViewerHeader({ name, sql, onAdd }: { name: string; sql: string; onAdd(): void }) {
- return <header className={s.header}><h1>{name}</h1><button className="btn btn-primary" onClick={onAdd}>+ Add to my dashboard</button><a className="btn btn-quiet" href={playgroundHref(sql)}>Open in playground</a></header>
+ return <header className={s.header}><h1>{name}</h1><button className="btn btn-primary" onClick={onAdd}>+ Add to my dashboard</button><Link className="btn btn-quiet" href={playgroundHref(sql)}>Open in playground</Link></header>
 }
 async function copyText(text: string, done: () => void) {
  try { await navigator.clipboard.writeText(text); done() } catch { /* Keep the action available for retry. */ }
@@ -63,15 +64,15 @@ export function WidgetHeader({ name, chart, user, official, uses, expiresAt, hea
  const [copied, setCopied] = useState(false)
  useEffect(() => { if (copied) { const timer = setTimeout(() => setCopied(false), 2000); return () => clearTimeout(timer) } }, [copied])
  return <header className={s.widgetHeader}>
-  <nav aria-label="Breadcrumb"><a href="/explore">Explore</a> / <a href="/explore?tab=widgets">Widgets</a> / <span>{name}</span></nav>
+  <nav aria-label="Breadcrumb"><Link href="/explore">Explore</Link> / <Link href="/explore?tab=widgets">Widgets</Link> / <span>{name}</span></nav>
   <div className={s.titleRow}><h1>{name}</h1><span className="chip"><ChartIcon type={chart}/>{CHART_LABELS[chart]}</span></div>
   <div className={s.facts}>by {official ? <><span className="chip chip-official">⛨ Official</span> Arkiv SQL Indexer</> : <AddressLink address={user}/>}<span>on {uses} dashboards</span>{official ? <span className="chip">◷ Kept live</span> : <TimeLeft expiresAt={expiresAt} head={head}/>}<span className={s.live}><i aria-hidden="true"/>Live, computed in your browser</span>{ms !== undefined && <RunBadge ms={ms}/>}</div>
-  <div className={s.widgetActions}><button className="btn btn-quiet" onClick={() => void copyText(`${location.origin}/widgets/${widgetKey}`, () => setCopied(true))}>{copied ? '✓ Link copied' : 'Copy link'}</button><span className={s.srOnly} aria-live="polite">{copied ? 'Link copied' : ''}</span><a className="btn" href={playgroundHref(sql)}>Open in playground</a>{canAdd && <button className="btn btn-primary" onClick={onAdd}>+ Add to dashboard</button>}</div>
+  <div className={s.widgetActions}><button className="btn btn-quiet" onClick={() => void copyText(`${location.origin}/widgets/${widgetKey}`, () => setCopied(true))}>{copied ? '✓ Link copied' : 'Copy link'}</button><span className={s.srOnly} aria-live="polite">{copied ? 'Link copied' : ''}</span><Link className="btn" href={playgroundHref(sql)}>Open in playground</Link>{canAdd && <button className="btn btn-primary" onClick={onAdd}>+ Add to dashboard</button>}</div>
  </header>
 }
 export function UsedOnPanel({ items, total, expanded = false }: { items: ReturnType<typeof toUsedOn>; total: number; expanded?: boolean }) {
  const [open, setOpen] = useState(expanded)
- return <section className={s.panel}><h2>Used on {total} dashboards</h2><ul className={s.uses}>{(open ? items : items.slice(0, 4)).map(item => <li key={item.key}><a href={`/d/${item.key}`}><span><strong>{item.title}</strong><small>{item.widgets} widgets</small></span>{item.official && <span className="chip chip-official">⛨ Official</span>}</a></li>)}</ul>{!open && total > 4 && <button className="btn btn-quiet" aria-expanded={false} onClick={() => setOpen(true)}>Show all {total}</button>}</section>
+ return <section className={s.panel}><h2>Used on {total} dashboards</h2><ul className={s.uses}>{(open ? items : items.slice(0, 4)).map(item => <li key={item.key}><Link href={`/d/${item.key}`}><span><strong>{item.title}</strong><small>{item.widgets} widgets</small></span>{item.official && <span className="chip chip-official">⛨ Official</span>}</Link></li>)}</ul>{!open && total > 4 && <button className="btn btn-quiet" aria-expanded={false} onClick={() => setOpen(true)}>Show all {total}</button>}</section>
 }
 export function LifetimePanel({ official, owner, expiresAt, head, lifetimeDays, widgetKey, name = 'widget', canExtend, reason, balance, address, onExtended, onDeleted, onTransferred, onSigned }: {
  official: boolean; owner: boolean; expiresAt: number; head?: number; lifetimeDays: LifetimeDays; widgetKey: string; name?: string; canExtend: boolean; reason?: string; balance?: { wei: bigint | null; level: BalanceLevel }; address?: string; onExtended?(result: WriteResult): void; onDeleted?(r: DirectResult): void; onTransferred?(r: DirectResult, to: string): void; onSigned?(): void

@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useEffect, useReducer, useState } from 'react'
 import { useDashAuth } from '../auth/DashAuthProvider'
 import { dashboardBrowseQuery, dashboardBrowseReducer, initDashboardBrowse, resultsLine, type DashboardBrowseState } from '../../lib/dash/dashboard-browse-state'
@@ -6,6 +7,7 @@ import { dashboardCountSql, dashboardListSql, toDashboardItems, type DashboardLi
 import { fetchDashboards } from '../../lib/dash/read'
 import { createBrowserRpc } from '../../lib/rpc-browser'
 import { useIndex } from '../../lib/use-index'
+import { useNavigate } from '../../lib/use-navigate'
 import { useTimedQuery } from '../../lib/use-query'
 import { showLoading } from '../../lib/dash/loading'
 import { useDebounced } from '../../lib/dash/use-debounced'
@@ -16,15 +18,16 @@ import { SearchField, ToggleChip, Toolbar } from './Toolbar'
 import s from './explore.module.css'
 export const NEW_DASHBOARD_HREF = '/me?new=dashboard'
 /** Starts login first when needed, then opens the new dashboard dialog on /me. */
-export function goNewDashboard(auth: ReturnType<typeof useDashAuth>, event: React.MouseEvent) {
+export function goNewDashboard(auth: ReturnType<typeof useDashAuth>, event: React.MouseEvent, navigate: (href: string) => void = href => window.location.assign(href)) {
  if (auth.status === 'authenticated') return
  event.preventDefault()
- void auth.requestLogin().then(ok => { if (ok) window.location.assign(NEW_DASHBOARD_HREF) }).catch(() => {})
+ void auth.requestLogin().then(ok => { if (ok) navigate(NEW_DASHBOARD_HREF) }).catch(() => {})
 }
 export function DashboardBrowseView({ state, dispatch, items, total, loading, error, head, descriptions, onWidgets, children }: {
  state: DashboardBrowseState; dispatch(a: Parameters<typeof dashboardBrowseReducer>[1]): void; items: DashboardListItem[]; total: number | null; loading: boolean; error?: string; head?: number; descriptions?: Map<string,string>; onWidgets?(): void; children?: React.ReactNode
 }) {
  const auth = useDashAuth()
+ const navigate = useNavigate()
  const [search,setSearch] = useState(state.search)
  const debounced = useDebounced(search)
  useEffect(()=>{setSearch(state.search)},[state.search])
@@ -37,14 +40,14 @@ export function DashboardBrowseView({ state, dispatch, items, total, loading, er
    <SearchField label="Search dashboards by title or creator 0x…" value={search} onChange={setSearch}/>
    <select className={s.select} aria-label="Sort dashboards" value={state.sort} onChange={e=>dispatch({type:'sort',value:e.target.value as DashboardBrowseState['sort']})}><option value="newest">Newest</option><option value="widgets">Most widgets</option><option value="expiring">Expiring soon</option></select>
    <ToggleChip label="Official only" checked={state.official} onChange={value=>dispatch({type:'official',value})}/>
-   <a className={`btn btn-primary ${s.primary}`} href={NEW_DASHBOARD_HREF} onClick={e=>goNewDashboard(auth,e)}><PlusIcon/>New dashboard</a>
+   <Link className={`btn btn-primary ${s.primary}`} href={NEW_DASHBOARD_HREF} onClick={e=>goNewDashboard(auth,e,navigate)}><PlusIcon/>New dashboard</Link>
   </Toolbar>
   {error && <p role="alert" className="error">{error}</p>}
   {empty ? filtered
    ? <EmptyState icon="search" title="No matches" body={state.search ? `Nothing matches “${state.search}”.` : 'Nothing matches these filters.'} actions={<button type="button" className="btn" onClick={()=>{setSearch('');dispatch({type:'clear'})}}>Clear filters</button>}/>
    : <EmptyState icon="dashboard" title="No dashboards yet" body="Dashboards are public pages of live charts stored on Arkiv. Create one from your widgets or start from an official report." actions={<>
-     {loggedIn ? <a className="btn btn-primary" href={NEW_DASHBOARD_HREF}><PlusIcon/>New dashboard</a> : <button type="button" className="btn btn-primary" onClick={()=>void auth.requestLogin().then(ok=>{if(ok) window.location.assign(NEW_DASHBOARD_HREF)}).catch(()=>{})}><LoginIcon/>Log in to create</button>}
-     {onWidgets ? <button type="button" className="btn btn-quiet" onClick={onWidgets}>Browse widgets</button> : <a className="btn btn-quiet" href="/explore?tab=widgets">Browse widgets</a>}
+     {loggedIn ? <Link className="btn btn-primary" href={NEW_DASHBOARD_HREF}><PlusIcon/>New dashboard</Link> : <button type="button" className="btn btn-primary" onClick={()=>void auth.requestLogin().then(ok=>{if(ok) navigate(NEW_DASHBOARD_HREF)}).catch(()=>{})}><LoginIcon/>Log in to create</button>}
+     {onWidgets ? <button type="button" className="btn btn-quiet" onClick={onWidgets}>Browse widgets</button> : <Link className="btn btn-quiet" href="/explore?tab=widgets">Browse widgets</Link>}
     </>}/>
   : <div className={s.grid} aria-busy={loading}>{loading && !children ? <SkeletonCards count={6} label="Loading dashboards…"/> : <>{items.map(item=><DashboardBrowseCard key={item.key} item={item} head={head} description={descriptions ? descriptions.get(item.key) ?? null : undefined}/>)}{children}</>}</div>}
   {total !== null && state.pages * 12 < total && <button type="button" className={`btn ${s.more}`} onClick={()=>dispatch({type:'more'})}>Load 12 more</button>}

@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { WidgetPayloadError } from './WidgetPayloadError'
 import { useDebounced } from '../../lib/dash/use-debounced'
 import { showLoading } from '../../lib/dash/loading'
@@ -100,7 +101,7 @@ export function ImportModal({ dashboardTitle, placed, remaining, onAdd, onClose,
    {!listOverride && <Counts state={state} user={auth.address} onCounts={onCounts}/>}
    <div className="import-results">
     {total === 0 ? (state.tab === 'mine' && !state.search && !state.chart
-     ? <EmptyState compact icon="widget" title="You have no widgets yet" body="Save a query as a widget, then import it here. You can also pick from all public widgets." actions={<><a className="btn btn-primary" href="/widgets/new"><PlusIcon/>New widget</a><button type="button" className="btn btn-quiet" onClick={() => dispatch({ type: 'tab', value: 'all' })}>All widgets</button></>}/>
+     ? <EmptyState compact icon="widget" title="You have no widgets yet" body="Save a query as a widget, then import it here. You can also pick from all public widgets." actions={<><Link className="btn btn-primary" href="/widgets/new"><PlusIcon/>New widget</Link><button type="button" className="btn btn-quiet" onClick={() => dispatch({ type: 'tab', value: 'all' })}>All widgets</button></>}/>
      : <EmptyState compact icon="search" title="No matches" body="No widgets match these filters."/>) : <div className="import-grid">
      {listOverride ? <Cards list={listOverride} state={state} placed={placed} toggle={toggle} version={0}/> : <LiveResults state={state} user={auth.address} placed={placed} toggle={toggle} remember={remember}/>}
     </div>}

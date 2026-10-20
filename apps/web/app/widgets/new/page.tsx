@@ -4,8 +4,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useDashAuth } from '../../../components/auth/DashAuthProvider'
 import { LoginGate } from '../../../components/widgets/LoginGate'
 import { WidgetEditor } from '../../../components/widgets/WidgetEditor'
-import { TopBar } from '../../../components/dash/TopBar'
-import { Footer } from '../../../components/dash/Footer'
 import { initEditor } from '../../../lib/dash/editor-state'
 import { isEntityKey } from '../../../lib/dash/schema'
 
@@ -23,5 +21,5 @@ export function NewWidgetBody() {
  return <Suspense fallback={null}><CreateEditor/></Suspense>
 }
 export default function NewWidgetPage() {
- return <><TopBar/><main id="main" className="wrap"><NewWidgetBody/></main><Footer/></>
+ return <main id="main" className="wrap"><NewWidgetBody/></main>
 }
