@@ -39,13 +39,13 @@ export function DashboardBrowseView({ state, dispatch, items, total, loading, er
   <Toolbar count={total ? <CountLine text={resultsLine(total,state)}/> : null}>
    <SearchField label="Search dashboards by title or creator 0x…" value={search} onChange={setSearch}/>
    <ToolbarSelect aria-label="Sort dashboards" value={state.sort} onChange={e=>dispatch({type:'sort',value:e.target.value as DashboardBrowseState['sort']})}><option value="newest">Newest</option><option value="widgets">Most widgets</option><option value="expiring">Expiring soon</option></ToolbarSelect>
-   <ToggleChip label="Official only" checked={state.official} onChange={value=>dispatch({type:'official',value})}/>
+   <ToggleChip label="Featured only" checked={state.official} onChange={value=>dispatch({type:'official',value})}/>
    <Link className={`btn btn-primary ${s.primary}`} href={NEW_DASHBOARD_HREF} onClick={e=>goNewDashboard(auth,e,navigate)}><PlusIcon/><PrimaryLabel>New dashboard</PrimaryLabel></Link>
   </Toolbar>
   {error && <p role="alert" className="error">{error}</p>}
   {empty ? filtered
    ? <EmptyState icon="search" title="No matches" body={state.search ? `Nothing matches “${state.search}”.` : 'Nothing matches these filters.'} actions={<button type="button" className="btn btn-outline" onClick={()=>{setSearch('');dispatch({type:'clear'})}}>Clear filters</button>}/>
-   : <EmptyState icon="dashboard" title="No dashboards yet" body="Dashboards are public pages of live charts stored on Arkiv. Create one from your widgets or start from an official report." actions={<>
+   : <EmptyState icon="dashboard" title="No dashboards yet" body="Dashboards are public pages of live charts stored on Arkiv. Create one from your widgets or start from a featured dashboard." actions={<>
      {loggedIn ? <Link className="btn btn-primary" href={NEW_DASHBOARD_HREF}><PlusIcon/>New dashboard</Link> : <button type="button" className="btn btn-primary" onClick={()=>void auth.requestLogin().then(ok=>{if(ok) navigate(NEW_DASHBOARD_HREF)}).catch(()=>{})}><LoginIcon/>Log in to create</button>}
      {onWidgets ? <button type="button" className="btn btn-quiet" onClick={onWidgets}>Browse widgets</button> : <Link className="btn btn-quiet" href="/explore?tab=widgets">Browse widgets</Link>}
     </>}/>

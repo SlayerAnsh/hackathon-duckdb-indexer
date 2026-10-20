@@ -36,7 +36,7 @@ export default function AboutPage() {
       <span className="sx-kw">ORDER BY</span> count <span className="sx-kw">DESC</span>, creator{'\n'}
       <span className="sx-kw">LIMIT</span> <span className="sx-num">10</span>
      </code></pre>
-     <figcaption>The Top 10 creators chart on the Creators official dashboard. <code>arkiv_query</code> filters and pages entities; it has no GROUP BY, JOIN or ORDER BY on attributes.</figcaption>
+     <figcaption>The Top 10 creators chart on the Creators featured dashboard. <code>arkiv_query</code> filters and pages entities; it has no GROUP BY, JOIN or ORDER BY on attributes.</figcaption>
     </figure>
    </header>
 
@@ -119,8 +119,8 @@ export default function AboutPage() {
 
    <Section id="reproduce" title="Reproduce it" lead="Five minutes in a browser. No wallet, no API key.">
     <ol className={s.steps}>
-     <li><span><b>Open the <Link href="/explore">Official dashboards</Link>.</b> Every chart is one SQL query run by DuckDB in your tab. Each card shows its timing, and most name the clause <code>arkiv_query</code> cannot express.</span></li>
-     <li><span><b>Open the <Link href="/explore">Creators official dashboard</Link>.</b> The Creator vs current owner table lists entities whose owner differs from their creator, where a transfer has occurred.</span></li>
+     <li><span><b>Open the <Link href="/explore">Featured dashboards</Link>.</b> Every chart is one SQL query run by DuckDB in your tab. Each card shows its timing, and most name the clause <code>arkiv_query</code> cannot express.</span></li>
+     <li><span><b>Open the <Link href="/explore">Creators featured dashboard</Link>.</b> The Creator vs current owner table lists entities whose owner differs from their creator, where a transfer has occurred.</span></li>
      <li><span><b>Open the <Link href="/playground">playground</Link> and press Run.</b> The featured query ranks widgets by dashboard placements, including widgets with no links using JOIN and GROUP BY.</span></li>
      <li><span><b>Press Verify page.</b> Each row is re-read from the public RPC and labelled ok, stale, extended, expired or deleted. Payload loads a row&apos;s payload from the chain.</span></li>
      <li><span><b>Hover the status bar.</b> It shows the indexed expression, the chain head, the browser live tail block and pending attribute fetches.</span></li>

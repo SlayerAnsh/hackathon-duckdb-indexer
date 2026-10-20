@@ -15,7 +15,7 @@ export function OfficialDashboardsView({ enabled, items, descriptions, head, err
  if (!enabled) return null
  return <section className={s.section} aria-labelledby="official-h">
   <div className={s.sectionHead}>
-   <div><h2 id="official-h">Official dashboards</h2><p>Live network reports kept on Arkiv by this app. Open one to see every chart and its SQL.</p></div>
+   <div><h2 id="official-h">Featured dashboards</h2><p>Live network reports kept on Arkiv by this app. Open one to see every chart and its SQL.</p></div>
    <Link className={s.headLink} href="/explore">All dashboards <span aria-hidden="true">→</span></Link>
   </div>
   <div className={s.officialGrid} aria-busy={items === null && !error}>
@@ -23,7 +23,7 @@ export function OfficialDashboardsView({ enabled, items, descriptions, head, err
    {items === null
     ? !error && <SkeletonCards count={3} label="Loading official dashboards…"/>
     : items.length === 0
-     ? !error && <EmptyState compact icon="official" title="Official reports are on their way" body="Network reports kept live by this app will appear here. Until then, browse what the community built." actions={<Link className="btn btn-sm" href="/explore">Browse community dashboards</Link>}/>
+     ? !error && <EmptyState compact icon="official" title="Featured dashboards are on their way" body="Network reports kept live by this app will appear here. Until then, browse what the community built." actions={<Link className="btn btn-sm" href="/explore">Browse community dashboards</Link>}/>
      : items.map(item => <DashboardBrowseCard key={item.key} item={item} head={head} description={descriptions ? descriptions.get(item.key) ?? null : undefined}/>)}
   </div>
  </section>

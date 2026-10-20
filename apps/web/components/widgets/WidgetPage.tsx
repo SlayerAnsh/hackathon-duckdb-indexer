@@ -118,7 +118,7 @@ export function WidgetHeader({ name, chart, user, official, uses, expiresAt, hea
    </div>
   </div>
   <div className={s.facts}>
-   <span className={s.by}>by {official ? <><span className="chip chip-official"><ShieldGlyph/>Official</span><span>Arkiv SQL Indexer</span></> : <AddressLink address={user}/>}</span>
+   <span className={s.by}>by {official ? <><span className="chip chip-official"><ShieldGlyph/>Featured</span><span>Arkiv SQL Indexer</span></> : <AddressLink address={user}/>}</span>
    <span>on {plural(uses, 'dashboard')}</span>
    <span>{official ? <KeptLive/> : <TimeLeft expiresAt={expiresAt} head={head}/>}</span>
    <span className={s.live}><i aria-hidden="true"/>Live, computed in your browser</span>
@@ -131,7 +131,7 @@ export function UsedOnPanel({ items, total, expanded = false }: { items: ReturnT
  return <section className={`card ${s.panel}`}>
   <div className="card-h"><h2>Used on {plural(total, 'dashboard')}</h2></div>
   {items.length === 0 ? <p className={s.panelEmpty}>Not on any dashboard yet. Add it to one of yours and it shows up here.</p>
-   : <ul className={s.uses}>{(open ? items : items.slice(0, 4)).map(item => <li key={item.key}><Link className={s.useLink} href={`/d/${item.key}`}><span className={s.useText}><strong>{item.title}</strong><small>{plural(item.widgets, 'widget')}</small></span>{item.official && <span className="chip chip-official"><ShieldGlyph/>Official</span>}</Link></li>)}</ul>}
+   : <ul className={s.uses}>{(open ? items : items.slice(0, 4)).map(item => <li key={item.key}><Link className={s.useLink} href={`/d/${item.key}`}><span className={s.useText}><strong>{item.title}</strong><small>{plural(item.widgets, 'widget')}</small></span>{item.official && <span className="chip chip-official"><ShieldGlyph/>Featured</span>}</Link></li>)}</ul>}
   {!open && total > 4 && <div className={s.panelFoot}><button type="button" className="btn btn-quiet btn-sm" aria-expanded={false} onClick={() => setOpen(true)}>Show all {total}</button></div>}
  </section>
 }

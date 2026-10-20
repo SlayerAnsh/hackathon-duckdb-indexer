@@ -460,7 +460,7 @@ fieldset legend{padding:0;margin-bottom:8px;font-size:12px;font-weight:500;color
 .check:has(input:disabled){color:var(--text-3b);cursor:not-allowed}
 
 /* Switch: <input type="checkbox" role="switch" class="switch">. Inside a
-   bordered chip: <label class="switch-chip"><input … class="switch"> Official only</label> */
+   bordered chip: <label class="switch-chip"><input … class="switch"> Featured only</label> */
 .switch,:where(input[role=switch]){-webkit-appearance:none;appearance:none;position:relative;flex:none;width:28px;height:16px;margin:0;padding:0;border:0;border-radius:999px;background:var(--border-strong);cursor:pointer;transition:background-color var(--dur)}
 .switch::before,:where(input[role=switch])::before{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--text-2);box-shadow:0 1px 2px color-mix(in srgb,var(--surface) 50%,transparent);transition:transform var(--dur) var(--ease-out),background-color var(--dur)}
 .switch:hover:not(:disabled),:where(input[role=switch]):hover:not(:disabled){background:var(--ui-edge)}

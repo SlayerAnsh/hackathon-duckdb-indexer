@@ -57,10 +57,10 @@ test('dashboard filters reset pages and label results',()=>{
 const item = {key:key(1),title:'Overview',user:W,official:true,widgets:8,charts:['bar','donut'] as ('bar'|'donut')[],createdAt:1,updatedAt:2,expiresAt:100}
 test('dashboard card authors, lifetime, chart icons and empty thumbnails',()=>{
  const html=render(<DashboardBrowseCard item={item} description="Network report"/>)
- for(const text of ['Official','Arkiv SQL Indexer','Kept live','8 widgets','Network report',`href="/d/${key(1)}"`]) expect(html).toContain(text)
+ for(const text of ['Featured','Arkiv SQL Indexer','Kept live','8 widgets','Network report',`href="/d/${key(1)}"`]) expect(html).toContain(text)
  expect((html.match(/<svg/g)??[]).length).toBeGreaterThanOrEqual(2)
  const user=render(<DashboardBrowseCard item={{...item,official:false,user:U,widgets:1,charts:[]}} head={10}/>)
- expect(user).not.toContain('Official')
+ expect(user).not.toContain('Featured')
  expect(user).toContain('1 widget')
  expect(user).toContain('No widgets yet')
  expect(user).toContain('Expires in')
@@ -70,7 +70,7 @@ test('Explore exposes accessible tabs and dashboard empty states',()=>{
  for(const text of ['<h1>Explore</h1>','role="tablist"','aria-label="Explore"','aria-selected="true" tabindex="0"','aria-selected="false" tabindex="-1"']) expect(html).toContain(text)
  const props={state:initDashboardBrowse(),dispatch:()=>{},items:[],loading:false,total:0}
  const empty=render(<DashboardBrowseView {...props}/>)
- for(const text of ['No dashboards yet','Log in to create','Browse widgets','role="status"','New dashboard','Official only','role="switch"']) expect(empty).toContain(text)
+ for(const text of ['No dashboards yet','Log in to create','Browse widgets','role="status"','New dashboard','Featured only','role="switch"']) expect(empty).toContain(text)
  expect(empty).not.toContain('0 dashboards')
  const search=render(<DashboardBrowseView {...props} state={{...props.state,search:'abc'}}/>)
  for(const text of ['No matches','Nothing matches “abc”.','Clear filters']) expect(search).toContain(text)
@@ -105,7 +105,7 @@ test('explorer widget card does not mark transferred official authorship as Offi
  const { WidgetBrowseCard } = await import('../components/widgets/WidgetBrowseCard')
  const item = { key:key(70), name:'Transferred', chart:'bar' as const, user:W, owner:U, expiresAt:100, createdAt:1, uses:0 }
  const html = render(<WidgetBrowseCard item={item} payload={null} version={0} variant="explorer" visibleOverride official={isOfficialOwned(item.user,item.owner,W)}/> )
- expect(html).not.toContain('Official')
+ expect(html).not.toContain('Featured')
  expect(readFileSync(new URL('../components/widgets/ExplorerGrid.tsx',import.meta.url),'utf8')).toContain('isOfficialOwned(item.user, item.owner,')
 })
 
