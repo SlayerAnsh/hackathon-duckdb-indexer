@@ -25,5 +25,5 @@ export function menuIndex(key: string, index: number, count: number): number | '
 export function updatedLabel(updatedAt: number, head: number): string { return `Updated ${blockAge(updatedAt, head)} ago` }
 export function importedFrom(widgetUser: string, dashboardUser: string, wallet: string): string | null {
  if (widgetUser.toLowerCase() === dashboardUser.toLowerCase()) return null
- return 'Imported from ' + (widgetUser.toLowerCase() === wallet.toLowerCase() ? 'Arkiv SQL Indexer' : shortHex(widgetUser))
+ return 'Imported from ' + shortHex(widgetUser)
 }

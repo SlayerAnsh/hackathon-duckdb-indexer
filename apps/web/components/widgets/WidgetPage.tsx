@@ -118,7 +118,7 @@ export function WidgetHeader({ name, chart, user, official, uses, expiresAt, hea
    </div>
   </div>
   <div className={s.facts}>
-   <span className={s.by}>by {official ? <><span className="chip chip-official"><ShieldGlyph/>Featured</span><span>Arkiv SQL Indexer</span></> : <AddressLink address={user}/>}</span>
+   <span className={s.by}>{official && <span className="chip chip-official"><ShieldGlyph/>Featured</span>}by <AddressLink address={user}/></span>
    <span>on {plural(uses, 'dashboard')}</span>
    <span>{official ? <KeptLive/> : <TimeLeft expiresAt={expiresAt} head={head}/>}</span>
    <span className={s.live}><i aria-hidden="true"/>Live, computed in your browser</span>
@@ -321,7 +321,7 @@ export function WidgetPage({ widgetKey }: { widgetKey: string }) {
   <LifetimePanel key={`life:${key}`} name={name} owner={owner} balance={balance} address={auth.address} onSigned={balance.refresh} onDeleted={deleted} onTransferred={transferred} official={official} expiresAt={expiresAt} head={head} lifetimeDays={widget.widget.lifetimeDays} widgetKey={key} canExtend={canExtendWidget({ ...widget, expiresAt }, head, auth.address ?? null, config.wallet)} onExtended={written}/>
  </>
  return <div className={s.page}>
-  <WidgetHeader name={name} chart={widget.chart} user={widget.user} official={official} uses={uses} expiresAt={expiresAt} head={head} ms={ms} widgetKey={key} sql={widget.widget.sql} canAdd onAdd={() => void openPicker()}/>
+  <WidgetHeader name={name} chart={widget.chart} user={widget.owner} official={official} uses={uses} expiresAt={expiresAt} head={head} ms={ms} widgetKey={key} sql={widget.widget.sql} canAdd onAdd={() => void openPicker()}/>
   {write && <div className={s.sync}><SyncChip write={write} version={version}/></div>}
   {oldWidget && oldWidget.owner === auth.address?.toLowerCase() && <NewVersionNotice oldKey={oldWidget.key} busy={deletingOld} disabled={!!signDisabledReason(balance.level)} disabledReason={signDisabledReason(balance.level)} error={deleteError} onDelete={() => void deleteOld()}/>}
   {auth.error && <div className="notice notice-bad" role="alert"><div><p>{auth.error}</p></div></div>}

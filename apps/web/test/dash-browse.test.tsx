@@ -109,7 +109,7 @@ test('explorer and import share the tested debounce and render payload failures'
 test('official widget cards use official author and kept live', () => {
  const html = render(<WidgetBrowseCard item={{ key: key(1), name: 'Official widget', chart: 'bar', user: W, owner: W, expiresAt: 100, createdAt: 1, uses: 2 }} payload={undefined} version={0} variant="explorer" official/>)
  expect(html).toContain('Official')
- expect(html).toContain('Arkiv SQL Indexer')
+ expect(html).toContain('0xabab…abab')
  expect(html).toContain('Kept live')
  expect(html).not.toContain('Extend')
 })

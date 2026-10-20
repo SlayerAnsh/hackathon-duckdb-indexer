@@ -15,7 +15,7 @@ export function DashboardBrowseCard({ item, head, description }: { item: Dashboa
   </div>
   <div className={s.body}>
    <h3><Link className={s.stretch} href={'/d/' + item.key}>{item.title}</Link></h3>
-   <div className={s.byline}>{item.official ? <OfficialAuthor/> : <span>by <span className={s.mono} title={item.user}>{shortHex(item.user)}</span></span>}</div>
+   <div className={s.byline}>{item.official ? <OfficialAuthor address={<span className={s.mono} title={item.user}>{shortHex(item.user)}</span>}/> : <span>by <span className={s.mono} title={item.user}>{shortHex(item.user)}</span></span>}</div>
    {description === undefined ? <span className="skel-text" data-skeleton="true" aria-hidden="true"/> : description ? <p className={s.description}>{description}</p> : null}
    <footer className={s.meta}><span>{item.widgets} {item.widgets === 1 ? 'widget' : 'widgets'}</span>{item.official ? <KeptLive/> : <TimeLeft expiresAt={item.expiresAt} head={head}/>}</footer>
   </div>

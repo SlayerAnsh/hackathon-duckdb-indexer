@@ -22,7 +22,7 @@ const stop = { onClick: (event: React.SyntheticEvent) => event.stopPropagation()
 export function WidgetCardBody({ item, official, href, lifetime, children }: { item: WidgetListItem; official: boolean; href?: string; lifetime: ReactNode; children?: ReactNode }) {
  return <div className={s.wbody}>
   <h3>{href ? <Link href={href}>{item.name}</Link> : item.name}</h3>
-  <div className={s.byline}>{official ? <OfficialAuthor/> : <span>by <span {...stop}><AddressLink address={item.user}/></span></span>}</div>
+  <div className={s.byline}>{official ? <OfficialAuthor address={<span {...stop}><AddressLink address={item.owner}/></span>}/> : <span>by <span {...stop}><AddressLink address={item.owner}/></span></span>}</div>
   {children}
   <div className={s.meta}><span className={s.metaFacts}><ChartIcon type={item.chart}/>{CHART_LABELS[item.chart]}<span className={s.sep} aria-hidden="true">·</span>on {item.uses} {item.uses === 1 ? 'dashboard' : 'dashboards'}</span>{lifetime}</div>
  </div>

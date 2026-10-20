@@ -12,7 +12,7 @@ test('report helpers number only live figures and format attribution and age', (
  ])]).toEqual([['bar', 1], ['table', 2]])
  const u = '0x' + '11'.repeat(20), w = '0x' + '22'.repeat(20), other = '0x' + '33'.repeat(20)
  expect(importedFrom(u, u, w)).toBeNull()
- expect(importedFrom(w, u, w)).toBe('Imported from Arkiv SQL Indexer')
+ expect(importedFrom(w, u, w)).toBe('Imported from 0x2222…2222')
  expect(importedFrom(other, u, w)).toStartWith('Imported from 0x')
  expect(updatedLabel(1, 61)).toBe('Updated 2 min ago')
 })

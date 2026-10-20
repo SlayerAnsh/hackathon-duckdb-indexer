@@ -57,7 +57,7 @@ test('dashboard filters reset pages and label results',()=>{
 const item = {key:key(1),title:'Overview',user:W,official:true,widgets:8,charts:['bar','donut'] as ('bar'|'donut')[],createdAt:1,updatedAt:2,expiresAt:100}
 test('dashboard card authors, lifetime, chart icons and empty thumbnails',()=>{
  const html=render(<DashboardBrowseCard item={item} description="Network report"/>)
- for(const text of ['Featured','Arkiv SQL Indexer','Kept live','8 widgets','Network report',`href="/d/${key(1)}"`]) expect(html).toContain(text)
+ for(const text of ['Featured','0xabab…abab','Kept live','8 widgets','Network report',`href="/d/${key(1)}"`]) expect(html).toContain(text)
  expect((html.match(/<svg/g)??[]).length).toBeGreaterThanOrEqual(2)
  const user=render(<DashboardBrowseCard item={{...item,official:false,user:U,widgets:1,charts:[]}} head={10}/>)
  expect(user).not.toContain('Featured')
