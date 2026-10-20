@@ -35,7 +35,8 @@ function prefersReducedMotion() {
  *
  * Handles Escape, click outside, a Tab focus trap, initial focus (an element
  * with `data-autofocus`, else the first control in the body, else the footer,
- * else the close button), focus return to the opener, body scroll lock, an
+ * else the close button, else the panel itself, which never shows a focus
+ * ring), focus return to the opener, body scroll lock, an
  * exit animation (skipped under prefers-reduced-motion) and
  * aria-labelledby/aria-describedby wiring.
  *
@@ -99,6 +100,12 @@ export function Dialog({ open, onClose, title, description, size = 'md', childre
   onMouseUp={event => { if (pressedOutside.current && event.target === event.currentTarget) requestClose(); pressedOutside.current = false }}>
   <div ref={panel} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descId : undefined}
    tabIndex={-1} data-state={state} className={`dialog dialog-${size}${className ? ` ${className}` : ''}`}
+   onBlur={event => {
+    // A focused button that becomes disabled (for example Save while a wallet signs) drops focus to
+    // <body>. Pull it back onto the panel so Tab and Escape keep working inside the dialog.
+    if (event.relatedTarget) return
+    requestAnimationFrame(() => { if (panel.current && document.activeElement === document.body) panel.current.focus() })
+   }}
    onKeyDown={event => {
     if (event.key === 'Escape') { event.stopPropagation(); event.preventDefault(); requestClose(); return }
     if (event.key !== 'Tab' || !panel.current) return

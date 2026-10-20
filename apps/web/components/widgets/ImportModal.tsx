@@ -85,7 +85,7 @@ export function ImportModal({ dashboardTitle, placed, remaining, onAdd, onClose,
   </>}>
   <div className={m.controls}>
    <div className={`tabs ${m.tabs}`} role="tablist" aria-label="Widget source">{(['mine', 'all'] as const).map(tab => <button key={tab} type="button" className="tab" role="tab" aria-selected={state.tab === tab} onClick={() => dispatch({ type: 'tab', value: tab })}>{tab === 'mine' ? 'My widgets' : 'All widgets'} <span className="tab-n">{(tab === 'mine' ? mine : all) ?? '…'}</span></button>)}</div>
-   <div className={`input-group ${m.search}`}>
+   <div className={`input-group ${m.searchBox}`}>
     <span className="adorn" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg></span>
     <input type="search" data-autofocus aria-label="Search by name or creator address" placeholder="Search by name or creator address" value={search} onChange={event => setSearch(event.target.value)}/>
     {search && <button type="button" className="ib ib-sm" aria-label="Clear search" onClick={() => setSearch('')}><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg></button>}

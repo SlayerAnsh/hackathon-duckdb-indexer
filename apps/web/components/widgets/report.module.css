@@ -69,6 +69,11 @@
 .figure:focus-within .actions{right:48px}
 .sql{margin-top:14px;overflow:hidden;background:var(--inset);border:1px solid var(--border);border-radius:var(--r-md)}
 .sql :global(.sqlpane){margin:0;border:0}
+/* Saved figure states: a skeleton the size of a plotted chart while the slot loads, and a
+   centered expired note when the widget entity is gone. */
+.loading{height:240px;border-radius:var(--r-md)}
+.expired{display:flex;flex-direction:column;align-items:center;gap:8px;margin:auto;padding:24px 0;text-align:center}
+.expired p{margin:0;max-width:40ch;font-size:var(--fs-sm);line-height:1.5;color:var(--text-3b)}
 
 /* ---------- page states: empty, missing, expired, error, loading */
 .state{margin-top:28px}

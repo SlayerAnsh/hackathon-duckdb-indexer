@@ -1,6 +1,8 @@
 import { formatMs } from '../../lib/format'
-import type { HistoryEntry } from '../dash/QueryHistory'
 import s from './playground.module.css'
+
+/** One run in the playground history. */
+export type HistoryEntry = { sql: string; ms: number; rows: number }
 
 export function HistoryList({ entries, onSelect }: { entries: HistoryEntry[]; onSelect: (sql: string) => void }) {
  if (!entries.length) return <div className={s.empty}><p className={s.emptyTitle}>No queries yet</p><p>Queries you run in this tab appear here. Click one to load it back into the editor.</p></div>

@@ -7,17 +7,6 @@ import { compact, shortHex } from '../../lib/format'
 import s from './charts.module.css'
 import { cx } from './cx'
 
-/* Recharts measures tick labels with a span appended to <body>. The app shell gives every
-   direct body child width:100%, which makes every x tick look as wide as the page and hides
-   them all. Creating the span first with an inline width keeps measurements honest. */
-if (typeof document !== 'undefined' && document.body && !document.getElementById('recharts_measurement_span')) {
- const span = document.createElement('span')
- span.id = 'recharts_measurement_span'
- span.setAttribute('aria-hidden', 'true')
- span.style.width = 'auto'
- document.body.appendChild(span)
-}
-
 const colors = Array.from({ length: 8 }, (_, i) => `var(--c${i + 1})`)
 export type ChartProps = { widget: Widget; data: TableData }
 const numeric = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }

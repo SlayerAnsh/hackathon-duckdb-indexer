@@ -6,8 +6,8 @@
 /* ---------- controls stay pinned while results scroll */
 .controls{position:sticky;top:0;z-index:3;display:grid;gap:12px;margin:0 -20px;padding:4px 20px 12px;background:var(--card);border-bottom:1px solid var(--border)}
 .tabs{margin:0}
-.search{min-width:0}
-.search>input{padding-left:8px}
+.searchBox{min-width:0}
+.searchBox>input{padding-left:8px}
 .types{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -20px;padding:0 20px;-webkit-mask-image:linear-gradient(90deg,transparent 0,var(--text) 20px,var(--text) calc(100% - 20px),transparent 100%);mask-image:linear-gradient(90deg,transparent 0,var(--text) 20px,var(--text) calc(100% - 20px),transparent 100%)}
 .types::-webkit-scrollbar{display:none}
 .types>:global(.fchip){flex:none;min-height:var(--h-sm);padding:0 10px}
