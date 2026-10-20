@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* New logo: SQL brackets around rising bars, a query over chain data drawn as a chart. Used in the top bar, the footer, the README and as the SVG favicon (`apps/web/app/icon.svg`, replacing `favicon.ico`). My home uses the shared Explore widget and dashboard cards.
+
 * `examples/ws_events_probe.ts`: the WebSocket entity events probe from the friction report, runnable with `bun examples/ws_events_probe.ts [seconds]` from the repo root (SDK and viem resolved from `packages/core`). `verify_against_chain.py` accepts `ARKIV_RPC_URL` to ask an RPC node of your choice.
 
 * Precision: the anonymous budget is sourced everywhere as the `RateLimit` header reading of 18 October 2026 (`limit=10000`, reset about one hour), not a documented value, next to the 20 October header (`limit=600, reset=60`, counted per request). Why Arkiv states that the trust point moves from a database operator to the public chain and that Verify still trusts the RPC node it asks. The live Verify result and the delta merge check are dated recordings with block numbers. The Featured chip address is `user` on dashboards and `$owner` on widget cards and widget pages.

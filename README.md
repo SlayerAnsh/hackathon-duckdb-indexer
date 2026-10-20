@@ -1,4 +1,4 @@
-# Arkiv SQL Indexer
+# <img src="docs/assets/logo.svg" width="32" height="32" alt=""> Arkiv SQL Indexer
 
 Plain SQL over every live Arkiv entity. The project has two parts:
 
