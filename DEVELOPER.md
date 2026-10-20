@@ -8,12 +8,14 @@ Use Bun 1.3.x (tested with 1.3.11). Docker uses `oven/bun:1.3` for workspace ins
 | :--- | :--- |
 | `packages/core` | Direct JSON RPC client, typed attribute decoding, `$key` chunk builder, browser merge views |
 | `apps/indexer` | DuckDB store, log replay backfill, attribute filler, live sync, snapshots, delta, internal HTTP |
-| `apps/web` | Next.js data proxy with disk fallback, DuckDB WASM loader, browser live tail, Official dashboards, /explore, playground, about page |
+| `apps/web` | Next.js app that runs against any indexer through `INDEXER_URL`: `/data` proxy with disk fallback, DuckDB WASM loader, browser live tail, Playground, widgets, dashboards, /explore, about page |
 | `apps/web/lib/dash` | Widget schemas, SQL, RPC reads, pending writes, authentication and serialized wallet operations |
 | `apps/web/lib/dash/wallet.ts` | Tiramisu wallet transport, balance reads and GLM formatting |
 | `apps/web/lib/dash/widget-actions.ts` | Direct widget extend, delete and transfer with safe wallet errors |
 | `apps/web/lib/dash/use-balance.ts` | Session wallet balance state and refresh after signatures |
-| `apps/web/app/api/dash` | Runtime wallet config, session and authenticated write routes |
+| `apps/web/app/api/dash` | Runtime wallet config, session, and authenticated app wallet writes (widget create and new version, dashboards, links, organize) |
+| `apps/web/app/api/rpc` | Keyed read only RPC proxy for browser reads (logic in `lib/dash/server/rpc-proxy.ts`) |
+| `apps/web/lib/dash/server` | Server only code: Privy auth, sessions, nonces, rate limits, wallet queue, operations, Featured seed and keepalive, RPC proxy |
 | `arkiv` | Entity schema, exact queries, and the friction report |
 | `test/deployment.test.ts` | Offline deployment and documentation checks |
 
@@ -29,7 +31,7 @@ bun test ./apps/web/test
 
 All automated tests use fixtures or fakes and need no RPC. The deployment tests inspect configuration and docs, not running containers. They also reject dash punctuation in the docs. Docker image builds, Range responses, credential absence in built bundles, restart persistence and public deployment need separate integration checks.
 
-Start the frontend with `INDEXER_URL=http://localhost:8080 bun run --cwd apps/web dev` when using a local indexer (`DATA_DIR=./data bun apps/indexer/src/main.ts`). The default upstream inside Compose is `http://indexer:8080`. Set `DATA_DIR` for the web app too if it should fall back to the stored files while the indexer is down.
+Start the frontend against the hosted indexer, which covers all Tiramisu data, with `INDEXER_URL=https://arkiv-sql-indexer.dokploy.anshudhar.dev bun run --cwd apps/web dev`, or against a local indexer (`DATA_DIR=./data bun apps/indexer/src/main.ts`) with `INDEXER_URL=http://localhost:8080`. The default upstream inside Compose is `http://indexer:8080`. The Playground needs no secrets; widgets and dashboards need the variables below. Set `DATA_DIR` for the web app too if it should fall back to the stored files while the indexer is down.
 
 ## Widget dashboard development
 
@@ -47,9 +49,9 @@ bun test ./test/deployment.test.ts
 (cd apps/web && ./node_modules/.bin/tsc --noEmit -p .)
 ```
 
-## Official dashboards
+## Featured dashboards
 
-The coordinator seeds the five Official dashboards (one per showcase view) from the repository root with the existing dashboard wallet. Export `DASHBOARD_PRIVATE_KEY` and optionally `NEXT_PUBLIC_TIRAMISU_RPC_URL` from the root environment without printing their values. The script defaults to Tiramisu and needs no Privy variables.
+Featured dashboards are app owned dashboards (called official in code: `lib/dash/official.ts`, `official-defs.ts`, `scripts/seed-official.ts`). The coordinator seeds the five Featured dashboards (network overview, expiry watch, creators, attributes, activity) from the repository root with the existing dashboard wallet. Export `DASHBOARD_PRIVATE_KEY` and optionally `NEXT_PUBLIC_TIRAMISU_RPC_URL` from the root environment without printing their values. The script defaults to Tiramisu and needs no Privy variables.
 
 ```sh
 bun apps/web/scripts/seed-official.ts --dry-run
@@ -57,11 +59,11 @@ bun apps/web/scripts/seed-official.ts
 bun apps/web/scripts/seed-official.ts --keepalive
 ```
 
-`--dry-run` validates all definitions, queries existing official slugs and reports what would be created without sending writes. Seeding skips each live official dashboard whose slug already exists. Each new dashboard, its widgets and its links are created in one batch with 90 day lifetimes. `--keepalive` runs one renewal pass on demand.
+`--dry-run` validates all definitions, queries existing Featured slugs and reports what would be created without sending writes. Seeding skips each live Featured dashboard whose slug already exists. Each new dashboard, its widgets and its links are created in one batch with 90 day lifetimes. `--keepalive` runs one renewal pass on demand.
 
-Run the seed while user traffic is low. The script has its own serial write queue and cannot coordinate the wallet nonce with the running web container. A simultaneous user write can clash with its predictions or transaction nonce. Reconcile an uncertain submission before rerunning; a rerun skips live official slugs that already exist.
+Run the seed while user traffic is low. The script has its own serial write queue and cannot coordinate the wallet nonce with the running web container. A simultaneous user write can clash with its predictions or transaction nonce. Reconcile an uncertain submission before rerunning; a rerun skips live Featured slugs that already exist.
 
-When dashboards are enabled, Node.js instrumentation starts an in process keepalive 60 seconds after server start, then every 6 hours after the previous run settles. It uses the same serial write queue as user writes. Live official dashboards, widgets and links with fewer than 30 days remaining are extended to the current head plus 90 days, in batches of 50. Failed runs are logged and the timer continues. Nothing runs during the production build or when dashboards are disabled. No new secret, public endpoint or Dokploy job is needed. Run one web container so there is one timer and one wallet queue.
+When dashboards are enabled, Node.js instrumentation starts an in process keepalive 60 seconds after server start, then every 6 hours after the previous run settles. It uses the same serial write queue as user writes. Live Featured dashboards, widgets and links with fewer than 30 days remaining are extended to the current head plus 90 days, in batches of 50. Failed runs are logged and the timer continues. Nothing runs during the production build or when dashboards are disabled. No new secret, public endpoint or Dokploy job is needed. Run one web container so there is one timer and one wallet queue.
 
 ## Data layout
 
@@ -100,4 +102,4 @@ In the browser (`apps/web/lib/indexdb.ts`), internal merge views combine the sna
 
 ## Deployment verification
 
-Use the README setup and wait for the health check. Check `/data/manifest.json` through port 3000 and request `Range: bytes=0-99` for a Parquet file named in the manifest; expect 206. Restart the stack without deleting the data directory and confirm checkpoint reuse. Stop the indexer and confirm the web app still serves stored data from disk. Verify the API key is absent from the built `.next` files without printing the key. Check that the indexer log says `API key not used` unless a keyed mode was chosen deliberately. The dashboard wallet writes for authenticated dashboard operations, coordinator seeding and automatic official keepalive. TLS belongs in the host proxy, outside Compose.
+Use the README setup and wait for the health check. Check `/data/manifest.json` through port 3000 and request `Range: bytes=0-99` for a Parquet file named in the manifest; expect 206. Restart the stack without deleting the data directory and confirm checkpoint reuse. Stop the indexer and confirm the web app still serves stored data from disk. Verify the API key is absent from the built `.next` files without printing the key. Check that the indexer log says `API key not used` unless a keyed mode was chosen deliberately. The app wallet writes for authenticated widget and dashboard operations, coordinator seeding and automatic Featured keepalive. Users sign widget extend, delete and transfer themselves. TLS belongs in the host proxy, outside Compose.

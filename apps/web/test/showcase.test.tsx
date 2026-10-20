@@ -22,7 +22,7 @@ test('showcase redirects and no application links retain the route', async () =>
  expect(readFileSync(join(root,'app/showcase/page.tsx'),'utf8')).toContain("redirect('/explore')")
  function scan(dir: string) { for (const entry of readdirSync(dir,{withFileTypes:true})) { const path=join(dir,entry.name); if(entry.isDirectory()) scan(path); else if (/\.(tsx?|css)$/.test(path)) expect(readFileSync(path,'utf8')).not.toMatch(/["'`]\/showcase/ ) } }
  for (const dir of ['app','components','lib']) scan(join(root,dir))
- for (const name of ['README.md','SPECS.md','DEVELOPER.md']) { const text=readFileSync(new URL('../../../'+name,import.meta.url),'utf8'); expect(text).not.toContain('/showcase'); expect(text).toContain('/explore'); expect(text).toContain('Official dashboards') }
+ for (const name of ['README.md','SPECS.md','DEVELOPER.md']) { const text=readFileSync(new URL('../../../'+name,import.meta.url),'utf8'); expect(text).not.toContain('/showcase'); expect(text).toContain('/explore'); expect(text).toContain('Featured dashboards') }
 })
 
 test('shared chart bodies retain fixed SQL windows without range controls', async () => {

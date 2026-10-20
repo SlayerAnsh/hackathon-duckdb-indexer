@@ -1,10 +1,15 @@
 # Arkiv SQL Indexer: Specification
 
-Status: implemented, 18 October 2026 (submission deadline 18 October 2026, 22:59 UTC). Sections describe the current code. Where the original plan changed, the text says so.
+Status: implemented, 18 October 2026 (submission deadline 18 October 2026, 22:59 UTC). Sections describe the current code. Where the original plan changed, the text says so. Since 20 October 2026 the project ships two parts: the open source, self hostable indexer and a web app that runs against the hosted indexer.
 
 ## 1. Summary
 
-A self hosted indexer that mirrors the Arkiv entities matching one optional Arkiv query expression (blank means every entity) into immutable Parquet snapshots plus a small live delta. A Next.js frontend loads them into DuckDB WASM so anyone can run full SQL (joins, GROUP BY, ORDER BY on attributes, window functions) in their own browser. Expired data disappears from every layer: the snapshot excludes it, old snapshots are deleted, and the browser filters every row against the current chain head read directly from Arkiv RPC. A verify button checks any row against the chain.
+Two parts:
+
+* **Indexer** (`apps/indexer`, MIT, self hostable with Docker Compose or Bun). Mirrors all Arkiv entities, or the subset matching `INDEX_EXPRESSION`, and publishes Parquet snapshots, a delta and a manifest over HTTP. The hosted instance at `https://arkiv-sql-indexer.dokploy.anshudhar.dev` indexes every entity on Tiramisu.
+* **Web app** (`apps/web`, hosted at `https://arkiv-sql.dokploy.anshudhar.dev`). Runs against the hosted indexer through the `/data` proxy (`INDEXER_URL`) and offers a SQL Playground, widgets and public dashboards stored as Arkiv entities, Featured dashboards kept live by the app wallet, Privy login and a keyed read only RPC proxy (`/api/rpc`).
+
+In detail: a self hostable indexer mirrors the Arkiv entities matching one optional Arkiv query expression (blank means every entity) into immutable Parquet snapshots plus a small live delta. A Next.js frontend loads them into DuckDB WASM so anyone can run full SQL (joins, GROUP BY, ORDER BY on attributes, window functions) in their own browser. Expired data disappears from every layer: the snapshot excludes it, old snapshots are deleted, and the browser filters every row against the current chain head read directly from Arkiv RPC. A verify button checks any row against the chain.
 
 ## 2. Problem
 
@@ -17,7 +22,7 @@ Goals (P0 unless marked):
 1. Index all entities matching a configured Arkiv expression, with backfill and live sync.
 2. Publish versioned Parquet snapshots and a per block delta over HTTP.
 3. Browser SQL over the merged data (snapshot, delta, live tail) through DuckDB WASM.
-4. Official dashboards stored on Arkiv, with live charts and inspectable SQL (owner decision, 20 October 2026).
+4. Featured dashboards (called Official until 20 October 2026) stored on Arkiv, with live charts and inspectable SQL (owner decision, 20 October 2026).
 5. SQL editor with syntax highlighting and schema aware autocomplete.
 6. Expiry enforced in the browser against the live chain head.
 7. Removed on 20 October 2026 because widgets, dashboards and links now provide live application data through the dashboard wallet.
@@ -66,16 +71,17 @@ Surprises are recorded in `arkiv/friction.md` with versions and reproduction ste
 
 ```
 Arkiv RPC (Tiramisu, public endpoint)
-   |  eth_getLogs (replay, live sync)              ^  eth_blockNumber, eth_getLogs (live tail),
-   |  arkiv_query $key batches (fill)              |  arkiv_query $key batches (live attributes, payload, verify)
+   |  eth_getLogs (replay, live sync)              ^  eth_blockNumber, eth_getLogs (live tail), arkiv_query
+   |  arkiv_query $key batches (fill)              |  (live attributes, payload, verify) via the web /api/rpc read proxy
    v                                               |
-indexer (Bun, single process)                 browser (via Next.js /data proxy)
+indexer (Bun, single process, self hostable)  browser (index files via the Next.js /data proxy to INDEXER_URL)
    DuckDB file, only writer                      DuckDB WASM in a worker
    snapshot builder  -> snap/v{n}/*.parquet ---> base tables
    delta writer      -> delta.json          ---> delta tables
    Bun.serve: manifest.json, snap, delta         live tables (from the live tail)
                                                  merged tables, public views filtered by live head
-web backend dashboard wallet -> Arkiv via SDK wallet client
+web backend app wallet -> Arkiv via SDK wallet client (creates widgets, dashboards, links; Featured keepalive)
+browser Privy wallet    -> Arkiv public RPC (user signed widget extend, delete, transfer)
 ```
 
 Monorepo with Bun workspaces:
@@ -83,7 +89,7 @@ Monorepo with Bun workspaces:
 ```
 packages/core       shared types, attribute decoding, expression helpers, row shapes
 apps/indexer        sync, snapshot, delta, HTTP
-apps/web            Next.js dashboard and SQL editor
+apps/web            Next.js app: Playground, widgets, dashboards, /data and /api/rpc proxies
 arkiv/schema.md     entity schema and exact queries
 arkiv/friction.md   friction report
 ```
@@ -241,7 +247,7 @@ Contents: latest state for every key in `changes` above the snapshot block. Big 
 | `/snap/v{n}/*` | `public, max-age=300, immutable` | Range requests, versioned so never rewritten |
 | `/health` | none | head lag, last snapshot, live and pending counts |
 
-The indexer is not exposed publicly. The browser reaches it only through the Next.js proxy (9.0), so no CORS headers are needed. Parquet URLs never change content, so range requests from DuckDB WASM can never mix two versions.
+In Compose the indexer is internal (`expose` only). The hosted deployment also gives it a public domain so scripts and DuckDB can read it directly. It sends no CORS headers, so browsers reach it only through the Next.js proxy (9.0). Parquet URLs never change content, so range requests from DuckDB WASM can never mix two versions.
 
 ## 8. Browser data layer
 
@@ -249,9 +255,9 @@ The indexer is not exposed publicly. The browser reaches it only through the Nex
 2. Fetch the manifest. Check `chainId` and genesis hash against the RPC, and show a banner on mismatch.
 3. Import the snapshot into tables `base_entities` and `base_attributes` (data is small, so full import, no lazy views).
 4. Poll `delta.json` every 2 s with `If-None-Match` and refetch the manifest about every 10 s. On change, replace `delta_entities`, `delta_attributes`, `delta_tombstones`. A delta whose `fromBlock` does not follow the manifest's snapshot block triggers a manifest refetch first.
-5. Freshness comes from the browser live tail on the public RPC without an API key, starting at `delta.toBlock + 1`. Poll logs every four seconds in windows of 1,000 blocks. Apply deletes, expiry extensions and transfers from logs. Creations and patches enter `live_pending`; fetch attributes with expression scoped batches of at most 50 keys (`atBlock` head, `limit` 50), at most once every 20 seconds. Use the indexed key and creation owner relevance prefilter from 7.5. HTTP 429 pauses attribute fetching until Retry-After while log updates continue. Failed requests never delete rows. Live rows compete with delta and base by updated block, with live winning ties. Pending rows keep previous attributes. Clear live tables on snapshot version change.
+5. Freshness comes from the browser live tail, read through the `/api/rpc` proxy (section 12), starting at `delta.toBlock + 1`. Poll logs every four seconds in windows of 1,000 blocks. Apply deletes, expiry extensions and transfers from logs. Creations and patches enter `live_pending`; fetch attributes with expression scoped batches of at most 50 keys (`atBlock` head, `limit` 50), at most once every 20 seconds. Use the indexed key and creation owner relevance prefilter from 7.5. HTTP 429 pauses attribute fetching until Retry-After while log updates continue. Failed requests never delete rows. Live rows compete with delta and base by updated block, with live winning ties. Pending rows keep previous attributes. Clear live tables on snapshot version change.
 
-The backend may serve an existing store with `SYNC_PAUSED=true`, making no RPC calls and requiring no API key. Missing stores fail startup clearly. If the indexer is unreachable, the proxy serves the same files from a read only mount of the data directory (9.0). The optional API key is used only by the keyed backend modes (7.1), is unused by default, and never reaches the browser.
+The backend may serve an existing store with `SYNC_PAUSED=true`, making no RPC calls and requiring no API key. Missing stores fail startup clearly. If the indexer is unreachable, the proxy serves the same files from a read only mount of the data directory (9.0). The optional API key is used by the keyed indexer modes (7.1) and by the web server's read proxy (section 12). It never reaches the browser.
 6. Poll `eth_blockNumber` every 2 s and store it as `live_head`.
 
 The merge runs once per data change into plain tables `merged_entities` and `merged_attributes`. Internal views retain the complete source ranking and pending attribute fallback. A fetched row wins over a pending row; otherwise the newest updated block wins, with live winning ties. Attribute sets come from the winning source, with previous base or delta attributes retained for live pending keys.
@@ -276,7 +282,7 @@ A demo wide view (for example `widgets`) is a `PIVOT` over `attributes` for one 
 ## 9. Frontend (Next.js)
 
 - Next.js App Router with `output: 'standalone'` (a Node server, needed for the proxy). Pages are client components; DuckDB WASM runs only in the browser.
-- Pages: `/` (story sections and live stats), `/explore` (public dashboards and widgets), `/playground` (SQL editor), `/about` (architecture and expiry), `/widgets/new` (create widget), `/widgets/<key>` (view or edit widget), `/d/<key>` (public dashboard), `/d/<key>/edit` (organize dashboard) and `/me` (login required home and activity).
+- Pages: `/` (story sections and live stats), `/explore` (public dashboards and widgets), `/playground` (SQL editor), `/about` (architecture and expiry), `/widgets/new` (create widget), `/widgets/<key>` (view or edit widget), `/d/<key>` (public dashboard), `/d/<key>/edit` (organize dashboard) and `/me` (login required home and activity). The former showcase route redirects to `/explore`, and `/widgets` to `/explore?tab=widgets`.
 - Status bar: indexed expression, chain, stored and serving blocks, oldest block with complete attributes, head lag, and live tail pending count and budget state.
 
 ### 9.0 Data proxy
@@ -292,11 +298,11 @@ The browser loads all index data from the Next.js origin under `/data/*`. A rout
 
 A route handler is used instead of `rewrites()` in `next.config` because rewrites are fixed at build time (the indexer URL could not change per deployment) and their forwarding of `Range` and conditional headers would need separate verification. Test: a `curl -H 'Range: bytes=0-99'` through the proxy returns 206 with the same bytes as the indexer.
 
-### 9.1 Official dashboards
+### 9.1 Featured dashboards
 
-Owner decision, 20 October 2026: Official dashboards replace the showcase. The landing page shows up to six in seed order, and `/explore` lists public dashboards and widgets. Each report is a normal dashboard with widget and link entities on Arkiv, marked official by its user attribute matching the dashboard wallet. Anyone may open the reports and import their widgets.
+Owner decision, 20 October 2026: Featured dashboards (named Official in code) replace the showcase. The landing page shows up to six in seed order, and `/explore` lists public dashboards and widgets with a Featured only filter. Each report is a normal dashboard with widget and link entities on Arkiv, marked Featured when both its `user` attribute and its Arkiv owner equal the app wallet. Anyone may open the reports and import their widgets.
 
-The reports are Arkiv network overview, Expiry watch, Creators, and Attributes and activity. They cover network counters, creations, entity types, expiry distributions, creator rankings, attribute statistics and activity. Queries remain defined in `apps/web/lib/views.ts` for playground snippets and official definitions. Every chart runs SQL in the viewer's DuckDB and exposes that SQL. The app keeps official entities live automatically.
+The reports are Arkiv network overview, Expiry watch, Creators, Attributes and Activity (`apps/web/lib/dash/official-defs.ts`). They cover network counters, creations, entity types, expiry distributions, creator rankings, attribute statistics and activity. Queries remain defined in `apps/web/lib/views.ts` for playground snippets and Featured definitions. Every chart runs SQL in the viewer's DuckDB and exposes that SQL. The app keeps Featured entities live automatically.
 
 Block numbers convert to time at 2 seconds per block. Charts use Recharts or plain SVG.
 
@@ -305,7 +311,7 @@ Block numbers convert to time at 2 seconds per block. Charts use Recharts or pla
 - CodeMirror 6 through `@uiw/react-codemirror` with `@codemirror/lang-sql`. Syntax highlighting from the SQL language package.
 - Autocomplete: table and column names read from `information_schema.columns` for the public views, passed as the `schema` option, plus SQL keywords and DuckDB function names from `duckdb_functions()`.
 - Ctrl or Cmd plus Enter runs. Cancel button interrupts the running query. Results capped at 1,000 displayed rows with a note, and CSV download of the full result.
-- Snippet sidebar with every official report query plus the featured JOIN and GROUP BY query "Most placed widgets", and a local query history.
+- Snippet sidebar with every Featured report query plus the featured JOIN and GROUP BY query "Most placed widgets", and a local query history.
 - Query text kept in the URL hash so a query can be shared as a link.
 
 ### 9.3 Row actions
@@ -327,7 +333,7 @@ See the [design spec](docs/superpowers/specs/2026-10-20-widget-dashboards-design
 
 ### User owned widgets (owner decision, 20 October 2026)
 
-User widgets are created by the app wallet with fixed `readonly` and `permissionlessExtension` flags and transferred to the session wallet in the same batch. The immutable `user` attribute records the author; the Arkiv owner controls deletion, transfer and saving new versions. Editing creates a new widget and repoints only the author's dashboard links. The old version stays until expiry unless its owner deletes it. Anyone logged in can extend a live user widget by signing in the browser. Extend, transfer and delete need GLM in the signing wallet; saving stays free. Legacy widgets owned by the app wallet have no user signing actions. Official widgets require both `user` and `$owner` to equal the app wallet and use backend keepalive.
+User widgets are created by the app wallet with fixed `readonly` and `permissionlessExtension` flags and transferred to the session wallet in the same batch. The immutable `user` attribute records the author; the Arkiv owner controls deletion, transfer and saving new versions. Editing creates a new widget and repoints only the author's dashboard links. The old version stays until expiry unless its owner deletes it. Anyone logged in can extend a live user widget by signing in the browser. Extend, transfer and delete need GLM in the signing wallet; saving stays free. Legacy widgets owned by the app wallet have no user signing actions. Featured widgets require both `user` and `$owner` to equal the app wallet and use backend keepalive.
 
 Removed widget endpoints: `PUT /api/dash/widgets/[key]`, `DELETE /api/dash/widgets/[key]` and `POST /api/dash/widgets/[key]/extend`. New versions use `POST /api/dash/widgets` with `replaces`; widget extend, delete and transfer use direct browser signatures.
 
@@ -370,16 +376,19 @@ Dashboard environment:
 | `NEXT_PUBLIC_PRIVY_APP_ID` | Web build and runtime | Privy app ID; blank disables dashboards |
 | `PRIVY_APP_SECRET` | Web runtime only | Privy verification and session HMAC |
 | `DASHBOARD_PRIVATE_KEY` | Web runtime only | Funded backend dashboard wallet |
-| `NEXT_PUBLIC_TIRAMISU_RPC_URL` | Web build and runtime | Public browser RPC and backend transport |
+| `NEXT_PUBLIC_TIRAMISU_RPC_URL` | Web build and runtime | Public RPC for wallet signing, backend writes and the `/api/rpc` upstream |
+| `NEXT_PUBLIC_EXPLORER_URL` | Web build and runtime | Block explorer for address links |
+| `TIRAMISU_API_KEY` | Web runtime only (and indexer) | Optional key for `/api/rpc` and server dashboard reads |
+| `INDEXER_URL` | Web runtime | `/data` proxy upstream, `http://indexer:8080` in Compose |
 
-Secrets are never build arguments or passed to the indexer. Production uses a blank expression. Filtered self hosted indexes must include the dashboard creator with `OR`; changing the expression requires a fresh data directory and full backfill.
+Secrets are never build arguments, and the Privy secret and wallet key never reach the indexer. Production runs on Dokploy with `docker-compose.dokploy.yml`: the app at `https://arkiv-sql.dokploy.anshudhar.dev` and the indexer at `https://arkiv-sql-indexer.dokploy.anshudhar.dev`, with a blank expression. Filtered self hosted indexes must include the dashboard creator with `OR`; changing the expression requires a fresh data directory and full backfill.
 
 ## 15. Testing
 
 - `packages/core`: attribute decoding for all nine types, expression chunk builder.
 - Indexer: backfill and per block apply against a fake RPC (recorded fixtures), snapshot and delta file contents, expiry sweep.
 - Merge views: DuckDB (node) tests for the merge cases in section 8.
-- Web: proxy and disk fallback, live tail, verify classification, views, playground and Official dashboards rendering.
+- Web: proxy and disk fallback, read proxy, live tail, verify classification, views, playground and Featured dashboards rendering.
 - Deployment: compose, Dockerfiles, `.env.example` and docs (`test/deployment.test.ts`).
 - Manual smoke test against Tiramisu using widget creation and dashboard placement.
 
@@ -399,9 +408,10 @@ Public MIT repository with setup in the README (wallet addresses, live URL and v
 
 ## 18. Open decisions
 
-- Host machine and public domain for the compose stack.
+- Resolved: the compose stack runs on Dokploy (section 14).
+
 Production indexes every entity with a blank expression. Self hosters may scope to the dashboard wallet.
 
 ## Theme and shell
 
-Owner decisions of 20 October 2026 apply the console theme throughout the app, with dark and light mode, a calm navbar and the status bar on every page. Dashboards use a report view with numbered figures and a share menu for Copy link and Post on X. Chart types include stacked bar and histogram; time ranges are removed. Explore has Dashboards and Widgets tabs. Official dashboards and widgets are authored by Arkiv SQL Indexer and maintained by automatic keepalive. Official widgets show Kept live and offer no Extend action.
+Owner decisions of 20 October 2026 apply the console theme throughout the app, with dark and light mode, a calm navbar and the status bar on every page. Dashboards use a report view with numbered figures and a share menu for Copy link and Post on X. Chart types include stacked bar and histogram; time ranges are removed. Explore has Dashboards and Widgets tabs. Featured dashboards and widgets are authored by Arkiv SQL Indexer and maintained by automatic keepalive. Featured widgets show Kept live and offer no Extend action.

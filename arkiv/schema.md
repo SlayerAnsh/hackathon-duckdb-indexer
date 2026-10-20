@@ -1,8 +1,8 @@
 # Arkiv schema and queries
 
-This file lists the widget, dashboard and link entity types the dashboard wallet creates, their attributes and expiry, and every Arkiv RPC request the indexer and the browser send. Network: Tiramisu, chain ID 7738577, RPC `https://rpc.tiramisu.db-chain.testnet.arkiv.network`. SDK: `@arkiv-network/sdk` 0.8.1 with viem 2.57.3.
+This file lists the widget, dashboard and link entity types the web app's app wallet (the dashboard wallet) creates, their attributes and expiry, and every Arkiv RPC request the indexer and the browser send. Network: Tiramisu, chain ID 7738577, RPC `https://rpc.tiramisu.db-chain.testnet.arkiv.network`. SDK: `@arkiv-network/sdk` 0.8.1 with viem 2.57.3.
 
-The indexer itself is schema agnostic. It mirrors every live entity that matches `INDEX_EXPRESSION` (blank means every entity on the chain), whatever its attributes. The application entity types, lifetimes and operations are documented in [Widget dashboards](#widget-dashboards). Payloads stay on chain and are fetched on demand, never stored in Parquet.
+The open source indexer (`apps/indexer`) is schema agnostic. It mirrors every live entity that matches `INDEX_EXPRESSION` (blank means every entity on the chain), whatever its attributes. The application entity types, lifetimes and operations are documented in [Widget dashboards](#widget-dashboards). Payloads stay on chain and are fetched on demand, never stored in Parquet.
 
 ## SQL columns
 
@@ -50,7 +50,9 @@ No `arkiv_query` runs per event. A fill response is accepted only if its `blockN
 
 `BACKFILL_MODE=query` pages the expression itself at one confirmed block: `arkiv_query(INDEX_EXPRESSION, {atBlock: head minus CONFIRMATIONS, limit: 200, select: ROW_SELECT, cursor})`. With `SYNC_USE_API_KEY=true` or `BACKFILL_MODE=query`, live sync queries the touched relevant keys of each batch as key chunks with `{atBlock: <batch end>, limit: 200, select: ROW_SELECT, cursor}` on `ARKIV_RPC_URL`, sending `Authorization: Bearer <TIRAMISU_API_KEY>`. Returned keys replace their attributes; relevant indexed keys that are missing become tombstones. A batch with no relevant keys sends no `arkiv_query`.
 
-### Browser (public RPC, no credentials)
+### Browser (through the `/api/rpc` read proxy, no credentials in the browser)
+
+Browser reads go to the web app's same origin `POST /api/rpc`, which forwards them to `NEXT_PUBLIC_TIRAMISU_RPC_URL` and adds `Authorization: Bearer <TIRAMISU_API_KEY>` only when the server has a key. Wallet signatures use the public RPC directly.
 
 | Purpose | Method and arguments | Cadence |
 | :--- | :--- | :--- |
@@ -65,7 +67,7 @@ Payload and Verify use bare key predicates without the configured expression, wi
 
 ## Widget dashboards
 
-The web backend writes `widget`, `dashboard` and `link` entities with `contentType: application/json` and UTF-8 JSON payloads. The app wallet is the Arkiv creator of every entity. A user widget's Arkiv owner is the user's wallet; dashboards, links and official widgets remain app owned. The `user` attribute records widget authorship and application ownership for dashboards and links, represented by a Privy embedded wallet. Widget owner controls and My widgets use the Arkiv owner, never the author. Login values are `google`, `discord`, `x` or `telegram`; no email, social handle or Privy user ID is written. Payloads remain off Parquet. Everything is public.
+The web backend writes `widget`, `dashboard` and `link` entities with `contentType: application/json` and UTF-8 JSON payloads. The app wallet is the Arkiv creator of every entity. A user widget's Arkiv owner is the user's wallet; dashboards, links and Featured widgets remain app owned. The `user` attribute records widget authorship and application ownership for dashboards and links, represented by a Privy embedded wallet. Widget owner controls and My widgets use the Arkiv owner, never the author. Login values are `google`, `discord`, `x` or `telegram`; no email, social handle or Privy user ID is written. Payloads remain off Parquet. Everything is public.
 
 | Entity type | Attribute | Arkiv type | Value or purpose |
 | :--- | :--- | :--- | :--- |
@@ -80,6 +82,7 @@ The web backend writes `widget`, `dashboard` and `link` entities with `contentTy
 | dashboard | user | addr | Dashboard owner's embedded wallet |
 | dashboard | login | str | Login provider |
 | dashboard | title | str | Dashboard title |
+| dashboard | slug | str | Featured dashboards only, see [Featured entities](#featured-entities) |
 | link | type | str | `link` |
 | link | project | str | `arkiv-sql-indexer-dash` |
 | link | user | addr | Dashboard owner's embedded wallet |
@@ -129,7 +132,7 @@ Size spans on a 12 column row are `xs: 3`, `sm: 4`, `md: 6`, `xl: 12`; phones sh
 
 ### Expiry and operations
 
-One day is 43,200 blocks at two seconds per block. Server writes run through `apps/web/lib/dash/server/operations.ts` inside one serial wallet queue and check ownership against live RPC state. User widgets have `readonly: true` and `permissionlessExtension: true`, fixed at creation. Creating and transferring happen in one `executeBatch` with `creates` then `ownershipChanges`; only the predicted widget key is transferred to the session address. Links have no creation flags and are never transferred. Direct widget lifecycle actions are signed in the browser and need GLM; saving stays free.
+One day is 43,200 blocks at two seconds per block. App wallet writes (widget create and new version, dashboards, links, organize, Featured seed and keepalive) run through `apps/web/lib/dash/server/operations.ts` inside one serial wallet queue and check ownership against live RPC state. User widgets have `readonly: true` and `permissionlessExtension: true`, fixed at creation. Creating and transferring happen in one `executeBatch` with `creates` then `ownershipChanges`; only the predicted widget key is transferred to the session address. Links have no creation flags and are never transferred. Widget extend, delete and transfer have no server endpoint: the user's Privy wallet signs them in the browser (`apps/web/lib/dash/widget-actions.ts`) and needs GLM. Saving stays free.
 
 | Entity or action | Implemented operation and expiry |
 | :--- | :--- |
@@ -196,10 +199,10 @@ Every expression is sent through `queryAll` as `arkiv_query(expression, { limit:
 
 Dashboard reads always filter `$creator` on the configured dashboard wallet as well as project. Another wallet can copy every attribute, so attributes alone are never trusted identity. Decoders recheck creator, project, type, required attributes and payload validity before accepting an entity. Lists, counts and activity use creator and project scoped local DuckDB SQL; RPC reads supply payloads only where needed. Stored widget SQL must pass `checkWidgetSql` before execution in the viewer's DuckDB, capped at 5,000 result rows.
 
-Legacy widgets without creation flags remain owned by the app wallet and have no user Extend, Delete or Transfer actions. Do not transfer them to users: mutable attributes could undermine the Official marker.
+Legacy widgets without creation flags remain owned by the app wallet and have no user Extend, Delete or Transfer actions. Do not transfer them to users: mutable attributes could undermine the Featured marker.
 
-## Official entities
+## Featured entities
 
-An entity is Official when its `user` attribute and `$owner` both equal the app wallet address. Readers still require the app wallet as creator and the dashboard project tag. Official widgets and dashboards use `login = arkiv`. Official dashboards also carry a string `slug` attribute with at most 64 bytes, matching `^[a-z0-9]+(?:-[a-z0-9]+)*$`.
+User facing copy calls these Featured; code and helpers use the name official (`apps/web/lib/dash/official.ts`). An entity is Featured when its `user` attribute and `$owner` both equal the app wallet address. Readers still require the app wallet as creator and the dashboard project tag. Featured widgets and dashboards use `login = arkiv`. Featured dashboards also carry a string `slug` attribute with at most 64 bytes, matching `^[a-z0-9]+(?:-[a-z0-9]+)*$`.
 
-Official dashboards, widgets and links have 90 day lifetimes and are renewed by the app wallet. A user cannot forge an Official entity through the API: the server derives `user` from the verified session, refuses app wallet sessions and rejects app wallet addresses in every user write operation. Readers accept `login = arkiv` only when `user` equals the app wallet.
+Featured dashboards, widgets and links have 90 day lifetimes and are renewed by the app wallet. A user cannot forge a Featured entity through the API: the server derives `user` from the verified session, refuses app wallet sessions and rejects app wallet addresses in every user write operation. Readers accept `login = arkiv` only when `user` equals the app wallet.

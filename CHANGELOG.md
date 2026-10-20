@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+* Project restructure. The repository now ships two parts: an open source, self hostable indexer (`apps/indexer`, MIT, Docker Compose or Bun, all entities or an `INDEX_EXPRESSION` subset, Parquet snapshots, delta and manifest over HTTP) and a web app (`apps/web`) that runs against the hosted indexer at https://arkiv-sql-indexer.dokploy.anshudhar.dev covering all Arkiv data on Tiramisu. The app offers a SQL Playground, widgets saved as Arkiv entities, public dashboards with Featured dashboards kept live by the app wallet, Privy login, the keyed `/api/rpc` read proxy and the `/data` proxy to `INDEXER_URL`. README, SPECS, DEVELOPER, `arkiv/schema.md`, `.env.example` and page metadata describe this structure, with quick starts for self hosting the indexer and for running the app against the hosted indexer.
+
+* App owned dashboards are called Featured instead of Official in user facing copy.
+
 * Browser reads go through a same origin read proxy at `POST /api/rpc` that adds the server side `TIRAMISU_API_KEY` when set. It allows only read methods, caps body size and batch length, rate limits per client IP and times out after 15 seconds. Wallet signing and writes keep the public RPC. The key may now reach the web server runtime, never a public variable, build argument or the browser.
 
 * Header shows Log in; signed in users get an account popover with balance, copy address, explorer link and quick links. Explore toolbars use two aligned rows, and empty lists show designed empty states with skeletons while loading.

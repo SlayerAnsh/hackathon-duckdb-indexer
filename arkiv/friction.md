@@ -8,12 +8,12 @@ Versions throughout: `@arkiv-network/sdk` 0.8.1, viem 2.57.3, Bun 1.3.11, Tirami
 
 | Surface | Where | Entries below |
 | :--- | :--- | :--- |
-| `arkiv_query` over direct JSON RPC, anonymous | Indexer filler, browser live tail, Payload, Verify | Anonymous budget, query length, flat cost |
+| `arkiv_query` over direct JSON RPC, anonymous unless a key is configured | Indexer filler; browser live tail, Payload and Verify through the web `/api/rpc` read proxy | Anonymous budget, query length, flat cost |
 | `arkiv_query` with an API key (opt in) | Indexer keyed sync and `BACKFILL_MODE=query` | Flat cost, monthly quota, keyed live sync |
 | `eth_getLogs` on the Arkiv contract, decoded with SDK `ENTITY_EVENTS_ABI` | Indexer replay and live sync, browser live tail | Log result cap, keyed live sync, expiry without event |
 | `eth_blockNumber`, `eth_chainId`, `eth_getBlockByNumber` | Indexer checkpoint and reorg checks, browser live head | Anonymous budget (these keep working) |
 | SDK query builder (`key`, `eq`, `or`, `render`) | `packages/core/src/query.ts` | Query length |
-| SDK wallet client (`executeBatch`, `createEntity`, `patchEntity`, `extendEntity`, `changeOwnership`, `predictEntityKeys`, `ExpirationTime`) | `apps/demo-writer` | Mutation errors |
+| SDK wallet client (`executeBatch`, `createEntity`, `patchEntity`, `extendEntity`, `changeOwnership`, `predictEntityKeys`, `ExpirationTime`) | `apps/web/lib/dash/server/operations.ts` (app wallet), `apps/web/lib/dash/widget-actions.ts` (browser signed widget actions) | Mutation errors |
 
 ## Anonymous query budget and error envelope
 
@@ -176,12 +176,12 @@ Workaround: every indexer batch sweeps `expires_at <= batch end` and records tom
 
 **Expected.** A writer should detect "entity not found" or "entity expired" from a typed SDK error.
 
-**Actual.** The demo writer has to walk the `cause` chain of the thrown error, check `data.errorName` for `EntityNotFound` or `EntityExpired`, and fall back to matching message text (`No live entity with key`, `no entity 0x...`, `entity 0x... expired at block`).
+**Actual.** A writer has to walk the `cause` chain of the thrown error, check `data.errorName` for `EntityNotFound` or `EntityExpired`, and fall back to matching message text (`No live entity with key`, `no entity 0x...`, `entity 0x... expired at block`).
 
-Workaround: `isGone` in `apps/demo-writer/src/writer.ts` does exactly this, then drops the ticket from local state.
+Workaround: `apps/web/lib/dash/server/operations.ts` and `apps/web/lib/dash/widget-actions.ts` match these names and messages (the server walks the `cause` chain and returns not found; the browser maps them to an expired widget error). (The original workaround lived in the removed demo writer.)
 
 **Versions.** SDK 0.8.1, viem 2.57.3, Bun 1.3.11, Tiramisu.
 
-**Steps to reproduce.** Call `patchEntity` or `extendEntity` on a ticket key after it expired, and inspect the thrown error and its `cause` chain.
+**Steps to reproduce.** Call `patchEntity` or `extendEntity` on an entity key after it expired, and inspect the thrown error and its `cause` chain.
 
 **Suggested fix.** Export typed error classes or a stable `code` for missing and expired entities from the SDK mutation helpers.
