@@ -77,7 +77,7 @@ test('run excludes queued wait and measures send through last batch', async () =
 })
 
 test('delta refreshes public rows and head-only changes enforce expiry', async () => {
-  const { DuckDBInstance } = await import('../../../packages/core/node_modules/@duckdb/node-api')
+  const { DuckDBInstance } = await import('@duckdb/node-api')
   const instance = await DuckDBInstance.create(':memory:')
   const conn = await instance.connect()
   try {
@@ -92,7 +92,7 @@ test('delta refreshes public rows and head-only changes enforce expiry', async (
 })
 
 test('snapshot rollover clears live rows and refreshes within its transaction', async () => {
-  const { DuckDBInstance } = await import('../../../packages/core/node_modules/@duckdb/node-api')
+  const { DuckDBInstance } = await import('@duckdb/node-api')
   const { IndexDb } = await import('../lib/indexdb')
   const instance = await DuckDBInstance.create(':memory:'); const conn = await instance.connect()
   const statements: string[] = []

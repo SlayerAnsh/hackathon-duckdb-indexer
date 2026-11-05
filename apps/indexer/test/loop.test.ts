@@ -14,7 +14,7 @@ test('tick syncs and publishes delta', async () => { const ctx = await setup(); 
 test('tick after interval snapshots and resets delta', async () => { const ctx = await setup(); ctx.rpc.blockNumber = async () => 133; await tick(ctx); expect((await ctx.store.state())!).toMatchObject({ snapshot_version: 2, snapshot_block: 130 }); expect(JSON.parse(await readFile(ctx.dir + '/delta.json', 'utf8'))).toMatchObject({ fromBlock: 131, toBlock: 130, entities: [] }) })
 test('hash mismatch builds generation and switches only after publication', async () => { const ctx = await setup(), old = ctx.store, oldDir = ctx.dir; ctx.rpc.blockNumber = async () => 108; ctx.rpc.blockHash = async () => '0xnew'; await tick(ctx); track(ctx.store); expect(ctx.dir).toBe(oldDir + '-g1'); expect(ctx.store).not.toBe(old); expect((await ctx.store.state())!.head_hash).toBe('0xnew'); expect(JSON.parse(await readFile(ctx.dir + '/manifest.json', 'utf8')).snapshotBlock).toBe(105) })
 test('header timeout preserves generation and checkpoint', async () => { const ctx = await setup(), old = ctx.store; ctx.rpc.blockNumber = async () => 108; ctx.rpc.blockHash = async () => { throw Error('timeout') }; await expect(tick(ctx)).rejects.toThrow('timeout'); expect(ctx.store).toBe(old); expect((await old.state())!.head_block).toBe(100) })
-test('failed generation backfill preserves serving store', async () => { const ctx = await setup(), old = ctx.store, dir = ctx.dir; ctx.rpc.blockNumber = async () => 108; ctx.rpc.blockHash = async () => '0xnew'; ctx.rpc.query = async () => { throw Error('offline') }; await expect(tick(ctx)).rejects.toThrow('offline'); expect(ctx.store).toBe(old); expect(ctx.dir).toBe(dir) })
+test('failed generation backfill preserves serving store', async () => { const ctx = await setup(), old = ctx.store, dir = ctx.dir; ctx.rpc.blockNumber = async () => 108; ctx.rpc.blockHash = async () => '0xnew'; const { RpcError } = await import('@asi/core'); ctx.rpc.query = async () => { throw new RpcError('offline', 200, -32001) }; await expect(tick(ctx)).rejects.toThrow('offline'); expect(ctx.store).toBe(old); expect(ctx.dir).toBe(dir) })
 test('new generation uses a new snapshot version and survives restart', async () => {
   const ctx = await setup(); ctx.rpc.blockNumber = async () => 108; ctx.rpc.blockHash = async () => '0xnew'
   await tick(ctx); track(ctx.store)
@@ -31,7 +31,7 @@ test('unavailable pinned state rebuilds without changing failed checkpoint', asy
   await old.upsert([row('0x' + '01'.repeat(32))], null)
   const { ENTITY_EVENTS_ABI, toEventSelector } = await import('@asi/core')
   ctx.rpc.getLogs = async () => [{ topics: [toEventSelector(ENTITY_EVENTS_ABI.find(e => e.name === 'EntityPatched')!), '0x' + '01'.repeat(32), '0x' + '00'.repeat(32)], data: '0x', blockNumber: 101, logIndex: 0, transactionHash: hash }]
-  ctx.rpc.query = async (e, o) => { if (e.includes('$key')) throw new RpcError('unavailable', 200, -32006); return { data: [], blockNumber: o.atBlock! } }
+  ctx.rpc.query = async e => { if (e.includes('$key = key(')) throw new RpcError('unavailable', 200, -32006); return { data: [], blockNumber: 108 } }
   await tick(ctx); track(ctx.store)
   expect(ctx.store).not.toBe(old); expect(ctx.dir).toContain('-g1')
 })

@@ -11,12 +11,8 @@ export async function verifyRows(rpcUrl: string, keys: string[]): Promise<Map<st
  const rpc = createBrowserRpc(rpcUrl)
  const result = new Map<string, { updatedAt: number; expiresAt: number; owner: string } | null>(keys.map(k => [k.toLowerCase(), null]))
  for (const expression of keyChunkQueries(null, [...new Set(keys)])) {
- let cursor: string | undefined
- do {
- const page = await rpc.query(expression, { cursor, select: { key: true, updatedAt: true, expiresAt: true, owner: true } })
+ const page = await rpc.query(expression, { limit: 100, select: { key: true, updatedAt: true, expiresAt: true, owner: true } })
  for (const row of page.data) if (row.key && row.owner) result.set(row.key.toLowerCase(), { updatedAt: Number(row.updatedAt), expiresAt: Number(row.expiresAt), owner: row.owner })
- cursor = page.cursor
- } while (cursor)
  }
  return result
 }

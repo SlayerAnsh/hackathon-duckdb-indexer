@@ -1,13 +1,15 @@
+import { keysetExpr } from '../lib/dash/entities'
+import { DashboardSchema, LinkSchema } from '../lib/dash/arkiv-schemas'
 import { expect, test } from 'bun:test'
 import { ExpirationTime } from '@arkiv-network/sdk'
-import { addr, key } from '@arkiv-network/sdk/attr'
+import { addr, key } from '@arkiv-network/sdk/schema'
 import { asDashboard, asLink, asWidget, decodeDashEntity, dashboardBundleExpr } from '../lib/dash/entities'
 import { parseOrganizeInput, planOrganize, createDashboard, updateDashboard, deleteDashboard, organizeDashboard, addLink } from '../lib/dash/server/operations'
 import { fakeChain, dashboardRow, linkRow, widgetRow, validWidget, U, OTHER, W, D, K, PREDICTED_1 } from './dash-fakes'
 const S = { address: U, login: 'google' as const, exp: 9e9 }
 const L1 = `0x${'31'.repeat(32)}`, L2 = `0x${'32'.repeat(32)}`, L3 = `0x${'33'.repeat(32)}`, W2 = `0x${'42'.repeat(32)}` as const
 const target = 1000 + 90 * 43200
-const payload = (data: any) => JSON.parse(new TextDecoder().decode(data.payload))
+const payload = (data: any) => JSON.parse(new TextDecoder().decode((data.values ?? data.set).payload))
 const dash = (expiresAt = 5000) => asDashboard(decodeDashEntity(dashboardRow({ expiresAt })), W)!
 const link = (k: string, w: string, position: number, expiresAt = 5000) => asLink(decodeDashEntity(linkRow({ key: k, widget: w, position, expiresAt })), W)!
 const widget = () => asWidget(decodeDashEntity(widgetRow({ key: W2 })), W)!
@@ -42,16 +44,18 @@ test('plan skips extensions at or past target', () => {
 test('organize reads one bundle and sends exactly one batch matching its plan', async () => {
   const f = fakeChain([dashboardRow(), linkRow({ key: L1 }), linkRow({ key: L3, widget: D }), widgetRow({ key: W2 })])
   expect(await organizeDashboard(f.deps, S, D, { title: 'Renamed', items: [{ link: L1, widget: K, size: 'xl' }, { link: null, widget: W2, size: 'xs' }] })).toEqual({ txHash: '0xtx', afterBlock: 1000, expiresAt: target })
-  expect(f.queries).toEqual([dashboardBundleExpr(W, D, [W2])])
+  expect(f.queries).toEqual([keysetExpr(dashboardBundleExpr(W, D, [W2]), null)])
   expect(f.calls.map(c => c.method)).toEqual(['batch'])
   const b = f.calls[0].data
-  expect(b.creates[0].attributes).toEqual({ type: 'link', project: 'arkiv-sql-indexer-dash', user: addr(U), dashboard: key(D), widget: key(W2) })
+  expect(b.creates[0].schema).toBe(LinkSchema)
+  expect(b.patches.map((p: any) => p.schema)).toEqual([LinkSchema, DashboardSchema])
+  expect(b.creates[0].values).toEqual({ payload: expect.any(Uint8Array), type: 'link', project: 'arkiv-sql-indexer-dash', user: addr(U), dashboard: key(D), widget: key(W2) })
   expect(payload(b.creates[0])).toEqual({ v: 1, size: 'xs', position: 1, name: validWidget.name })
-  expect(b.creates[0].expires).toEqual(ExpirationTime.atBlock(BigInt(target)))
+  expect(b.creates[0].expiration).toEqual(ExpirationTime.atBlock(BigInt(target)))
   expect(b.patches.map((p: any) => [p.entityKey, payload(p)])).toEqual([[L1, { v: 1, size: 'xl', position: 0, name: validWidget.name }], [D, { v: 1, title: 'Renamed', description: '' }]])
-  expect(b.patches[1].set).toEqual({ title: 'Renamed' })
+  expect(b.patches[1].set).toEqual({ payload: expect.any(Uint8Array), title: 'Renamed' })
   expect(b.deletes).toEqual([{ entityKey: L3 }])
-  expect(b.extensions).toEqual([D, L1].map(entityKey => ({ entityKey, expires: ExpirationTime.atBlock(BigInt(target)) })))
+  expect(b.extensions).toEqual([D, L1].map(entityKey => ({ entityKey, expiration: ExpirationTime.atBlock(BigInt(target)) })))
 })
 test('unchanged organize at target does not send an empty batch', async () => {
   const f = fakeChain([dashboardRow({ expiresAt: target }), linkRow({ key: L1, expiresAt: target })])
@@ -61,13 +65,14 @@ test('unchanged organize at target does not send an empty batch', async () => {
 test('create, rename and delete dashboards', async () => {
   const f = fakeChain([])
   expect(await createDashboard(f.deps, S, { title: 'New' })).toEqual({ txHash: '0xtx', afterBlock: 1000, key: PREDICTED_1, expiresAt: 0 })
-  expect(f.calls[0].data.attributes).toEqual({ type: 'dashboard', project: 'arkiv-sql-indexer-dash', user: addr(U), login: 'google', title: 'New' })
+  expect(f.calls[0].data.schema).toBe(DashboardSchema)
+  expect(f.calls[0].data.values).toEqual({ payload: expect.any(Uint8Array), type: 'dashboard', project: 'arkiv-sql-indexer-dash', user: addr(U), login: 'google', title: 'New' })
   expect(payload(f.calls[0].data)).toEqual({ v: 1, title: 'New', description: '' })
-  expect(f.calls[0].data.expires).toEqual(ExpirationTime.fromSeconds(90 * 86400))
+  expect(f.calls[0].data.expiration).toEqual(ExpirationTime.fromSeconds(90 * 86400))
   const g = fakeChain([dashboardRow(), linkRow({ key: L1 }), linkRow({ key: L2, expiresAt: 1000 }), linkRow({ key: L3, dashboard: K })])
   await updateDashboard(g.deps, S, D, { title: 'Rename', description: 'Description' })
   expect(g.calls[0].method).toBe('patch')
-  expect(g.calls[0].data.set).toEqual({ title: 'Rename' })
+  expect(g.calls[0].data.set).toEqual({ payload: expect.any(Uint8Array), title: 'Rename' })
   expect(payload(g.calls[0].data)).toEqual({ v: 1, title: 'Rename', description: 'Description' })
   await deleteDashboard(g.deps, S, D)
   expect(g.calls[1]).toEqual({ method: 'batch', data: { deletes: [{ entityKey: D }, { entityKey: L1 }] } })
@@ -83,10 +88,10 @@ test('all dashboard mutations require a live trusted dashboard owned by caller',
 test('addLink appends at max position with dashboard expiry and authoritative widget name', async () => {
   const f = fakeChain([dashboardRow(), linkRow({ widget: W2, position: 4 }), widgetRow()])
   expect(await addLink(f.deps, S, D, { widget: K, size: 'sm' })).toMatchObject({ linkKey: PREDICTED_1, afterBlock: 1000 })
-  expect(f.queries).toEqual([dashboardBundleExpr(W, D, [K])])
+  expect(f.queries).toEqual([keysetExpr(dashboardBundleExpr(W, D, [K]), null)])
   expect(f.calls.map(c => c.method)).toEqual(['create'])
   expect(payload(f.calls[0].data)).toEqual({ v: 1, size: 'sm', position: 5, name: validWidget.name })
-  expect(f.calls[0].data.expires).toEqual(ExpirationTime.atBlock(BigInt(5000)))
+  expect(f.calls[0].data.expiration).toEqual(ExpirationTime.atBlock(BigInt(5000)))
   for (const [rows, code] of [ [[dashboardRow(), widgetRow(), linkRow()], 'conflict'], [[dashboardRow(), widgetRow({ expiresAt: 1000 })], 'not_found'], [[dashboardRow(), widgetRow({ creator: OTHER })], 'not_found'], [[dashboardRow(), widgetRow(), ...Array.from({ length: 48 }, (_, i) => linkRow({ key: `0x${i.toString(16).padStart(64, '0')}`, widget: W2 }))], 'full'] ] as const) {
     const g = fakeChain([...rows]); await expect(addLink(g.deps, S, D, { widget: K, size: 'md' })).rejects.toMatchObject({ code }); expect(g.calls).toEqual([])
   }
@@ -116,7 +121,7 @@ test('cover only patch uses key type, preserves all untouched dashboard attribut
  const f = fakeChain([row, l, widgetRow()])
  await organizeDashboard(f.deps, S, D, { cover: K, items: [{ link: L1, widget: K, size: 'md' }] })
  const patches = f.calls[0].data.patches
- expect(patches).toEqual([{ entityKey: D, set: { cover: key(K) } }])
+ expect(patches).toEqual([{ schema: DashboardSchema, entityKey: D, set: { cover: key(K) } }])
  // SDK set merges these named attributes, so only cover changes.
  const retained = Object.fromEntries(row.attributes!.map(a => [a.name, a.value]))
  expect({ ...retained, ...patches[0].set }).toMatchObject({ type: 'dashboard', project: 'arkiv-sql-indexer-dash', user: U, login: 'google', title: 'Overview', slug: 'example', cover: key(K) })
@@ -127,7 +132,7 @@ test('cover only patch uses key type, preserves all untouched dashboard attribut
  for (const input of [{ cover: null, items: [{ link: L1, widget: K, size: 'md' as const }] }, { items: [] }]) {
   const h = fakeChain([row, l, widgetRow()])
   await organizeDashboard(h.deps, S, D, input)
-  expect(h.calls[0].data.patches).toEqual([{ entityKey: D, set: {}, unset: ['cover'] }])
+  expect(h.calls[0].data.patches).toEqual([{ schema: DashboardSchema, entityKey: D, set: {}, unset: ['cover'] }])
  }
 })
 

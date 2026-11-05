@@ -1,12 +1,14 @@
+import { keysetExpr } from '../lib/dash/entities'
+import { LinkSchema, WidgetSchema } from '../lib/dash/arkiv-schemas'
 import { expect, test } from 'bun:test'
 import { ExpirationTime } from '@arkiv-network/sdk'
-import { addr, key } from '@arkiv-network/sdk/attr'
+import { addr, key } from '@arkiv-network/sdk/schema'
 import { RpcError } from '@asi/core'
 import { createWidget, write } from '../lib/dash/server/operations'
 import { dashboardBundleExpr, widgetVersionExpr } from '../lib/dash/entities'
 import { fakeChain, widgetRow, dashboardRow, linkRow, validWidget, U, OTHER, K, D, W, PREDICTED_1, PREDICTED_2 } from './dash-fakes'
 const S = { address: U, login: 'google' as const, exp: 9e9 }
-const payload = (data: any) => JSON.parse(new TextDecoder().decode(data.payload))
+const payload = (data: any) => JSON.parse(new TextDecoder().decode((data.values ?? data.set).payload))
 
 test('create widget without a dashboard is one transferred readonly batch with attributes and JSON payload', async () => {
   const { deps, calls } = fakeChain([])
@@ -17,26 +19,27 @@ test('create widget without a dashboard is one transferred readonly batch with a
   expect(calls[0].data.creates[0].salt).toBe(BigInt(1))
   expect(calls[0].data.patches ?? []).toEqual([])
   expect(calls[0].data.ownershipChanges).toEqual([{ entityKey: PREDICTED_1, newOwner: U }])
-  expect(calls[0].data.creates[0].attributes).toEqual({ type: 'widget', project: 'arkiv-sql-indexer-dash', user: addr(U), login: 'google', name: 'Top 10 creators', chart: 'hbar' })
-  expect(calls[0].data.creates[0].contentType).toBe('application/json')
+  expect(calls[0].data.creates[0].values).toEqual({ payload: expect.any(Uint8Array), type: 'widget', project: 'arkiv-sql-indexer-dash', user: addr(U), login: 'google', name: 'Top 10 creators', chart: 'hbar' })
+  expect(calls[0].data.creates[0].schema).toBe(WidgetSchema)
   expect(payload(calls[0].data.creates[0])).toEqual(validWidget)
-  expect(calls[0].data.creates[0].expires).toEqual(ExpirationTime.fromSeconds(7 * 86400))
+  expect(calls[0].data.creates[0].expiration).toEqual(ExpirationTime.fromSeconds(7 * 86400))
   expect(r).toEqual({ txHash: '0xtx', afterBlock: 1000, key: PREDICTED_1, expiresAt: 1000 + 7 * 43200 })
 })
 test('create with add to dashboard is one batch referencing predicted keys and dashboard expiry', async () => {
   const { deps, calls, queries } = fakeChain([dashboardRow(), linkRow({ position: 4 })])
   const r = await createWidget(deps, S, { widget: validWidget, addTo: { dashboard: D, size: 'xl' } })
-  expect(queries).toEqual([dashboardBundleExpr(W, D)])
+  expect(queries).toEqual([keysetExpr(dashboardBundleExpr(W, D), null)])
   expect(calls.map(c => c.method)).toEqual(['batch'])
   const [w, l] = calls[0].data.creates
+  expect(w.schema).toBe(WidgetSchema); expect(l.schema).toBe(LinkSchema)
   expect(w.flags).toEqual({ readonly: true, permissionlessExtension: true }); expect(l).not.toHaveProperty('flags')
   expect(calls[0].data.ownershipChanges).toEqual([{ entityKey: PREDICTED_1, newOwner: U }])
   expect(w.salt).toBe(BigInt(1)); expect(l.salt).toBe(BigInt(2))
   expect(payload(w)).toEqual(validWidget)
-  expect(w.expires).toEqual(ExpirationTime.fromSeconds(7 * 86400))
-  expect(l.attributes).toEqual({ type: 'link', project: 'arkiv-sql-indexer-dash', user: addr(U), dashboard: key(D), widget: key(PREDICTED_1) })
+  expect(w.expiration).toEqual(ExpirationTime.fromSeconds(7 * 86400))
+  expect(l.values).toEqual({ payload: expect.any(Uint8Array), type: 'link', project: 'arkiv-sql-indexer-dash', user: addr(U), dashboard: key(D), widget: key(PREDICTED_1) })
   expect(payload(l)).toEqual({ v: 1, size: 'xl', position: 5, name: 'Top 10 creators' })
-  expect(l.expires).toEqual(ExpirationTime.atBlock(BigInt(5000)))
+  expect(l.expiration).toEqual(ExpirationTime.atBlock(BigInt(5000)))
   expect(r).toMatchObject({ key: PREDICTED_1, linkKey: PREDICTED_2, afterBlock: 1000 })
 })
 test('add to dashboard refuses a missing, foreign or full dashboard before writing', async () => {
@@ -112,14 +115,14 @@ test('replacement patches only live trusted links by the session and transfers t
  const L1 = '0x' + '44'.repeat(32)
  const f = fakeChain([widgetRow({ owner: U }), linkRow({ key: L1, position: 2 }), linkRow({ key: D, user: OTHER }), linkRow({ key: K, expiresAt: 999 }), linkRow({ key: PREDICTED_2, creator: OTHER })])
  const result = await createWidget(f.deps, S, { widget: validWidget, replaces: K })
- expect(f.queries).toEqual([widgetVersionExpr(W, K, U)])
+ expect(f.queries).toEqual([keysetExpr(widgetVersionExpr(W, K, U), null)])
  expect(f.calls.map(c => c.method)).toEqual(['batch'])
  const batch = f.calls[0].data
  expect(batch.creates).toHaveLength(1)
  expect(batch.creates[0].flags).toEqual({ readonly: true, permissionlessExtension: true })
  expect(batch.ownershipChanges).toEqual([{ entityKey: PREDICTED_1, newOwner: U }])
  expect(batch.patches).toHaveLength(1)
- expect(batch.patches[0]).toMatchObject({ entityKey: L1, set: { widget: key(PREDICTED_1) }, contentType: 'application/json' })
+ expect(batch.patches[0]).toMatchObject({ entityKey: L1, set: { widget: key(PREDICTED_1) }, schema: LinkSchema })
  expect(payload(batch.patches[0])).toEqual({ v: 1, size: 'md', position: 2, name: validWidget.name })
  expect(result.relinked).toEqual([L1])
 })

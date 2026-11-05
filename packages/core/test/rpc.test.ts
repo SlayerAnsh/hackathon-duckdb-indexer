@@ -12,12 +12,12 @@ test('sends bearer header when apiKey set', async () => {
   const f = fake({ result: '0x1' }); await createRpc('url', { ...f, apiKey: 'k1' }).chainId()
   expect(f.calls[0]!.headers.get('authorization')).toBe('Bearer k1')
 })
-test('query encodes atBlock and limit as hex', async () => {
+test('query encodes atBlock, limit and offset as hex', async () => {
   const f = fake({ result: { data: [], blockNumber: '0xb5591' } })
-  const page = await createRpc('url', f).query('x', { atBlock: 742801, limit: 200, select: ROW_SELECT })
-  expect(f.calls[0]!.body.params).toEqual(['x', { atBlock: '0xb5591', limit: '0xc8', select: ROW_SELECT }])
+  const page = await createRpc('url', f).query('x', { atBlock: 742801, limit: 100, offset: 200, select: ROW_SELECT })
+  expect(f.calls[0]!.body.params).toEqual(['x', { atBlock: '0xb5591', limit: '0x64', offset: '0xc8', select: ROW_SELECT }])
   expect(page.blockNumber).toBe(742801); expect(page.cursor).toBeUndefined()
-  expect(ROW_SELECT).toEqual({ key: true, owner: true, creator: true, createdAt: true, updatedAt: true, expiresAt: true, creationFlags: true, contentType: true, attributes: true })
+  expect(ROW_SELECT).toEqual({ key: true, owner: true, creator: true, createdAt: true, updatedAt: true, expiresAt: true, creationFlags: true, attributes: true })
 })
 test('query passes cursor through', async () => {
   const f = fake({ result: { data: [], blockNumber: '0x1', cursor: 'next' } })

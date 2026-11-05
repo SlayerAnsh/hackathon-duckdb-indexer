@@ -32,11 +32,11 @@ function popover(balance: { wei: bigint | null; level: 'unknown' | 'empty' | 'lo
 }
 test('account popover shows identity, balance warnings, links and log out', () => {
  const low = popover({ wei: BigInt("50000000000000000"), level: 'low' })
- for (const text of ['Signed in with Google', '0.05 GLM', 'Below 0.1 GLM', 'href="/me"', 'href="/widgets/new"', 'href="/explore"', 'Log out', 'role="dialog"', 'aria-label="Account"', `href="${addressUrl(popAddress)}"`, 'target="_blank"', 'Copy address']) expect(low).toContain(text)
- expect(popover({ wei: BigInt(0), level: 'empty' })).toContain('No GLM')
+ for (const text of ['Signed in with Google', '0.05 tGLM', 'Below 0.1 tGLM', 'href="/me"', 'href="/widgets/new"', 'href="/explore"', 'Log out', 'role="dialog"', 'aria-label="Account"', `href="${addressUrl(popAddress)}"`, 'target="_blank"', 'Copy address']) expect(low).toContain(text)
+ expect(popover({ wei: BigInt(0), level: 'empty' })).toContain('No tGLM')
  const unknown = popover({ wei: null, level: 'unknown' })
  expect(unknown).toContain('Balance unavailable')
- for (const text of ['Below 0.1 GLM', 'No GLM']) expect(unknown).not.toContain(text)
+ for (const text of ['Below 0.1 tGLM', 'No tGLM']) expect(unknown).not.toContain(text)
  expect(popover({ wei: BigInt("1000000000000000000"), level: 'ok' }, true)).toContain('Copied')
 })
 test('icon buttons never use the chart tooltip class', () => {
@@ -49,7 +49,7 @@ test('icon buttons never use the chart tooltip class', () => {
 test('login gate uses specified copy', () => {
  expect(shortHex(address)).toContain('…')
  const gate = render(<LoginGate/>)
- for (const text of ['Log in to build dashboards', 'Use Google, Discord, X or Telegram. Saving widgets and dashboards is free and nothing personal goes on chain. Your widgets belong to your wallet; extending, transferring or deleting them is signed by it and needs a little GLM.', '>Log in<']) expect(gate).toContain(text)
+ for (const text of ['Log in to build dashboards', 'Use Google, Discord, X or Telegram. Saving widgets and dashboards is free and nothing personal goes on chain. Your widgets belong to your wallet; extending, transferring or deleting them is signed by it and needs a little tGLM.', '>Log in<']) expect(gate).toContain(text)
 })
 test('menu keyboard navigation wraps', () => {
  expect(menuIndex('ArrowDown', 1, 2)).toBe(0)

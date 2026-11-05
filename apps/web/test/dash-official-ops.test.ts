@@ -1,6 +1,7 @@
+import { DashboardSchema, LinkSchema, WidgetSchema } from '../lib/dash/arkiv-schemas'
 import { expect, test, spyOn } from 'bun:test'
 import { ExpirationTime } from '@arkiv-network/sdk'
-import { addr, key } from '@arkiv-network/sdk/attr'
+import { addr, key } from '@arkiv-network/sdk/schema'
 import { OFFICIAL_DASHBOARDS } from '../lib/dash/official-defs'
 import { seedOfficial, keepOfficialAlive, readOfficialEnv } from '../lib/dash/server/official'
 import { startOfficialKeepalive, startKeepaliveFromEnv, type KeepaliveTimer } from '../lib/dash/server/keepalive'
@@ -25,14 +26,17 @@ test('seed predicts and creates each dashboard, widgets and links in one queued 
     expect(predict.mock.calls[i][0]).toEqual({ owner: W, count: 1 + 2 * n })
     const creates = f.calls[i].data.creates
     expect(creates).toHaveLength(1 + 2 * n)
-    expect(creates[0].attributes).toMatchObject({ type: 'dashboard', user: addr(W), login: 'arkiv', slug: def.slug, cover: key(`0x${(0xa2 + def.cover!).toString(16).padStart(64, '0')}`) })
+    expect(creates[0].schema).toBe(DashboardSchema)
+    expect(creates[0].values).toMatchObject({ type: 'dashboard', user: addr(W), login: 'arkiv', slug: def.slug, cover: key(`0x${(0xa2 + def.cover!).toString(16).padStart(64, '0')}`) })
     def.widgets.forEach((w, j) => {
-      expect(creates[j + 1].attributes).toMatchObject({ type: 'widget', login: 'arkiv' })
-      expect(payload(creates[j + 1].payload)).toEqual(w.widget)
-      expect(creates[n + j + 1].attributes).toMatchObject({ type: 'link', dashboard: key(result.created[i].key as `0x${string}`), widget: key(`0x${(0xa2 + j).toString(16).padStart(64, '0')}`) })
-      expect(payload(creates[n + j + 1].payload)).toEqual({ v: 1, size: w.size, position: j, name: w.widget.name })
+      expect(creates[j + 1].schema).toBe(WidgetSchema)
+      expect(creates[n + j + 1].schema).toBe(LinkSchema)
+      expect(creates[j + 1].values).toMatchObject({ type: 'widget', login: 'arkiv' })
+      expect(payload(creates[j + 1].values.payload)).toEqual(w.widget)
+      expect(creates[n + j + 1].values).toMatchObject({ type: 'link', dashboard: key(result.created[i].key as `0x${string}`), widget: key(`0x${(0xa2 + j).toString(16).padStart(64, '0')}`) })
+      expect(payload(creates[n + j + 1].values.payload)).toEqual({ v: 1, size: w.size, position: j, name: w.widget.name })
     })
-    creates.forEach((c: any, j: number) => { expect(c.expires).toEqual(ExpirationTime.fromSeconds(90 * 86400)); expect(c.salt).toBe(BigInt(j + 1)) })
+    creates.forEach((c: any, j: number) => { expect(c.expiration).toEqual(ExpirationTime.fromSeconds(90 * 86400)); expect(c.salt).toBe(BigInt(j + 1)) })
   })
 })
 
@@ -67,7 +71,7 @@ test('keepalive filters live official entities, queues writes and is idempotent'
   const f = fakeChain(rows, head)
   const queue = spyOn(f.deps.queue, 'run')
   expect(await keepOfficialAlive(f.deps)).toEqual({ checked: 2, extended: 1, txHashes: ['0xtx'] })
-  expect(f.calls[0].data.extensions).toEqual([{ entityKey: entityKey(1), expires: ExpirationTime.atBlock(BigInt(head + 90 * days)) }])
+  expect(f.calls[0].data.extensions).toEqual([{ entityKey: entityKey(1), expiration: ExpirationTime.atBlock(BigInt(head + 90 * days)) }])
   expect((await keepOfficialAlive(f.deps)).extended).toBe(0)
   expect(f.calls).toHaveLength(1)
   expect(queue).toHaveBeenCalledTimes(2)
@@ -203,7 +207,7 @@ test('cover backfill CLI dry runs in either flag order without predicting or bro
  expect(f.calls).toEqual([])
  expect(predict).not.toHaveBeenCalled()
  expect(await setOfficialCovers(f.deps)).toBe(1)
- expect(f.calls[0].data.patches).toEqual([{ entityKey: D, set: { cover: key(K) } }])
+ expect(f.calls[0].data.patches).toEqual([{ schema: DashboardSchema, entityKey: D, set: { cover: key(K) } }])
  const g = fakeChain(rows)
  await keepOfficialAlive(g.deps)
  expect(g.calls.some(c => c.data.patches?.[0]?.set.cover)).toBe(true)

@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test'
+import { rabdiEntity } from './dash-fakes'
 import type { ArkivRpc, RpcEntity } from '@asi/core'
 import { emptyWidget, DASH_PROJECT } from '../lib/dash/schema'
 import { fetchWidget, fetchWidgets, fetchDashboardBundle, fetchDashboards } from '../lib/dash/read'
@@ -9,9 +10,9 @@ const W = '0x' + 'ab'.repeat(20), U = '0x' + 'cd'.repeat(20)
 const key = (n: number) => '0x' + n.toString(16).padStart(64, '0')
 const K = key(1), D = key(2)
 function row(k: string, type = 'widget', attrs: Record<string, string> = {}, payload: object = { ...emptyWidget(), name: 'Widget', sql: 'SELECT 1' }, creator = W): RpcEntity {
-  return { key: k as `0x${string}`, owner: W as `0x${string}`, creator: creator as `0x${string}`, createdAt: '0x1', updatedAt: '0xa', expiresAt: '0xffff',
+  return rabdiEntity({ key: k as `0x${string}`, owner: W as `0x${string}`, creator: creator as `0x${string}`, createdAt: '0x1', updatedAt: '0xa', expiresAt: '0xffff',
     attributes: Object.entries({ project: DASH_PROJECT, user: U, login: 'google', name: 'Widget', chart: 'table', type, ...attrs }).map(([name, value]) => ({ name, value, type: name === 'user' ? 'addr' : ['widget', 'dashboard'].includes(name) ? 'key' : 'str' })),
-    payload: ('0x' + Buffer.from(JSON.stringify(payload)).toString('hex')) as `0x${string}` }
+    payload: ('0x' + Buffer.from(JSON.stringify(payload)).toString('hex')) as `0x${string}` }) as RpcEntity
 }
 function fake(data: RpcEntity[]) {
   const calls: Parameters<ArkivRpc['query']>[] = []

@@ -1,5 +1,18 @@
 # Arkiv SQL Indexer: Specification
 
+## Rabdi runtime (November 2026)
+
+The runtime uses Arkiv SDK 1.0.1 on Rabdi, chain 7794095, with two second blocks and native currency tGLM. RPC authentication remains `Authorization: Bearer <key>`. Dated Tiramisu measurements and evidence describe the earlier network only.
+
+`BACKFILL_MODE=scan` is the default. It scans latest state without credentials, splitting the key space into 16 equal ranges scanned 4 at a time. `query` performs the same scan with the API key and enables keyed live sync. `logs` replays from genesis and requires a provider retaining that history. Rabdi serves roughly the most recent 1,000 blocks of logs, so genesis replay is unsuitable for its public RPC. When a lagging checkpoint encounters unavailable logs, the indexer automatically builds and publishes a fresh store generation.
+
+Rabdi has no historical state. Reads never send `atBlock`. Pages contain at most 100 entities. Cursors are bound to one block and cannot safely be reused across requests. Each range uses keyset pages ordered by `$key:key ASC`, with `$key >= key(<lo>)` on its first page and `$key > key(<last>)` on subsequent pages. A bounded range also includes `$key < key(<hi>)`. Bounds use full 32 byte hex keys. The final range has no upper bound. Nonblank expressions are parenthesized and joined to the bounds with `AND`. RPC reads run concurrently while store transactions are serialized. These are latest state walks, not atomic snapshots. Changes during a scan require subsequent log reconciliation within the retained window. Key lookups use chunks of at most 50 keys and one bounded page.
+
+Entities have no native `payload` or `contentType`. Blobs are `bytes` attributes, up to 128 KiB. The SQL index stores only the first 32 bytes as hex in `attributes.value` and the full byte length in `attributes.num`; `content_type` remains NULL for compatibility. Widget, dashboard and link JSON is UTF8 encoded in an unindexed `payload` bytes attribute and fetched in full only for rendering. The indexed application attributes are `type`, `project`, `user`, `dashboard` and `widget`, where present. Other application attributes are unindexed. Strings are limited to 128 bytes and entities to 32 attributes.
+
+RPC filters require indexed attributes, typed hex literals such as `addr()` and `key()`, `AND`, `OR`, `NOT` and `$expiresAt`. The removed forms `&&`, `||`, `~`, `!=` and `$expiration` must not be used. SDK creates use `(schema, values, { expiration })`; batch creates carry `schema`, `values`, `expiration` and optional `flags` and `salt`. Patches carry `schema`, `entityKey`, `set` and optional `unset`. Extensions use `entityKey` and `expiration`.
+
+
 Status: implemented. The first version shipped on 18 October 2026; the challenge deadline was then extended to 20 October 2026, and sections marked 19 or 20 October record the later decisions. Git history: first commit `9ae759d` (18 October 2026, an empty scaffold with this spec and the plans), last commit 20 October 2026; no code predates it. Sections describe the current code. Where the original plan changed, the text says so. Since 20 October 2026 the project ships two parts: the open source, self hostable indexer and a web app that runs against the hosted indexer.
 
 ## 1. Summary
@@ -13,7 +26,7 @@ In detail: a self hostable indexer mirrors the Arkiv entities matching one optio
 
 ## 2. Problem
 
-`arkiv_query` supports boolean filters only: newest first, at most 200 results per page, no joins, no GROUP BY, no ORDER BY on attributes, no aggregation beyond count. Teams who want analytics must build their own indexer or trust someone else's, and typical indexers keep data forever, which breaks the expiry promise Arkiv makes.
+`arkiv_query` supports typed filters and key ordering with at most 100 results per page. SQL joins and GROUP BY remain application concerns. Teams who want analytics must build their own indexer or trust someone else's, and typical indexers keep data forever, which breaks the expiry promise Arkiv makes.
 
 ## 3. Goals and non goals
 
@@ -32,7 +45,7 @@ Goals (P0 unless marked):
 
 Non goals: server side SQL endpoint, history beyond current state, Parquet expiry buckets, DataFusion, DuckLake, multi expression indexes.
 
-## 4. Verified facts (SDK `@arkiv-network/sdk` 0.8.1 source, read 18 October 2026)
+## 4. Historical Tiramisu facts (SDK `@arkiv-network/sdk` 0.8.1 source, read 18 October 2026)
 
 - `arkiv_query(query, { atBlock?, select?, limit?, cursor? })`. `atBlock` reads past state "within the node's retained range". `limit` max 200. The cursor is bound to the query, block and selection, so a backfill pinned to one `atBlock` is a consistent snapshot.
 - `select` fields: `key, owner, creator, createdAt, updatedAt, expiresAt, creationFlags, contentType, payload, attributeSchema, attributes`. All default off except `key`. `updatedAt` is selectable even though `$updatedAt` cannot be used as a predicate.
@@ -103,7 +116,7 @@ arkiv/friction.md   friction report
 | `ARKIV_RPC_URL` | HTTP RPC | Rabdi public RPC |
 | `INDEX_EXPRESSION` | Optional Arkiv query expression, blank means every entity | empty |
 | `PUBLIC_RPC_URL` | Anonymous logs and chain metadata | Rabdi public RPC |
-| `BACKFILL_MODE` | Public log replay or legacy query scan | `logs` |
+| `BACKFILL_MODE` | Latest scan, keyed query scan or retained log replay | `scan` |
 | `FILL_RPC_URL` | RPC for attribute fills of pending rows | Rabdi public RPC |
 | `FILL_USE_API_KEY` | send the API key with fills (spends monthly quota) | `false` |
 | `SYNC_USE_API_KEY` | keyed live sync: key lookups on `ARKIV_RPC_URL` (spends monthly quota) | `false` |
@@ -139,7 +152,7 @@ CREATE TABLE entities (
 CREATE TABLE attributes (
   key VARCHAR, name VARCHAR, type VARCHAR,
   value VARCHAR,                     -- canonical text: decimal for numbers, 0x for bytes and addresses
-  num DOUBLE,                        -- numeric types only, approximate for u256 and dec
+  num DOUBLE,                        -- numeric types (approximate for u256 and dec), byte length for bytes
   PRIMARY KEY (key, name)
 );
 CREATE TABLE changes (               -- drives the delta
@@ -157,21 +170,15 @@ The planned `payload_size` column was dropped, since it would need every payload
 
 ### 7.4 Backfill
 
-1. `B0 = head - CONFIRMATIONS`.
-2. Replay native operation logs from block zero through `B0` using `PUBLIC_RPC_URL` without an API key, in adaptive windows that start at 20,000 blocks. Commit each window and its next block checkpoint atomically, deduplicating by block and log index.
-3. Compute live keys in SQL: a creation exists, the latest operation is not deletion, and the latest known expiration exceeds `B0`.
-4. The replay also records, per key, the owner and creation flags from `EntityCreated`, the new owner from `OwnershipTransferred`, and the expiry from `EntityCreated` and `ExpiryExtended`. Replay tables persisted before this capture get a second resumable pass over the public logs that only fills owner and flags.
-5. Insert every live key without a fetched row from log data: owner is the latest owner, creator the owner at creation, `created_at` the creation block, `updated_at` the block of the latest event, `expires_at` the latest expiry, `content_type` NULL and `attrs_pending = true`. Fetched rows are never overwritten.
-6. Set `start_block = head_block = B0` and build snapshot v1 (7.6) immediately. No row query is needed before the first snapshot.
-7. After startup a filler runs beside live sync. Every `FILL_INTERVAL_MS` it takes the `FILL_CHUNK` pending keys with the highest `updated_at` (then `created_at`), queries them by key at the indexed head on `FILL_RPC_URL` without the API key, and upserts the returned rows with `attrs_pending = false` and a change row so the next delta carries them. A key that is not returned is dropped when its row expired at the queried block or when a filter expression is set; otherwise it stays pending and moves behind keys not yet tried. HTTP 429 pauses only the filler until Retry-After and is logged once. Keys that live sync fetches, deletes or sweeps in the meantime are no longer pending and are never overwritten by an older fill.
-
-On 18 October 2026 the anonymous budget the header reported was 10,000 units per caller and window (about one hour), at least 100 units per query, so about 100 fills of 50 keys per window. Today's header no longer reports the cost budget (§4), so the filler does not assume a size: it pauses on HTTP 429 until Retry-After. `FILL_USE_API_KEY=true` sends the key with fills and spends the monthly quota instead.
-
-`BACKFILL_MODE=query` retains the legacy paginated expression scan as an explicit option. Public log capacity errors use the suggested retry range when present, otherwise halve the window. HTTP 429 waits for Retry-After. Failed windows preserve the last committed checkpoint.
+1. Record the confirmed head and its hash before scanning.
+2. In `scan` mode, split the key space into 16 equal ranges scanned 4 at a time, reading latest entities with keyset pagination and serializing page writes into the store. Retry transient network errors and HTTP 429.
+3. In `query` mode, use the same scan with the configured API key. In `logs` mode, replay retained genesis logs and populate pending rows. Rabdi public RPC cannot supply that history.
+4. Check the original head hash, publish the snapshot and checkpoint, and reconcile subsequent changes through logs. A scan has no historical snapshot guarantee.
+5. The filler reads pending keys at latest state and replaces attributes only while the pending row remains unchanged. HTTP 429 pauses fills until Retry After.
 
 ### 7.5 Live sync
 
-Runs every `SYNC_BATCH_BLOCKS` blocks (default 5, about 10 seconds). By default (logs mode without `SYNC_USE_API_KEY`) sync is keyless:
+Runs every `SYNC_BATCH_BLOCKS` blocks (default 5, about 10 seconds). By default (scan mode without `SYNC_USE_API_KEY`) sync is keyless:
 
 1. `to = chainHead - CONFIRMATIONS`, `from = head_block + 1`. Skip when fewer than `SYNC_BATCH_BLOCKS` blocks are ready.
 2. Fetch and decode logs as in step 2 below, then apply them in block and log order from log data alone, with no `arkiv_query`:
@@ -182,7 +189,7 @@ Runs every `SYNC_BATCH_BLOCKS` blocks (default 5, about 10 seconds). By default 
    * `EntityDeleted`: remove the row and its attributes with a tombstone.
    * Events for keys without a row are ignored.
 3. Every changed key gets `changes(to, key, false)`, so the delta carries it. Expiry sweep, hash checks and the checkpoint commit work as below, in one transaction.
-4. The filler (7.4 step 7) fetches attributes for pending keys newest first, so new and patched keys come first. It writes a fetched row only if the row is still pending and its `updated_at` is not newer than the block it queried; otherwise the key stays pending and is fetched again at a newer block. A re-fetch replaces all attributes.
+4. The filler (7.4 step 5) fetches attributes for pending keys newest first, so new and patched keys come first. It writes a fetched row only if the row is still pending and its `updated_at` is not newer than the block it queried; otherwise the key stays pending and is fetched again at a newer block. A re-fetch replaces all attributes.
 
 Limitation: with a filter expression that has no `$creator` or `$owner` term, keyless sync cannot see an existing entity that starts matching through a patch, nor one transferred into a `$owner` filter. Use `SYNC_USE_API_KEY=true` for such filters.
 
@@ -191,7 +198,7 @@ Keyed sync (`SYNC_USE_API_KEY=true` or `BACKFILL_MODE=query`):
 1. `to = chainHead - CONFIRMATIONS`, `from = head_block + 1`. Skip when `to < from`.
 2. `eth_getLogs` on `ARKIV_ADDRESS` for `[from, to]`, split into windows of at most 1,000 blocks; a `max results` error halves the window. Decode with the SDK `ENTITY_EVENTS_ABI`. The entity key is topic 1. For `EntityCreated` the owner is topic 2.
 3. Relevance prefilter (SPECS §4): keep a touched key when it is already indexed, or when it was created in this batch by an owner the expression's `$creator`/`$owner` terms allow. When the expression has no such terms, keep every touched key.
-4. Query `(<expr>) AND ($key = key(k1) OR ... OR $key = key(k50))` with `atBlock: to`, 50 keys per call.
+4. Query `(<expr>) AND ($key = key(k1) OR ... OR $key = key(k50))` at latest state with `limit: 100`, 50 keys per call.
 5. Keys returned: upsert entity, replace attributes, insert `changes(to, key, false)`.
 6. Keys kept but not returned: the entity was deleted, expired, or stopped matching the filter. Delete it and insert `changes(to, key, true)`. This one rule handles deletes, patches that leave the filter, and transfers that leave a `$owner` filter. No local expression evaluator needed.
 7. Commit the batch in one transaction, setting `head_block = to`. A batch with no relevant keys makes zero `arkiv_query` calls.
@@ -200,7 +207,7 @@ Every batch also runs the expiry sweep at `to`: `DELETE FROM entities WHERE expi
 
 Provider limits (from the Arkiv indexing guide, observed on Tiramisu): `eth_getLogs` fails above 20,000 results (`-32602 query exceeds max results 20000`), so retry the suggested range or halve the window; JSON-RPC batches above 50 calls fail with HTTP 413; `-32006` means the requested block state is unavailable, so keep the checkpoint and never substitute head. The indexer stores the hash of `head_block` and rechecks it each batch; a mismatch (reorg or reset) triggers a fresh backfill into a new store generation. Confirmation lag is a policy, not finality.
 
-If `atBlock` falls outside the retained range (indexer down too long, `-32006`), fall back to a fresh backfill into a new store generation `-g<n>`, selected through `active-generation.json`.
+If logs fall outside the roughly 1,000 block retention window, a capacity error on the lagging checkpoint triggers a fresh store generation. The active generation pointer changes after the replacement is published.
 
 ### 7.6 Snapshot
 
@@ -255,7 +262,7 @@ In Compose the indexer is internal (`expose` only). The hosted deployment also g
 2. Fetch the manifest. Check `chainId` and genesis hash against the RPC, and show a banner on mismatch.
 3. Import the snapshot into tables `base_entities` and `base_attributes` (data is small, so full import, no lazy views).
 4. Poll `delta.json` every 2 s with `If-None-Match` and refetch the manifest about every 10 s. On change, replace `delta_entities`, `delta_attributes`, `delta_tombstones`. A delta whose `fromBlock` does not follow the manifest's snapshot block triggers a manifest refetch first.
-5. Freshness comes from the browser live tail, read through the `/api/rpc` proxy (section 12), starting at `delta.toBlock + 1`. Poll logs every four seconds in windows of 1,000 blocks. Apply deletes, expiry extensions and transfers from logs. Creations and patches enter `live_pending`; fetch attributes with expression scoped batches of at most 50 keys (`atBlock` head, `limit` 50), at most once every 20 seconds. Use the indexed key and creation owner relevance prefilter from 7.5. HTTP 429 pauses attribute fetching until Retry-After while log updates continue. Failed requests never delete rows. Live rows compete with delta and base by updated block, with live winning ties. Pending rows keep previous attributes. Clear live tables on snapshot version change.
+5. Freshness comes from the browser live tail, read through the `/api/rpc` proxy (section 12), starting at `delta.toBlock + 1`. Poll logs every four seconds in windows of 1,000 blocks. Apply deletes, expiry extensions and transfers from logs. Creations and patches enter `live_pending`; fetch attributes with expression scoped batches of at most 50 keys (latest state, `limit` 50), at most once every 20 seconds. Use the indexed key and creation owner relevance prefilter from 7.5. HTTP 429 pauses attribute fetching until Retry-After while log updates continue. Failed requests never delete rows. Live rows compete with delta and base by updated block, with live winning ties. Pending rows keep previous attributes. Clear live tables on snapshot version change.
 
 The backend may serve an existing store with `SYNC_PAUSED=true`, making no RPC calls and requiring no API key. Missing stores fail startup clearly. If the indexer is unreachable, the proxy serves the same files from a read only mount of the data directory (9.0). The optional API key is used by the keyed indexer modes (7.1) and by the web server's read proxy (section 12). It never reaches the browser.
 6. Poll `eth_blockNumber` every 2 s and store it as `live_head`.
@@ -316,7 +323,7 @@ Block numbers convert to time at 2 seconds per block. Charts use Recharts or pla
 
 ### 9.3 Row actions
 
-- Payload: fetched on demand from Arkiv RPC (`$key = k`, select payload), never through the indexer.
+- Payload: fetched on demand from Arkiv RPC (`$key = key(k)`, select attributes, limit 1), never through the indexer.
 - Verify (P1): when the result has a `key` column, batch query `$key = k` at head (chunks of 50, selection `key`, `updatedAt`, `expiresAt`, `owner`) and label each row `ok`, `stale`, `extended`, `expired` or `deleted`, or `present` when the result lacks `updated_at` and `expires_at`. The tooltip names the RPC URL and block checked and states that this is a consistency check, not a cryptographic proof, because `eth_getProof` is unavailable.
 
 ## 10. Application writer

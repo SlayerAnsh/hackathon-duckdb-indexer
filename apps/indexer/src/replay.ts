@@ -1,5 +1,5 @@
 import * as T from '@duckdb/node-api'
-import { clampBlock, ENTITY_EVENTS_ABI, decodeEventLog, RpcError, type ArkivRpc, type RawLog } from '@asi/core'
+import { clampBlock, ENTITY_EVENTS_ABI, decodeEventLog, isLogCapacityError, RpcError, type ArkivRpc, type RawLog } from '@asi/core'
 import type { Store } from './store'
 
 export async function fetchLogsAdaptive(rpc: ArkivRpc, from: number, to: number, onWindow: (logs: RawLog[], from: number, to: number) => Promise<void>, opts: { window?: number; sleep?: (ms: number) => Promise<void> } = {}): Promise<void> {
@@ -17,8 +17,8 @@ export async function fetchLogsAdaptive(rpc: ArkivRpc, from: number, to: number,
         await sleep(Number.isFinite(delay) ? Math.max(0, delay) : 1000)
         continue
       }
-      if (!(error instanceof RpcError && error.code === -32602 && /max results/i.test(error.message)) || start === end) throw error
-      const range = /retry with the range\s+(\d+)-(\d+)/i.exec(error.message)
+      if (!isLogCapacityError(error) || start === end) throw error
+      const range = /retry with the range\s+(\d+)-(\d+)/i.exec((error as RpcError).message)
       if (range && Number(range[1]) === start && Number(range[2]) >= start && Number(range[2]) < end) end = Number(range[2])
       else end = start + Math.floor((end - start + 1) / 2) - 1
       window = end - start + 1

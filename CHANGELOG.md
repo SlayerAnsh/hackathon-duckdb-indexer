@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+* Backfill scans split the key space into 16 equal ranges scanned 4 at a time, with serialized store writes and drained workers on failure. A full anonymous scan of about 87,000 entities costs roughly 9,000 of the 10,000 hourly anonymous query units, so a second scan from the same IP within the hour waits for `Retry-After` (up to about 30 minutes) before resuming.
+
+* Migrated runtime dependencies and writes to Arkiv SDK 1.0.1. Rabdi wallet and balance labels now use tGLM.
+* Default backfill is `scan`. `query` authenticates the same latest state scan; `logs` requires retained genesis history. Reads use keyset pages of at most 100 without historical state or reusable cursors. A lagging checkpoint outside Rabdi's roughly 1,000 block log window triggers an automatic generation rebuild.
+* Bytes attributes retain a 32 byte hex prefix and full byte length in the index. Widget, dashboard and link JSON lives in the unindexed `payload` bytes attribute. Application filters index `type`, `project`, `user`, `dashboard` and `widget`, where present.
+
 * Rabdi is the only chain. Tiramisu support and the `NEXT_PUBLIC_ARKIV_CHAIN` selector are removed; every default RPC, explorer and chain ID now points at Rabdi (chain 7794095). Renamed `NEXT_PUBLIC_TIRAMISU_RPC_URL` to `NEXT_PUBLIC_ARKIV_RPC_URL` and `TIRAMISU_API_KEY` to `ARKIV_API_KEY`; deployments must rename them. Existing index data directories hold Tiramisu data and must be replaced. Dated evidence from the challenge stays on Tiramisu and its explorer links stay there.
 
 * New logo: SQL brackets around rising bars, a query over chain data drawn as a chart. Used in the top bar, the footer, the README and as the SVG favicon (`apps/web/app/icon.svg`, replacing `favicon.ico`). My home uses the shared Explore widget and dashboard cards.

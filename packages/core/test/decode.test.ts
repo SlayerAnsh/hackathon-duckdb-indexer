@@ -1,10 +1,10 @@
 import { test, expect } from 'bun:test'
 import { decodeEntity, decodeAttribute } from '../src/decode'
 import type { RpcEntity } from '../src/types'
-const fixture: RpcEntity = { key: '0x95fad865481db04f4ee45c83421546b3a1b8adbdccce650ec445d17c61f4cd23', owner: '0x679b5ab1cd4b488d73025d0d72d4017fa2d97b59', creator: '0x679b5ab1cd4b488d73025d0d72d4017fa2d97b59', createdAt: '0xb55f4', updatedAt: '0xb55f4', expiresAt: '0xb5978', creationFlags: { readonly: false, permissionlessExtension: false, raw: 0 }, contentType: 'application/octet-stream', attributes: [{ name: 'project', type: 'str', value: 'arkiv-chain-indexer-baseload' }, { name: 'random_number_0_21eaaa3098b459fe', type: 'u64', value: '0x6c9cfffaf132' }] }
+const fixture: RpcEntity = { key: '0x95fad865481db04f4ee45c83421546b3a1b8adbdccce650ec445d17c61f4cd23', owner: '0x679b5ab1cd4b488d73025d0d72d4017fa2d97b59', creator: '0x679b5ab1cd4b488d73025d0d72d4017fa2d97b59', createdAt: '0xb55f4', updatedAt: '0xb55f4', expiresAt: '0xb5978', creationFlags: { readonly: false, permissionlessExtension: false, raw: 0 }, attributes: [{ name: 'project', type: 'str', value: 'arkiv-chain-indexer-baseload' }, { name: 'random_number_0_21eaaa3098b459fe', type: 'u64', value: '0x6c9cfffaf132' }] }
 const attr = (type: string, value: unknown) => decodeAttribute('0xAB', { name: 'a', type, value })
 test('decodes entity row', () => {
-  expect(decodeEntity(fixture).entity).toEqual({ key: fixture.key!, owner: fixture.owner!, creator: fixture.creator!, created_at: 742900, updated_at: 742900, expires_at: 743800, creation_flags: 0, content_type: 'application/octet-stream' })
+  expect(decodeEntity(fixture).entity).toEqual({ key: fixture.key!, owner: fixture.owner!, creator: fixture.creator!, created_at: 742900, updated_at: 742900, expires_at: 743800, creation_flags: 0, content_type: null })
 })
 test('decodes str', () => {
   expect(decodeEntity(fixture).attributes[0]).toEqual({ key: fixture.key!, name: 'project', type: 'str', value: 'arkiv-chain-indexer-baseload', num: null })
@@ -28,10 +28,15 @@ test('lowercases addr, key, bytes32 and entity addresses', () => {
   expect(decodeEntity({ ...fixture, key: '0xAB', owner: '0xCD', creator: '0xEF' }).entity).toMatchObject({ key: '0xab', owner: '0xcd', creator: '0xef' })
 })
 test('creationFlags as number', () => { expect(decodeEntity({ ...fixture, creationFlags: 2 }).entity.creation_flags).toBe(2) })
-test('optional content and attributes may be absent', () => {
-  const decoded = decodeEntity({ ...fixture, contentType: undefined, attributes: undefined })
+test('attributes may be absent and content type is always null on Rabdi', () => {
+  const decoded = decodeEntity({ ...fixture, attributes: undefined })
   expect(decoded.entity.content_type).toBeNull(); expect(decoded.attributes).toEqual([])
 })
 test('clamps block fields beyond safe integer precision', () => {
   expect(decodeEntity({ ...fixture, createdAt: '0xffffffffffffffff', updatedAt: '0xffffffffffffffff', expiresAt: '0xffffffffffffffff' }).entity).toMatchObject({ created_at: Number.MAX_SAFE_INTEGER, updated_at: Number.MAX_SAFE_INTEGER, expires_at: Number.MAX_SAFE_INTEGER })
+})
+test('bytes attributes keep a 32 byte hex prefix and their full length', () => {
+  expect(attr('bytes', '0xDEADBEEF')).toEqual({ key: '0xab', name: 'a', type: 'bytes', value: '0xdeadbeef', num: 4 })
+  const long = attr('bytes', '0x' + 'ab'.repeat(1000))
+  expect(long.value).toBe('0x' + 'ab'.repeat(32)); expect(long.num).toBe(1000)
 })

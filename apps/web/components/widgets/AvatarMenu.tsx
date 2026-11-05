@@ -47,8 +47,8 @@ export function AccountPopoverView({ address, login, balance, copied, onCopy, on
   <div className={a.sec}>
    <div className={a.balRow}><span className={a.label}>Balance</span>{balance.wei === null ? <span className={a.unknown}>Balance unavailable</span> : <span className={a.glm}>{formatGlm(balance.wei)}</span>}</div>
    <p className={a.net}>Rabdi testnet. Pays for extend, transfer and delete.</p>
-   {balance.wei !== null && balance.level === 'low' && <p className={`${a.note} ${a.warn}`}><Warn/>Below 0.1 GLM. Extending and deleting widgets may fail.</p>}
-   {balance.wei !== null && balance.level === 'empty' && <p className={`${a.note} ${a.bad}`}><Warn/>No GLM. Fund this address to extend or delete widgets.</p>}
+   {balance.wei !== null && balance.level === 'low' && <p className={`${a.note} ${a.warn}`}><Warn/>Below 0.1 tGLM. Extending and deleting widgets may fail.</p>}
+   {balance.wei !== null && balance.level === 'empty' && <p className={`${a.note} ${a.bad}`}><Warn/>No tGLM. Fund this address to extend or delete widgets.</p>}
   </div>
   <div className={`${a.sec} ${a.links}`}>
    {LINKS.map(link => <Link key={link.href} href={link.href} className="mi" data-menu-item="true" onClick={onClose}><svg {...icon}>{link.path}</svg>{link.label}</Link>)}

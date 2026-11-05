@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test'
 import { loadConfig } from '../src/config'
 test('all entity defaults and normalized expression', () => {
-  for (const expression of [undefined, '', '   ']) expect(loadConfig({ ARKIV_API_KEY: 'x', INDEX_EXPRESSION: expression })).toMatchObject({ expression: '', backfillMode: 'logs', publicRpcUrl: 'https://rpc.rabdi.db-chain.testnet.arkiv.network' })
+  for (const expression of [undefined, '', '   ']) expect(loadConfig({ ARKIV_API_KEY: 'x', INDEX_EXPRESSION: expression })).toMatchObject({ expression: '', backfillMode: 'scan', publicRpcUrl: 'https://rpc.rabdi.db-chain.testnet.arkiv.network' })
   expect(loadConfig({ ARKIV_API_KEY: 'x', PUBLIC_RPC_URL: 'public', BACKFILL_MODE: 'query' })).toMatchObject({ publicRpcUrl: 'public', backfillMode: 'query' })
   expect(() => loadConfig({ ARKIV_API_KEY: 'x', BACKFILL_MODE: 'bad' })).toThrow('BACKFILL_MODE')
 })
@@ -11,7 +11,8 @@ test('fill defaults use the anonymous public RPC', () => {
   expect(() => loadConfig({ ARKIV_API_KEY: 'x', FILL_CHUNK: '51' })).toThrow('FILL_CHUNK')
 })
 test('API key is optional and unused by default', () => {
-  expect(loadConfig({})).toMatchObject({ apiKey: '', syncUseApiKey: false, fillUseApiKey: false, backfillMode: 'logs' })
+  expect(loadConfig({})).toMatchObject({ apiKey: '', syncUseApiKey: false, fillUseApiKey: false, backfillMode: 'scan' })
+  expect(loadConfig({ BACKFILL_MODE: 'logs' }).backfillMode).toBe('logs')
   expect(loadConfig({ ARKIV_API_KEY: 'x' })).toMatchObject({ apiKey: 'x', syncUseApiKey: false })
   expect(loadConfig({ ARKIV_API_KEY: 'x', SYNC_USE_API_KEY: 'true' })).toMatchObject({ syncUseApiKey: true })
 })

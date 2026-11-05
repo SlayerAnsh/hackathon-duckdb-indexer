@@ -1,11 +1,11 @@
 import { DEFAULT_RPC_URL } from '../../chain'
-import { ExpirationTime, type AttributeInputs } from '@arkiv-network/sdk'
-import { addr, key } from '@arkiv-network/sdk/attr'
+import { ExpirationTime } from '@arkiv-network/sdk'
+import { addr, DashboardSchema, key, LinkSchema, WidgetSchema } from '../arkiv-schemas'
 import { privateKeyToAccount } from 'viem/accounts'
 import { asDashboard, asLink, asWidget, jsonPayload, queryAll } from '../entities'
 import { OFFICIAL_DASHBOARDS, type OfficialDashboardDef } from '../official-defs'
 import { isOfficialOwned, officialExpr, OFFICIAL_KEEP_DAYS, OFFICIAL_LOGIN } from '../official'
-import { BLOCKS_PER_DAY, CONTENT_TYPE, DASH_PROJECT, MAX_LINKS_PER_DASHBOARD, MAX_REMAINING_DAYS, SIZES, parseDashboardPayload, parseWidgetPayload, utf8Bytes } from '../schema'
+import { BLOCKS_PER_DAY, DASH_PROJECT, MAX_LINKS_PER_DASHBOARD, MAX_REMAINING_DAYS, SIZES, parseDashboardPayload, parseWidgetPayload, utf8Bytes } from '../schema'
 import { read, write, type OpsDeps } from './operations'
 
 export type SeedResult = { created: { slug: string; key: string; txHash: string }[]; skipped: string[] }
@@ -47,11 +47,12 @@ export async function seedOfficial(deps: OpsDeps, defs = OFFICIAL_DASHBOARDS): P
     const n = def.widgets.length
     const predicted = await read(() => deps.client.predictEntityKeys({ owner: deps.client.account!.address, count: 1 + 2 * n }))
     const common = { project: DASH_PROJECT, user: addr(hex(deps.wallet)) }
-    const create = (index: number, attributes: AttributeInputs, payload: object) => ({ salt: predicted[index].salt, attributes,
-      payload: jsonPayload(payload), contentType: CONTENT_TYPE, expires: ExpirationTime.fromSeconds(90 * 86400) })
-    const creates = [create(0, { ...common, type: 'dashboard', login: OFFICIAL_LOGIN, title: def.title, slug: def.slug, ...(def.cover === undefined ? {} : { cover: key(predicted[1 + def.cover].key) }) }, { v: 1, title: def.title, description: def.description }),
-      ...def.widgets.map(({ widget }, i) => create(1 + i, { ...common, type: 'widget', login: OFFICIAL_LOGIN, name: widget.name, chart: widget.chart }, widget)),
-      ...def.widgets.map(({ widget, size }, i) => create(1 + n + i, { ...common, type: 'link', dashboard: key(predicted[0].key), widget: key(predicted[1 + i].key) }, { v: 1, size, position: i, name: widget.name }))]
+    const options = (index: number) => ({ salt: predicted[index].salt, expiration: ExpirationTime.fromSeconds(90 * 86400) })
+    const creates = [{ ...options(0), schema: DashboardSchema, values: { ...common, type: 'dashboard', login: OFFICIAL_LOGIN, title: def.title, slug: def.slug,
+        ...(def.cover === undefined ? {} : { cover: key(predicted[1 + def.cover].key) }), payload: jsonPayload({ v: 1, title: def.title, description: def.description }) } },
+      ...def.widgets.map(({ widget }, i) => ({ ...options(1 + i), schema: WidgetSchema, values: { ...common, type: 'widget', login: OFFICIAL_LOGIN, name: widget.name, chart: widget.chart, payload: jsonPayload(widget) } })),
+      ...def.widgets.map(({ widget, size }, i) => ({ ...options(1 + n + i), schema: LinkSchema, values: { ...common, type: 'link', dashboard: key(predicted[0].key), widget: key(predicted[1 + i].key),
+        payload: jsonPayload({ v: 1, size, position: i, name: widget.name }) } }))]
     const tx = await write(() => deps.client.executeBatch({ creates }))
     result.created.push({ slug: def.slug, key: predicted[0].key, txHash: tx.txHash })
   })
@@ -65,7 +66,7 @@ async function reconcileOfficialCovers(deps: OpsDeps, dryRun: boolean, snapshot?
  const live = entities.filter(e => e.expiresAt > head)
  const widgets = new Map(live.map(e => asWidget(e, deps.wallet)).filter(w => w !== null).map(w => [w.key, w]))
  const links = live.map(e => asLink(e, deps.wallet)).filter(l => l !== null)
- const patches: { entityKey: `0x${string}`; set: { cover: ReturnType<typeof key> } }[] = []
+ const patches: { schema: typeof DashboardSchema; entityKey: `0x${string}`; set: { cover: ReturnType<typeof key> } }[] = []
  for (const entity of live) {
   const dashboard = asDashboard(entity, deps.wallet)
   if (!dashboard?.official) continue
@@ -74,7 +75,7 @@ async function reconcileOfficialCovers(deps: OpsDeps, dryRun: boolean, snapshot?
   const name = def.widgets[def.cover].widget.name
   const candidates = links.filter(l => l.dashboardKey === dashboard.key && l.user === dashboard.user && widgets.get(l.widgetKey)?.name === name).sort((a,b) => a.link.position - b.link.position || a.key.localeCompare(b.key))
   const cover = candidates[0]?.widgetKey
-  if (cover && cover !== dashboard.cover) patches.push({ entityKey: hex(dashboard.key), set: { cover: key(hex(cover)) } })
+  if (cover && cover !== dashboard.cover) patches.push({ schema: DashboardSchema, entityKey: hex(dashboard.key), set: { cover: key(hex(cover)) } })
  }
  if (!dryRun) for (let i = 0; i < patches.length; i += 50) await write(() => deps.client.executeBatch({ patches: patches.slice(i, i + 50) }))
  return patches.length
@@ -91,7 +92,7 @@ export function keepOfficialAlive(deps: OpsDeps, { keepDays = OFFICIAL_KEEP_DAYS
     const due = live.filter(e => e.expiresAt < head + keepDays * BLOCKS_PER_DAY && e.expiresAt < target)
     const result: KeepaliveResult = { checked: live.length, extended: 0, txHashes: [] }
     for (let i = 0; i < due.length; i += 50) {
-      const extensions = due.slice(i, i + 50).map(e => ({ entityKey: hex(e.key), expires: ExpirationTime.atBlock(BigInt(target)) }))
+      const extensions = due.slice(i, i + 50).map(e => ({ entityKey: hex(e.key), expiration: ExpirationTime.atBlock(BigInt(target)) }))
       const tx = await write(() => deps.client.executeBatch({ extensions }))
       result.extended += extensions.length
       result.txHashes.push(tx.txHash)

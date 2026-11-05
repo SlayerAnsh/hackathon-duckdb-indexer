@@ -1,10 +1,10 @@
 export { extendTarget } from '../time'
 import { isOfficialUser } from '../official'
-import { ExpirationTime, type AttributeInputs, type WalletArkivClient, type PublicArkivClient } from '@arkiv-network/sdk'
-import { addr, key } from '@arkiv-network/sdk/attr'
+import { ExpirationTime, type PatchEntityParameters, type WalletArkivClient, type PublicArkivClient } from '@arkiv-network/sdk'
+import { addr, DashboardSchema, key, LinkSchema, WidgetSchema } from '../arkiv-schemas'
 import { RpcError, type ArkivRpc } from '@asi/core'
 import { type DashboardEntity, type LinkEntity, type WidgetEntity, asDashboard, asLink, asWidget, dashboardBundleExpr, jsonPayload, keysExprs, queryAll, widgetVersionExpr } from '../entities'
-import { WIDGET_FLAGS, BLOCKS_PER_DAY, DASHBOARD_LIFETIME_DAYS, SIZES, isEntityKey, parseDashboardPayload, type Parsed, CONTENT_TYPE, DASH_PROJECT, MAX_LINKS_PER_DASHBOARD, type Size, type WidgetPayload, type WriteResult } from '../schema'
+import { WIDGET_FLAGS, BLOCKS_PER_DAY, DASHBOARD_LIFETIME_DAYS, SIZES, isEntityKey, parseDashboardPayload, type Parsed, DASH_PROJECT, MAX_LINKS_PER_DASHBOARD, type Size, type WidgetPayload, type WriteResult } from '../schema'
 import { dashErrors } from './errors'
 import type { WriteQueue } from './queue'
 import type { Session } from './session'
@@ -18,8 +18,8 @@ function requireUser(deps: OpsDeps, session: Session): void {
   if (isOfficialUser(session.address, deps.wallet)) throw dashErrors.forbidden()
 }
 
-export function widgetAttributes(w: WidgetPayload, s: Session): AttributeInputs {
-  return { type: 'widget', project: DASH_PROJECT, user: addr(hex(s.address)), login: s.login, name: w.name, chart: w.chart }
+export function widgetAttributes(w: WidgetPayload, s: Session) {
+  return { type: 'widget', project: DASH_PROJECT, user: addr(hex(s.address)), login: s.login, name: w.name, chart: w.chart, payload: jsonPayload(w) }
 }
 export async function read<T>(work: () => Promise<T>): Promise<T> {
   try { return await work() } catch (error) {
@@ -76,11 +76,11 @@ export function createWidget(deps: OpsDeps, s: Session, input: { widget: WidgetP
     } else head = await read(() => deps.reader.blockNumber())
     const predicted = await read(() => deps.client.predictEntityKeys({ owner: deps.client.account!.address, count: (input.addTo ? 2 : 1) as number }))
     const widgetKey = predicted[0]
-    const creates = [{ attributes: widgetAttributes(input.widget, s), payload: jsonPayload(input.widget), contentType: CONTENT_TYPE,
-      expires: ExpirationTime.fromSeconds(input.widget.lifetimeDays * 86400), flags: WIDGET_FLAGS, salt: widgetKey.salt }]
-    const patches = relinks.map(l => ({ entityKey: hex(l.key), set: { widget: key(widgetKey.key) }, payload: jsonPayload({ ...l.link, name: input.widget.name }), contentType: CONTENT_TYPE }))
+    const widgetCreate = { schema: WidgetSchema, values: widgetAttributes(input.widget, s),
+      expiration: ExpirationTime.fromSeconds(input.widget.lifetimeDays * 86400), flags: WIDGET_FLAGS, salt: widgetKey.salt }
+    const patches = relinks.map(l => ({ schema: LinkSchema, entityKey: hex(l.key), set: { widget: key(widgetKey.key), payload: jsonPayload({ ...l.link, name: input.widget.name }) } }))
     const result = await write(() => deps.client.executeBatch({
-      creates: [...creates, ...(dashboard && input.addTo ? [{ ...linkCreate(dashboard, { widget: widgetKey.key, size: input.addTo.size, position, name: input.widget.name }, dashboard.expiresAt), salt: predicted[1].salt }] : [])],
+      creates: [widgetCreate, ...(dashboard && input.addTo ? [{ ...linkCreate(dashboard, { widget: widgetKey.key, size: input.addTo.size, position, name: input.widget.name }, dashboard.expiresAt), salt: predicted[1].salt }] : [])],
       ...(patches.length ? { patches } : {}), ownershipChanges: [{ entityKey: widgetKey.key, newOwner: hex(s.address) }],
     }))
     return { txHash: result.txHash, afterBlock: head, key: widgetKey.key, expiresAt: head + input.widget.lifetimeDays * BLOCKS_PER_DAY,
@@ -156,15 +156,15 @@ async function readDashboard(deps: OpsDeps, s: Session, entityKey: string, extra
   return { head, dashboard, links, widgets }
 }
 function linkCreate(dashboard: DashboardEntity, item: { widget: string; size: Size; position: number; name: string }, expiresAt: number) {
-  return { attributes: { type: 'link', project: DASH_PROJECT, user: addr(hex(dashboard.user)), dashboard: key(hex(dashboard.key)), widget: key(hex(item.widget)) },
-    payload: jsonPayload({ v: 1, size: item.size, position: item.position, name: item.name }), contentType: CONTENT_TYPE, expires: ExpirationTime.atBlock(BigInt(expiresAt)) }
+  return { schema: LinkSchema, values: { type: 'link', project: DASH_PROJECT, user: addr(hex(dashboard.user)), dashboard: key(hex(dashboard.key)), widget: key(hex(item.widget)),
+    payload: jsonPayload({ v: 1, size: item.size, position: item.position, name: item.name }) }, expiration: ExpirationTime.atBlock(BigInt(expiresAt)) }
 }
 export function createDashboard(deps: OpsDeps, s: Session, input: { title: string; description?: string }): Promise<WriteResult> {
   return deps.queue.run(async () => {
     requireUser(deps, s)
     const head = await read(() => deps.reader.blockNumber())
-    const result = await write(() => deps.client.createEntity({ attributes: { type: 'dashboard', project: DASH_PROJECT, user: addr(hex(s.address)), login: s.login, title: input.title },
-      payload: jsonPayload({ v: 1, title: input.title, description: input.description ?? '' }), contentType: CONTENT_TYPE, expires: ExpirationTime.fromSeconds(DASHBOARD_LIFETIME_DAYS * 86400) }))
+    const result = await write(() => deps.client.createEntity(DashboardSchema, { type: 'dashboard', project: DASH_PROJECT, user: addr(hex(s.address)), login: s.login, title: input.title,
+      payload: jsonPayload({ v: 1, title: input.title, description: input.description ?? '' }) }, { expiration: ExpirationTime.fromSeconds(DASHBOARD_LIFETIME_DAYS * 86400) }))
     return { txHash: result.txHash, afterBlock: head, key: result.entityKey, expiresAt: Number(result.expiresAt) }
   })
 }
@@ -172,8 +172,8 @@ export function updateDashboard(deps: OpsDeps, s: Session, entityKey: string, in
   return deps.queue.run(async () => {
     requireUser(deps, s)
     const { head } = await readDashboard(deps, s, entityKey)
-    const result = await write(() => deps.client.patchEntity({ entityKey: hex(entityKey), set: { title: input.title },
-      payload: jsonPayload({ v: 1, title: input.title, description: input.description ?? '' }), contentType: CONTENT_TYPE }))
+    const result = await write(() => deps.client.patchEntity(DashboardSchema, hex(entityKey), { set: { title: input.title,
+      payload: jsonPayload({ v: 1, title: input.title, description: input.description ?? '' }) } }))
     return { txHash: result.txHash, afterBlock: head }
   })
 }
@@ -195,15 +195,14 @@ export function organizeDashboard(deps: OpsDeps, s: Session, entityKey: string, 
       for (const entity of result.entities) { const widget = asWidget(entity, deps.wallet); if (widget && widget.expiresAt > state.head) state.widgets.set(widget.key, widget) }
     }
     const plan = planOrganize(state, input)
-    const patches = plan.patches.map(p => ({ entityKey: hex(p.link), payload: jsonPayload({ v: 1, size: p.size, position: p.position, name: p.name }), contentType: CONTENT_TYPE }))
+    const patches = plan.patches.map(p => ({ schema: LinkSchema, entityKey: hex(p.link), set: { payload: jsonPayload({ v: 1, size: p.size, position: p.position, name: p.name }) } }))
     // SDK set merges named attributes; unset removes cover without touching identity or slug.
-    const titlePatches = plan.title === undefined && plan.cover === undefined ? [] : [{ entityKey: hex(state.dashboard.key),
-      set: { ...(plan.title === undefined ? {} : { title: plan.title }), ...(plan.cover ? { cover: key(hex(plan.cover)) } : {}) },
-      ...(plan.cover === null ? { unset: ['cover'] } : {}),
-      ...(plan.title === undefined ? {} : { payload: jsonPayload({ ...state.dashboard.dashboard, title: plan.title }), contentType: CONTENT_TYPE }) }]
+    const titlePatches = plan.title === undefined && plan.cover === undefined ? [] : [{ schema: DashboardSchema, entityKey: hex(state.dashboard.key),
+      set: { ...(plan.title === undefined ? {} : { title: plan.title, payload: jsonPayload({ ...state.dashboard.dashboard, title: plan.title }) }), ...(plan.cover ? { cover: key(hex(plan.cover)) } : {}) },
+      ...(plan.cover === null ? { unset: ['cover' as const] } : {}) }]
     if (!plan.creates.length && !patches.length && !titlePatches.length && !plan.deletes.length && !plan.extend.length) return { txHash: '', afterBlock: state.head }
-    const result = await write(() => deps.client.executeBatch({ creates: plan.creates.map(c => linkCreate(state.dashboard, c, plan.target)), patches: [...patches, ...titlePatches],
-      deletes: plan.deletes.map(k => ({ entityKey: hex(k) })), extensions: plan.extend.map(k => ({ entityKey: hex(k), expires: ExpirationTime.atBlock(BigInt(plan.target)) })) }))
+    const result = await write(() => deps.client.executeBatch({ creates: plan.creates.map(c => linkCreate(state.dashboard, c, plan.target)), patches: [...patches, ...titlePatches] as PatchEntityParameters[],
+      deletes: plan.deletes.map(k => ({ entityKey: hex(k) })), extensions: plan.extend.map(k => ({ entityKey: hex(k), expiration: ExpirationTime.atBlock(BigInt(plan.target)) })) }))
     return { txHash: result.txHash, afterBlock: state.head, expiresAt: plan.target }
   })
 }
@@ -215,7 +214,8 @@ export function addLink(deps: OpsDeps, s: Session, dashboardKey: string, input: 
     if (!widget) throw dashErrors.notFound()
     if (links.some(l => l.widgetKey === widget.key)) throw dashErrors.conflict('conflict', 'Widget is already on this dashboard.')
     if (links.length >= MAX_LINKS_PER_DASHBOARD) throw dashErrors.conflict('full', 'Dashboard is full.')
-    const result = await write(() => deps.client.createEntity(linkCreate(dashboard, { widget: widget.key, size: input.size, position: links.reduce((max, l) => Math.max(max, l.link.position), -1) + 1, name: widget.name }, dashboard.expiresAt)))
+    const link = linkCreate(dashboard, { widget: widget.key, size: input.size, position: links.reduce((max, l) => Math.max(max, l.link.position), -1) + 1, name: widget.name }, dashboard.expiresAt)
+    const result = await write(() => deps.client.createEntity(link.schema, link.values, { expiration: link.expiration }))
     return { txHash: result.txHash, afterBlock: head, linkKey: result.entityKey }
   })
 }

@@ -1,4 +1,4 @@
-import { DuckDBInstance } from '../../../packages/core/node_modules/@duckdb/node-api'
+import { DuckDBInstance } from '@duckdb/node-api'
 
 export type NativeRow = {
   key: string; creator: string; owner?: string; created_at?: number; updated_at?: number; expires_at?: number

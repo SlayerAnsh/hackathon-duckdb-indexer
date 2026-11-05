@@ -69,7 +69,7 @@ test('extension eligibility excludes app owned, official, expired and anonymous 
  expect(canExtendWidget(w, 1000, null, W)).toBe(false)
  expect(canExtendWidget({ ...w, expiresAt: 900 }, 1000, U, W)).toBe(false)
  expect(canExtendWidget(w, undefined, U, W)).toBe(true)
- const error = 'Not enough GLM to pay the network fee. Fund your wallet and try again.'
+ const error = 'Not enough tGLM to pay the network fee. Fund your wallet and try again.'
  const html = render(<ExtendDialog expiresAt={2000} head={1000} lifetimeDays={7} phase="error" error={error} onCancel={() => {}} onConfirm={() => {}}/>)
  expect(html).toContain(error); expect(html).toContain('role="alert"')
 })

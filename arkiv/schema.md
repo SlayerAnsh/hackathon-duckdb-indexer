@@ -1,12 +1,25 @@
 # Arkiv schema and queries
 
-This file lists the widget, dashboard and link entity types the web app's app wallet (the dashboard wallet) creates, their attributes and expiry, and every Arkiv RPC request the indexer and the browser send. Network: Rabdi, chain ID 7794095, RPC `https://rpc.rabdi.db-chain.testnet.arkiv.network` (until November 2026: Tiramisu, chain ID 7738577; the app wallet and evidence below are from there). SDK: `@arkiv-network/sdk` 0.8.1 with viem 2.57.7 (declared range `^2.57.3`). App wallet (creator of every app entity): `0x1f61c3cac1612c020f64739b128c5f198939c8cd`; on chain evidence with explorer links is in the [README](../README.md#on-chain-evidence).
+## Rabdi runtime (November 2026)
+
+The runtime uses Arkiv SDK 1.0.1 on Rabdi, chain 7794095, with two second blocks and native currency tGLM. RPC authentication remains `Authorization: Bearer <key>`. Dated Tiramisu measurements and evidence describe the earlier network only.
+
+`BACKFILL_MODE=scan` is the default. It scans latest state without credentials, splitting the key space into 16 equal ranges scanned 4 at a time. `query` performs the same scan with the API key and enables keyed live sync. `logs` replays from genesis and requires a provider retaining that history. Rabdi serves roughly the most recent 1,000 blocks of logs, so genesis replay is unsuitable for its public RPC. When a lagging checkpoint encounters unavailable logs, the indexer automatically builds and publishes a fresh store generation.
+
+Rabdi has no historical state. Reads never send `atBlock`. Pages contain at most 100 entities. Cursors are bound to one block and cannot safely be reused across requests. Each range uses keyset pages ordered by `$key:key ASC`, with `$key >= key(<lo>)` on its first page and `$key > key(<last>)` on subsequent pages. A bounded range also includes `$key < key(<hi>)`. Bounds use full 32 byte hex keys. The final range has no upper bound. Nonblank expressions are parenthesized and joined to the bounds with `AND`. RPC reads run concurrently while store transactions are serialized. These are latest state walks, not atomic snapshots. Changes during a scan require subsequent log reconciliation within the retained window. Key lookups use chunks of at most 50 keys and one bounded page.
+
+Entities have no native `payload` or `contentType`. Blobs are `bytes` attributes, up to 128 KiB. The SQL index stores only the first 32 bytes as hex in `attributes.value` and the full byte length in `attributes.num`; `content_type` remains NULL for compatibility. Widget, dashboard and link JSON is UTF8 encoded in an unindexed `payload` bytes attribute and fetched in full only for rendering. The indexed application attributes are `type`, `project`, `user`, `dashboard` and `widget`, where present. Other application attributes are unindexed. Strings are limited to 128 bytes and entities to 32 attributes.
+
+RPC filters require indexed attributes, typed hex literals such as `addr()` and `key()`, `AND`, `OR`, `NOT` and `$expiresAt`. The removed forms `&&`, `||`, `~`, `!=` and `$expiration` must not be used. SDK creates use `(schema, values, { expiration })`; batch creates carry `schema`, `values`, `expiration` and optional `flags` and `salt`. Patches carry `schema`, `entityKey`, `set` and optional `unset`. Extensions use `entityKey` and `expiration`.
+
+
+This file lists the widget, dashboard and link entity types the web app's app wallet (the dashboard wallet) creates, their attributes and expiry, and every Arkiv RPC request the indexer and the browser send. Network: Rabdi, chain ID 7794095, RPC `https://rpc.rabdi.db-chain.testnet.arkiv.network` (until November 2026: Tiramisu, chain ID 7738577; the app wallet and evidence below are from there). SDK: `@arkiv-network/sdk` 1.0.1 with viem 2.57.7 (declared range `^2.57.3`). App wallet (creator of every app entity): `0x1f61c3cac1612c020f64739b128c5f198939c8cd`; on chain evidence with explorer links is in the [README](../README.md#on-chain-evidence).
 
 The open source indexer (`apps/indexer`) is schema agnostic. It mirrors every live entity that matches `INDEX_EXPRESSION` (blank means every entity on the chain), whatever its attributes. The application entity types, lifetimes and operations are documented in [Widget dashboards](#widget-dashboards). Payloads stay on chain and are fetched on demand, never stored in Parquet.
 
 ## SQL columns
 
-Every entity also has the system fields `key`, `owner`, `creator`, `createdAt`, `updatedAt`, `expiresAt`, `contentType` and `creationFlags`. Public SQL exposes two views:
+Every entity also has the system fields `key`, `owner`, `creator`, `createdAt`, `updatedAt`, `expiresAt` and `creationFlags`. Public SQL exposes two views:
 
 * `entities`: `key`, `owner`, `creator`, `created_at`, `updated_at`, `expires_at`, `content_type`, `creation_flags`, `attrs_pending`.
 * `attributes`: `key`, `name`, `type`, `value`, `num`.
@@ -17,12 +30,12 @@ Block numbers are numeric. Addresses and keys are lowercase hex. `value` is cano
 
 ## Exact Arkiv queries
 
-All requests are direct JSON RPC POSTs built by `packages/core/src/rpc.ts`. `atBlock` and `limit` are sent as hex quantities. `$key` predicates are rendered with SDK `key`, `eq`, `or` and `render`, in chunks of at most 50 keys (`packages/core/src/query.ts`).
+All requests are direct JSON RPC POSTs built by `packages/core/src/rpc.ts`. `limit` is sent as a hex quantity. No read sends `atBlock`. `$key` predicates are rendered with SDK `key`, `eq`, `or` and `render`, in chunks of at most 50 keys (`packages/core/src/query.ts`).
 
 The row selection `ROW_SELECT` is:
 
 ```json
-{"key":true,"owner":true,"creator":true,"createdAt":true,"updatedAt":true,"expiresAt":true,"creationFlags":true,"contentType":true,"attributes":true}
+{"key":true,"owner":true,"creator":true,"createdAt":true,"updatedAt":true,"expiresAt":true,"creationFlags":true,"attributes":true}
 ```
 
 ### Key chunk shape
@@ -42,15 +55,15 @@ A single key keeps the outer parentheses but has no `OR`. With a blank expressio
 | Store identity | `eth_chainId`; `eth_getBlockByNumber("0x0", false)` for the genesis hash | Startup |
 | Confirmed head | `eth_blockNumber`, minus `CONFIRMATIONS` (default 3) | Every 2 s |
 | Reorg check | `eth_getBlockByNumber(<block>, false)` hash of the checkpoint and of the batch end | Every batch |
-| Backfill replay | `eth_getLogs({address: 0x4400000000000000000000000000000000000044, fromBlock, toBlock})` from block zero, adaptive windows starting at 20,000 blocks | Once, resumable per window |
+| Backfill scan | `arkiv_query(<keyset expression>, {limit: 100, select: ROW_SELECT})` at latest state | Startup and rebuild |
 | Live sync | Same `eth_getLogs` in windows of at most 1,000 blocks, decoded with SDK `ENTITY_EVENTS_ABI` | Every `SYNC_BATCH_BLOCKS` (default 5) blocks |
-| Attribute fill | `arkiv_query(<key chunk>, {atBlock: <indexed head>, limit: 200, select: ROW_SELECT, cursor})` with up to `FILL_CHUNK` (default 50) pending keys, newest `updated_at` first | Every `FILL_INTERVAL_MS` (default 4000 ms) |
+| Attribute fill | `arkiv_query(<key chunk>, {limit: 100, select: ROW_SELECT})` with up to `FILL_CHUNK` (default 50) pending keys, newest `updated_at` first | Every `FILL_INTERVAL_MS` (default 4000 ms) |
 
-No `arkiv_query` runs per event. A fill response is accepted only if its `blockNumber` equals the requested `atBlock`, and a fetched row is written only if the key is still pending and unchanged since that block.
+No `arkiv_query` runs per event. Fill reads latest state and writes only keys still pending and unchanged since selection.
 
 ### Indexer (opt in, keyed)
 
-`BACKFILL_MODE=query` pages the expression itself at one confirmed block: `arkiv_query(INDEX_EXPRESSION, {atBlock: head minus CONFIRMATIONS, limit: 200, select: ROW_SELECT, cursor})`. With `SYNC_USE_API_KEY=true` or `BACKFILL_MODE=query`, live sync queries the touched relevant keys of each batch as key chunks with `{atBlock: <batch end>, limit: 200, select: ROW_SELECT, cursor}` on `ARKIV_RPC_URL`, sending `Authorization: Bearer <ARKIV_API_KEY>`. Returned keys replace their attributes; relevant indexed keys that are missing become tombstones. A batch with no relevant keys sends no `arkiv_query`.
+`BACKFILL_MODE=query` uses the same latest state scan as `scan`, with Bearer authentication. Keyed sync fetches relevant touched keys in chunks of 50 with `limit: 100` and no cursor or historical block. Returned rows replace their attributes. Missing relevant keys become tombstones.
 
 ### Browser (through the `/api/rpc` read proxy, no credentials in the browser)
 
@@ -61,15 +74,15 @@ Browser reads go to the web app's same origin `POST /api/rpc`, which forwards th
 | Live head | `eth_blockNumber`, stored as `live_head` | Every 2 s |
 | Chain check | `eth_chainId` and genesis hash, compared with the manifest | Each manifest refresh (about every 10 s) |
 | Live tail | `eth_getLogs` on the Arkiv address from `delta.toBlock + 1`, windows of at most 1,000 blocks | Every 4 s |
-| Live attributes | `arkiv_query(<key chunk with the manifest expression>, {atBlock: <head>, limit: 50, select: ROW_SELECT})` for up to 50 created or patched keys | At most once every 20 s; HTTP 429 pauses it until Retry-After |
-| Payload button | `arkiv_query("$key = key(<key>)", {select: {"payload":true,"contentType":true}})` at current head | On click |
-| Verify button (`verifyRows` in `apps/web/lib/verify.ts`) | `arkiv_query(<bare key chunk>, {select: {"key":true,"updatedAt":true,"expiresAt":true,"owner":true}, cursor})` for the result's keys, chunks of 50 | On click |
+| Live attributes | `arkiv_query(<key chunk with the manifest expression>, {limit: 50, select: ROW_SELECT})` for up to 50 created or patched keys | At most once every 20 s; HTTP 429 pauses it until Retry-After |
+| Payload button | `arkiv_query("$key = key(<key>)", {limit: 1, select: {"attributes":true}})` at current head | On click |
+| Verify button (`verifyRows` in `apps/web/lib/verify.ts`) | `arkiv_query(<bare key chunk>, {limit: 100, select: {"key":true,"updatedAt":true,"expiresAt":true,"owner":true}})` for the result's keys, chunks of 50 | On click |
 
-Payload and Verify use bare key predicates without the configured expression, without `atBlock` and without an explicit limit. Verify compares returned metadata with the indexed row and the live head; it is an RPC comparison, not a cryptographic proof, so it trusts the RPC node that answers (the server's `NEXT_PUBLIC_ARKIV_RPC_URL`, reached through `/api/rpc`; a self hosted app can point it at any endpoint or its own node), and a missing entity cannot distinguish deletion from expiry. The browser relevance prefilter matches the indexer: a log is used when its key is already known, when its `EntityCreated` owner matches a `$creator` or `$owner` term, or when the expression has no such terms.
+Payload and Verify use bare key predicates without the configured expression, without `atBlock`, with explicit limits of 1 and 100 respectively. Verify compares returned metadata with the indexed row and the live head; it is an RPC comparison, not a cryptographic proof, so it trusts the RPC node that answers (the server's `NEXT_PUBLIC_ARKIV_RPC_URL`, reached through `/api/rpc`; a self hosted app can point it at any endpoint or its own node), and a missing entity cannot distinguish deletion from expiry. The browser relevance prefilter matches the indexer: a log is used when its key is already known, when its `EntityCreated` owner matches a `$creator` or `$owner` term, or when the expression has no such terms.
 
 ## Widget dashboards
 
-The web backend writes `widget`, `dashboard` and `link` entities with `contentType: application/json` and UTF-8 JSON payloads. The app wallet is the Arkiv creator of every entity. A user widget's Arkiv owner is the user's wallet; dashboards, links and Featured widgets remain app owned. The `user` attribute records widget authorship and application ownership for dashboards and links, represented by a Privy embedded wallet. Widget owner controls and My widgets use the Arkiv owner, never the author. Login values are `google`, `discord`, `x` or `telegram`; no email, social handle or Privy user ID is written. Payloads remain off Parquet. Everything is public.
+The web backend writes `widget`, `dashboard` and `link` entities with JSON in a `payload` bytes attribute. The app wallet is the Arkiv creator of every entity. A user widget's Arkiv owner is the user's wallet; dashboards, links and Featured widgets remain app owned. The `user` attribute records widget authorship and application ownership for dashboards and links, represented by a Privy embedded wallet. Widget owner controls and My widgets use the Arkiv owner, never the author. Login values are `google`, `discord`, `x` or `telegram`; no email, social handle or Privy user ID is written. Only the bytes prefix and length reach Parquet; full JSON is read from the RPC. Everything is public.
 
 | Entity type | Attribute | Arkiv type | Value or purpose |
 | :--- | :--- | :--- | :--- |
@@ -155,7 +168,7 @@ Size spans on a 12 column row are `xs: 3`, `sm: 4`, `md: 6`, `xl: 12`; phones sh
 
 ### Expiry and operations
 
-One day is 43,200 blocks at two seconds per block. App wallet writes (widget create and new version, dashboards, links, organize, Featured seed and keepalive) run through `apps/web/lib/dash/server/operations.ts` inside one serial wallet queue and check ownership against live RPC state. User widgets have `readonly: true` and `permissionlessExtension: true`, fixed at creation. Creating and transferring happen in one `executeBatch` with `creates` then `ownershipChanges`; only the predicted widget key is transferred to the session address. Links have no creation flags and are never transferred. Widget extend, delete and transfer have no server endpoint: the user's Privy wallet signs them in the browser (`apps/web/lib/dash/widget-actions.ts`) and needs GLM. Saving stays free.
+One day is 43,200 blocks at two seconds per block. App wallet writes (widget create and new version, dashboards, links, organize, Featured seed and keepalive) run through `apps/web/lib/dash/server/operations.ts` inside one serial wallet queue and check ownership against live RPC state. User widgets have `readonly: true` and `permissionlessExtension: true`, fixed at creation. Creating and transferring happen in one `executeBatch` with `creates` then `ownershipChanges`; only the predicted widget key is transferred to the session address. Links have no creation flags and are never transferred. Widget extend, delete and transfer have no server endpoint: the user's Privy wallet signs them in the browser (`apps/web/lib/dash/widget-actions.ts`) and needs tGLM. Saving stays free.
 
 | Entity or action | Implemented operation and expiry |
 | :--- | :--- |
@@ -203,7 +216,7 @@ Without extras, the dashboard bundle includes only the dashboard key alternative
 ($creator = addr(0x1f61c3cac1612C020f64739B128C5f198939C8Cd) AND project = str('arkiv-sql-indexer-dash')) AND ($key = key(0x0000000000000000000000000000000000000000000000000000000000000001) OR $key = key(0x0000000000000000000000000000000000000000000000000000000000000002))
 ```
 
-Every expression is sent through `queryAll` as `arkiv_query(expression, { limit: 200, select: DASH_SELECT, cursor })`. No `atBlock` is supplied; the returned head is the first page's `blockNumber`, and every cursor page is read. The shared selection is:
+Every expression is sent through `queryAll` with keyset ordering and `limit: 100`. No cursor or `atBlock` is supplied. The returned head is the first page block number; pages may observe different blocks. The shared selection is:
 
 ```json
 {
@@ -213,8 +226,7 @@ Every expression is sent through `queryAll` as `arkiv_query(expression, { limit:
   "createdAt": true,
   "updatedAt": true,
   "expiresAt": true,
-  "attributes": true,
-  "payload": true
+  "attributes": true
 }
 ```
 

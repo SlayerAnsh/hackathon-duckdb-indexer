@@ -126,7 +126,7 @@ export default function AboutPage() {
      <p>The indexer turns the chain into files. The browser turns the files into a database and keeps it current.</p>
      <figure className={s.fig}><StepFlow label="Architecture from the Arkiv RPC to DuckDB in the browser" steps={ARCH}/></figure>
      <dl className={s.parts}>
-      <div><dt>Indexer</dt><dd>Replays public <code>eth_getLogs</code> from block zero without an API key, and writes every live entity from log data. Attributes are filled newest first with <code>$key</code> lookups of at most 50 keys, each pinned to one block with <code>atBlock</code>. Live sync applies creates, patches, extensions, transfers and deletes every 5 blocks.</dd></div>
+      <div><dt>Indexer</dt><dd>Scans latest state in key order with pages of at most 100 entities. Attributes are filled newest first with <code>$key</code> lookups of at most 50 keys. Rabdi retains roughly 1,000 blocks of logs; the indexer rebuilds when it falls behind that window. Live sync applies creates, patches, extensions, transfers and deletes every 5 blocks.</dd></div>
       <div><dt>Snapshot, delta, live tail</dt><dd>A new versioned pair of Parquet files every 30 blocks, keeping the latest two. A JSON delta carries every key changed since that snapshot, and the browser polls it every 2 seconds. Between deltas, the browser tails chain logs every 4 seconds and fetches attributes for new keys at most every 20 seconds.</dd></div>
       <div><dt>DuckDB WASM</dt><dd>Merges the three sources into two views, <code>entities</code> and <code>attributes</code>. Every query runs in your tab; there is no server SQL endpoint.</dd></div>
       <div><dt><code>/data</code> proxy</dt><dd>Next.js forwards manifest, delta and Parquet requests to <code>INDEXER_URL</code> (the hosted indexer for this app, or your own), with ETags and Range support. If the indexer is down, it serves the same files from a read only mount.</dd></div>
@@ -175,8 +175,8 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build`}
        <tbody>
         <tr><th scope="row">Save a widget</th><td>Any logged in user</td><td>Through the app, free.</td></tr>
         <tr><th scope="row">Edit a widget</th><td>Its Arkiv owner</td><td>Through the app, free. Saves a new version and repoints your dashboard links.</td></tr>
-        <tr><th scope="row">Extend a widget</th><td>Any logged in user</td><td>Signed in the browser, paid in GLM. Adds its lifetime again, up to 90 days ahead.</td></tr>
-        <tr><th scope="row">Delete or transfer a widget</th><td>Its Arkiv owner</td><td>Signed in the browser, paid in GLM.</td></tr>
+        <tr><th scope="row">Extend a widget</th><td>Any logged in user</td><td>Signed in the browser, paid in tGLM. Adds its lifetime again, up to 90 days ahead.</td></tr>
+        <tr><th scope="row">Delete or transfer a widget</th><td>Its Arkiv owner</td><td>Signed in the browser, paid in tGLM.</td></tr>
         <tr><th scope="row">Edit a dashboard</th><td>Its owner (the <code>user</code> attribute)</td><td>Through the app. Dashboards and links stay owned by the app wallet.</td></tr>
        </tbody>
       </table>

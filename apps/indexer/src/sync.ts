@@ -1,5 +1,5 @@
 import * as T from '@duckdb/node-api'
-import { clampBlock, ENTITY_EVENTS_ABI, decodeEventLog, decodeEntity, keyChunkQueries, ownerTerms, ROW_SELECT, RpcError, type ArkivRpc, type RawLog } from '@asi/core'
+import { clampBlock, ENTITY_EVENTS_ABI, decodeEventLog, decodeEntity, keyChunkQueries, getLogsSplitting, ownerTerms, ROW_SELECT, type ArkivRpc, type RawLog } from '@asi/core'
 import { ensureMisses } from './fill'
 import type { Store } from './store'
 export function touchedFromLogs(logs: RawLog[]): { keys: string[]; createdBy: Map<string, string> } {
@@ -15,16 +15,8 @@ export function touchedFromLogs(logs: RawLog[]): { keys: string[]; createdBy: Ma
 }
 // Logs for [from, to] in windows of 1,000 blocks; capacity errors split a window in half.
 async function batchLogs(rpc: ArkivRpc, from: number, to: number): Promise<RawLog[]> {
-  async function logs(start: number, end: number): Promise<RawLog[]> {
-    try { return await rpc.getLogs(start, end) }
-    catch (error) {
-      if (!(error instanceof RpcError && error.code === -32602 && /max results/i.test(error.message)) || start === end) throw error
-      const mid = Math.floor((start + end) / 2)
-      return [...await logs(start, mid), ...await logs(mid + 1, end)]
-    }
-  }
   const all: RawLog[] = []
-  for (let start = from; start <= to; start += 1000) all.push(...await logs(start, Math.min(to, start + 999)))
+  for (let start = from; start <= to; start += 1000) all.push(...await getLogsSplitting(rpc, start, Math.min(to, start + 999)))
   return all
 }
 
@@ -87,15 +79,13 @@ export async function syncBatch(rpc: ArkivRpc, store: Store, expression: string,
   return store.transaction(async () => {
     const returned = new Set<string>()
     let upserted = 0
+    // Rabdi keeps no historical state, so key lookups read the latest state. A chunk holds at most 50 keys,
+    // which always fits one page of 100, so no cursor (which Rabdi binds to a single block) is needed.
     for (const query of queries) {
-      let cursor: string | undefined
-      do {
-        const page = await queryRpc.query(query, { atBlock: to, limit: 200, select: ROW_SELECT, cursor })
-        if (page.blockNumber !== to) throw Error('Snapshot block mismatch')
-        const rows = page.data.map(decodeEntity)
-        for (const row of rows) returned.add(row.entity.key)
-        await store.upsert(rows, to); upserted += rows.length; cursor = page.cursor
-      } while (cursor)
+      const page = await queryRpc.query(query, { limit: 100, select: ROW_SELECT })
+      const rows = page.data.map(decodeEntity)
+      for (const row of rows) returned.add(row.entity.key)
+      await store.upsert(rows, to); upserted += rows.length
     }
     const removed = relevant.filter(k => indexed.has(k) && !returned.has(k))
     await store.remove(removed, to)

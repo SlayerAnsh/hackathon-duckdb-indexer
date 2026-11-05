@@ -15,7 +15,7 @@ export async function extendWidgetDirect(client: UserWalletClient, w: { key: str
  const target = extendTarget(w.expiresAt, head, w.lifetimeDays)
  if (w.expiresAt <= head) throw new WalletActionError('expired')
  if (target <= w.expiresAt) throw new WalletActionError('at_cap')
- const { txHash } = await client.extendEntity({ entityKey: hex(w.key), expires: ExpirationTime.atBlock(BigInt(target)) })
+ const { txHash } = await client.extendEntity({ entityKey: hex(w.key), expiration: ExpirationTime.atBlock(BigInt(target)) })
  return { txHash, afterBlock: head, expiresAt: target }
 }
 export async function deleteWidgetDirect(client: UserWalletClient, key: string): Promise<DirectResult> {

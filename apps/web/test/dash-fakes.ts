@@ -14,9 +14,9 @@ export const PREDICTED_2 = `0x${'a2'.padStart(64, '0')}` as const
 export const validWidget: WidgetPayload = { ...emptyWidget(), name: 'Top 10 creators', sql: 'SELECT creator, count(*) AS n FROM entities GROUP BY 1 ORDER BY n DESC LIMIT 10', chart: 'hbar', mapping: { x: 'creator', y: ['n'], groupBy: null, stacking: 'off', sort: 'query' } }
 type RowOptions = { owner?: string; key?: string; user?: string; expiresAt?: number; creator?: string }
 function row(type: string, attrs: Record<string, string>, payload: object, options: RowOptions): RpcRow {
-  return { key: (options.key ?? K) as `0x${string}`, owner: (options.owner ?? W) as `0x${string}`, creator: (options.creator ?? W) as `0x${string}`, createdAt: '0x1', updatedAt: '0x2', expiresAt: `0x${(options.expiresAt ?? 5000).toString(16)}`,
+  return rabdiEntity({ key: (options.key ?? K) as `0x${string}`, owner: (options.owner ?? W) as `0x${string}`, creator: (options.creator ?? W) as `0x${string}`, createdAt: '0x1', updatedAt: '0x2', expiresAt: `0x${(options.expiresAt ?? 5000).toString(16)}`,
     attributes: Object.entries({ type, project: DASH_PROJECT, user: options.user ?? U, ...attrs }).map(([name, value]) => ({ name, value, type: name === 'user' ? 'addr' : ['dashboard', 'widget'].includes(name) ? 'key' : 'str' })),
-    payload: `0x${Buffer.from(JSON.stringify(payload)).toString('hex')}` }
+    payload: `0x${Buffer.from(JSON.stringify(payload)).toString('hex')}` }) as RpcRow
 }
 export function widgetRow(options: RowOptions & { widget?: WidgetPayload } = {}): RpcRow {
   const widget = options.widget ?? validWidget
@@ -35,11 +35,11 @@ export function fakeChain(entities: RpcRow[], head = 1000) {
     calls.push({ method, data })
     return { txHash: '0xtx', entityKey: PREDICTED_1, createdEntities: [PREDICTED_1, PREDICTED_2], expiresAt: BigInt(0) }
   }
-  const client = { account: { address: W }, createEntity: record('create'), patchEntity: record('patch'), extendEntity: record('extend'), deleteEntity: record('delete'), executeBatch: async (data: any) => {
+  const client = { account: { address: W }, createEntity: async (schema: any, values: any, options: any) => record('create')({ schema, values, ...options }), patchEntity: async (schema: any, entityKey: any, changes: any) => record('patch')({ schema, entityKey, ...changes }), extendEntity: record('extend'), deleteEntity: record('delete'), executeBatch: async (data: any) => {
       const result = await record('batch')(data)
       for (const extension of data.extensions ?? []) {
         const entity = entities.find(e => e.key === extension.entityKey)
-        if (entity) entity.expiresAt = `0x${extension.expires.expiresAt.toString(16)}`
+        if (entity) entity.expiresAt = `0x${extension.expiration.expiresAt.toString(16)}`
       }
       return result
     },
@@ -47,7 +47,7 @@ export function fakeChain(entities: RpcRow[], head = 1000) {
       key: `0x${(0xa1 + i).toString(16).padStart(64, '0')}` as `0x${string}`, salt: BigInt(i + 1),
     })) } as unknown as DashWriterClient
   const deps: OpsDeps = { client, wallet: W, queue: new WriteQueue(), reader: {
-    query: async expression => { queries.push(expression); return { data: entities, blockNumber: head } }, blockNumber: async () => head,
+    query: async (expression, options) => { queries.push(expression); const after = expression.match(/\$key > key\((0x[0-9a-f]+)\)/i)?.[1]; return { data: [...entities].sort((a, b) => a.key!.localeCompare(b.key!)).filter(e => !after || e.key! > after).slice(0, options?.limit ?? 100), blockNumber: head } }, blockNumber: async () => head,
   } }
   return { deps, calls, queries }
 }
@@ -61,4 +61,10 @@ export function officialDashboardRow(slug = 'network-overview', options: RowOpti
   const result = dashboardRow({ user: W, ...options })
   result.attributes = [...result.attributes!.map(a => a.name === 'login' ? { ...a, value: 'arkiv' } : a), { name: 'slug', value: slug, type: 'str' }]
   return result
+}
+
+/** Rabdi has no entity payload: fixtures written with one get it as the `payload` bytes attribute instead. */
+export function rabdiEntity<T extends { attributes?: { name: string; type: string; value: unknown }[] }>(e: T & { payload?: string }): Omit<T, 'payload'> {
+  const { payload, ...rest } = e
+  return { ...rest, attributes: [...(rest.attributes ?? []), ...(payload === undefined ? [] : [{ name: 'payload', type: 'bytes', value: payload }])] } as Omit<T, 'payload'>
 }

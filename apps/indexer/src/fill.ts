@@ -39,19 +39,18 @@ export async function fillPending(rpc: ArkivRpc, store: Store, expression: strin
     // Newest first; keys the RPC did not return yet go to the back so they never block the queue.
     const keys = (await store.conn.runAndReadAll(`SELECT e.key FROM entities e LEFT JOIN fill_misses m USING (key) WHERE e.attrs_pending
       ORDER BY coalesce(m.misses, 0), e.updated_at DESC, e.created_at DESC, e.key LIMIT ?`, [opts.chunk ?? 50], [T.INTEGER])).getRowObjects().map(row => String(row.key))
-    return { keys, atBlock: state.head_block }
+    return { keys }
   })
   if (!picked || !picked.keys.length) return { fetched: 0, dropped: 0 }
-  const { keys, atBlock } = picked
+  const { keys } = picked
   const found = new Map<string, ReturnType<typeof decodeEntity>>()
+  // Rabdi keeps no historical state: read the latest one and compare against the block it was read at.
+  // At most 50 keys per chunk, so one page of 100 always holds the answer.
+  let atBlock: number
   try {
-    let cursor: string | undefined
-    do {
-      const page = await rpc.query(keyChunkQueries(expression || null, keys)[0]!, { atBlock, cursor, limit: 200, select: ROW_SELECT })
-      if (page.blockNumber !== atBlock) throw Error('Fill block mismatch')
-      for (const raw of page.data) { const row = decodeEntity(raw); found.set(row.entity.key, row) }
-      cursor = page.cursor
-    } while (cursor)
+    const page = await rpc.query(keyChunkQueries(expression || null, keys)[0]!, { limit: 100, select: ROW_SELECT })
+    atBlock = page.blockNumber
+    for (const raw of page.data) { const row = decodeEntity(raw); found.set(row.entity.key, row) }
   } catch (error) {
     if (error instanceof RpcError && error.status === 429) return { fetched: 0, dropped: 0, pausedUntil: retryAt(error.retryAfter, now()) }
     throw error

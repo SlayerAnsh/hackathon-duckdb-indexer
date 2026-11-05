@@ -2,13 +2,13 @@ import type { RpcEntity } from './types'
 export type { RpcEntity } from './types'
 export type RpcSelect = {
   key?: boolean; owner?: boolean; creator?: boolean; createdAt?: boolean
-  updatedAt?: boolean; expiresAt?: boolean; creationFlags?: boolean; contentType?: boolean
-  payload?: boolean; attributes?: boolean
+  updatedAt?: boolean; expiresAt?: boolean; creationFlags?: boolean
+  attributeSchema?: boolean; attributes?: boolean; count?: boolean
 }
 export type QueryPage = { data: RpcEntity[]; blockNumber: number; cursor?: string }
 export type RawLog = { topics: string[]; data: string; blockNumber: number; logIndex: number; transactionHash: string }
 export interface ArkivRpc {
-  query(expression: string, opts: { atBlock?: number; cursor?: string; limit?: number; select: RpcSelect }): Promise<QueryPage>
+  query(expression: string, opts: { atBlock?: number; cursor?: string; limit?: number; offset?: number; select: RpcSelect }): Promise<QueryPage>
   blockNumber(): Promise<number>
   chainId(): Promise<number>
   genesisHash(): Promise<string>
@@ -17,11 +17,28 @@ export interface ArkivRpc {
 }
 export const ROW_SELECT: RpcSelect = {
   key: true, owner: true, creator: true, createdAt: true, updatedAt: true,
-  expiresAt: true, creationFlags: true, contentType: true, attributes: true,
+  expiresAt: true, creationFlags: true, attributes: true,
 }
 export class RpcError extends Error {
   constructor(message: string, public status: number, public code: string | number, public retryAfter: string | null = null) {
     super(message); this.name = 'RpcError'
+  }
+}
+// Errors that mean the log window was too much work for the node, so a smaller window can succeed:
+// -32602 "query exceeds max results" (Tiramisu era providers) and Rabdi's -32603
+// "golemdb segment_range_of(transactions): NotImplemented", which a dense range triggers.
+export function isLogCapacityError(error: unknown): boolean {
+  if (!(error instanceof RpcError)) return false
+  return (error.code === -32602 && /max results/i.test(error.message)) ||
+    (error.code === -32603 && /segment_range_of|NotImplemented/i.test(error.message))
+}
+// getLogs that halves the range on capacity errors until single blocks; other errors propagate.
+export async function getLogsSplitting(rpc: Pick<ArkivRpc, 'getLogs'>, from: number, to: number): Promise<RawLog[]> {
+  try { return await rpc.getLogs(from, to) }
+  catch (error) {
+    if (!isLogCapacityError(error) || from === to) throw error
+    const mid = Math.floor((from + to) / 2)
+    return [...await getLogsSplitting(rpc, from, mid), ...await getLogsSplitting(rpc, mid + 1, to)]
   }
 }
 const hex = (n: number) => `0x${n.toString(16)}`
@@ -56,9 +73,9 @@ export function createRpc(url: string, opts: {
   }
   return {
     async query(expression, options) {
-      const { atBlock, limit, ...rest } = options
+      const { atBlock, limit, offset, ...rest } = options
       const page = await request<{ data: RpcEntity[]; blockNumber: string; cursor?: string }>('arkiv_query', [expression, {
-        ...rest, ...(atBlock !== undefined ? { atBlock: hex(atBlock) } : {}), ...(limit !== undefined ? { limit: hex(limit) } : {}),
+        ...rest, ...(atBlock !== undefined ? { atBlock: hex(atBlock) } : {}), ...(limit !== undefined ? { limit: hex(limit) } : {}), ...(offset !== undefined ? { offset: hex(offset) } : {}),
       }])
       return { ...page, blockNumber: Number(page.blockNumber) }
     },

@@ -23,10 +23,11 @@ test('warns without creator term', async () => {
 })
 test('interrupted backfill can restart cleanly', async () => {
   const config = loadConfig({ BACKFILL_MODE: 'query', INDEX_EXPRESSION: expression, ARKIV_API_KEY: 'test', DATA_DIR: await temp() })
-  await expect(bootstrap(config, fake(async (_e, opts) => {
-    if (opts.cursor) throw Error('offline')
-    return { data: [raw()], blockNumber: 100, cursor: 'next' }
-  }))).rejects.toThrow('offline')
+  const { RpcError } = await import('@asi/core')
+  await expect(bootstrap(config, fake(async e => {
+    if (e.includes('$key >')) throw new RpcError('rejected', 200, -32001)
+    return { data: Array.from({ length: 100 }, (_, n) => raw('0x' + (n + 1).toString(16).padStart(64, '0'))), blockNumber: 100 }
+  }))).rejects.toThrow('rejected')
   const result = await bootstrap(config, fake(async () => ({ data: [], blockNumber: 100 }))); track(result.store)
   expect(await rows(result.store, 'SELECT * FROM entities')).toHaveLength(0)
 })
@@ -47,7 +48,7 @@ test('CLI configuration errors have no stack trace', async () => {
 })
 test('logs bootstrap reuses the replay, keeps fetched rows and publishes pending rows without queries', async () => {
   const { event } = await import('./events')
-  const config = loadConfig({ ARKIV_API_KEY: 'x', DATA_DIR: await temp() })
+  const config = loadConfig({ BACKFILL_MODE: 'logs', ARKIV_API_KEY: 'x', DATA_DIR: await temp() })
   const logs = fake(async () => { throw Error('public query') })
   let crash = true
   const getLogs = mock(async () => { if (crash) { crash = false; throw Error('replay failed') } return Array.from({ length: 3 }, (_, n) => event(n + 1, 'EntityCreated', n + 1, 1000)) })
@@ -68,11 +69,11 @@ test('after one fill the delta and manifest carry the filled rows', async () => 
   const { event } = await import('./events')
   const { fillPending } = await import('../src/fill')
   const { publishFill } = await import('../src/main')
-  const config = loadConfig({ ARKIV_API_KEY: 'x', DATA_DIR: await temp() })
+  const config = loadConfig({ BACKFILL_MODE: 'logs', ARKIV_API_KEY: 'x', DATA_DIR: await temp() })
   const logs = fake(async () => { throw Error('public query') })
   logs.getLogs = async () => Array.from({ length: 3 }, (_, n) => event(n + 1, 'EntityCreated', n + 1, 1000))
   const result = await bootstrap(config, logs, () => {}, logs); track(result.store)
-  const filler = fake(async (text, opts) => ({ data: [...text.matchAll(/key\((0x[0-9a-f]+)\)/g)].slice(0, 1).map(m => raw(m[1])), blockNumber: opts.atBlock! }))
+  const filler = fake(async text => ({ data: [...text.matchAll(/key\((0x[0-9a-f]+)\)/g)].slice(0, 1).map(m => raw(m[1])), blockNumber: 100 }))
   expect(await fillPending(filler, result.store, '', { chunk: 1 })).toEqual({ fetched: 1, dropped: 0 })
   await publishFill(result.store, result.dir)
   const { readFile } = await import('node:fs/promises')

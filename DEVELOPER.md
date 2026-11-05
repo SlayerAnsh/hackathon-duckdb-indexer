@@ -1,6 +1,19 @@
 # Developer guide
 
-Use Bun 1.3.x (tested with 1.3.11). Docker uses `oven/bun:1.3` for workspace installation and the indexer, and `node:22-slim` for the Next.js standalone runtime. Key versions from `bun.lock`: `@arkiv-network/sdk` 0.8.1, viem 2.57.3, `@duckdb/node-api` 1.5.6-r.1 (indexer), `@duckdb/duckdb-wasm` 1.33.1-dev57.0 (browser), Next.js 16.4.2, React 19.3.0, `@codemirror/lang-sql` 6.10.0 with `@uiw/react-codemirror`, Recharts 3.
+## Rabdi runtime (November 2026)
+
+The runtime uses Arkiv SDK 1.0.1 on Rabdi, chain 7794095, with two second blocks and native currency tGLM. RPC authentication remains `Authorization: Bearer <key>`. Dated Tiramisu measurements and evidence describe the earlier network only.
+
+`BACKFILL_MODE=scan` is the default. It scans latest state without credentials, splitting the key space into 16 equal ranges scanned 4 at a time. `query` performs the same scan with the API key and enables keyed live sync. `logs` replays from genesis and requires a provider retaining that history. Rabdi serves roughly the most recent 1,000 blocks of logs, so genesis replay is unsuitable for its public RPC. When a lagging checkpoint encounters unavailable logs, the indexer automatically builds and publishes a fresh store generation. A full anonymous scan costs about 9,000 of the 10,000 hourly anonymous query units; a scan that runs out waits for `Retry-After` and resumes.
+
+Rabdi has no historical state. Reads never send `atBlock`. Pages contain at most 100 entities. Cursors are bound to one block and cannot safely be reused across requests. Each range uses keyset pages ordered by `$key:key ASC`, with `$key >= key(<lo>)` on its first page and `$key > key(<last>)` on subsequent pages. A bounded range also includes `$key < key(<hi>)`. Bounds use full 32 byte hex keys. The final range has no upper bound. Nonblank expressions are parenthesized and joined to the bounds with `AND`. RPC reads run concurrently while store transactions are serialized. These are latest state walks, not atomic snapshots. Changes during a scan require subsequent log reconciliation within the retained window. Key lookups use chunks of at most 50 keys and one bounded page.
+
+Entities have no native `payload` or `contentType`. Blobs are `bytes` attributes, up to 128 KiB. The SQL index stores only the first 32 bytes as hex in `attributes.value` and the full byte length in `attributes.num`; `content_type` remains NULL for compatibility. Widget, dashboard and link JSON is UTF8 encoded in an unindexed `payload` bytes attribute and fetched in full only for rendering. The indexed application attributes are `type`, `project`, `user`, `dashboard` and `widget`, where present. Other application attributes are unindexed. Strings are limited to 128 bytes and entities to 32 attributes.
+
+RPC filters require indexed attributes, typed hex literals such as `addr()` and `key()`, `AND`, `OR`, `NOT` and `$expiresAt`. The removed forms `&&`, `||`, `~`, `!=` and `$expiration` must not be used. SDK creates use `(schema, values, { expiration })`; batch creates carry `schema`, `values`, `expiration` and optional `flags` and `salt`. Patches carry `schema`, `entityKey`, `set` and optional `unset`. Extensions use `entityKey` and `expiration`.
+
+
+Use Bun 1.3.x (tested with 1.3.11). Docker uses `oven/bun:1.3` for workspace installation and the indexer, and `node:22-slim` for the Next.js standalone runtime. Key versions from `bun.lock`: `@arkiv-network/sdk` 1.0.1, viem 2.57.3, `@duckdb/node-api` 1.5.6-r.1 (indexer), `@duckdb/duckdb-wasm` 1.33.1-dev57.0 (browser), Next.js 16.4.2, React 19.3.0, `@codemirror/lang-sql` 6.10.0 with `@uiw/react-codemirror`, Recharts 3.
 
 ## Workspace layout
 
@@ -10,7 +23,7 @@ Use Bun 1.3.x (tested with 1.3.11). Docker uses `oven/bun:1.3` for workspace ins
 | `apps/indexer` | DuckDB store, log replay backfill, attribute filler, live sync, snapshots, delta, internal HTTP |
 | `apps/web` | Next.js app that runs against any indexer through `INDEXER_URL`: `/data` proxy with disk fallback, DuckDB WASM loader, browser live tail, Playground, widgets, dashboards, /explore, about page |
 | `apps/web/lib/dash` | Widget schemas, SQL, RPC reads, pending writes, authentication and serialized wallet operations |
-| `apps/web/lib/dash/wallet.ts` | Rabdi wallet transport, balance reads and GLM formatting |
+| `apps/web/lib/dash/wallet.ts` | Rabdi wallet transport, balance reads and tGLM formatting |
 | `apps/web/lib/dash/widget-actions.ts` | Direct widget extend, delete and transfer with safe wallet errors |
 | `apps/web/lib/dash/use-balance.ts` | Session wallet balance state and refresh after signatures |
 | `apps/web/app/api/dash` | Runtime wallet config, session, and authenticated app wallet writes (widget create and new version, dashboards, links, organize) |
@@ -38,7 +51,7 @@ Start the frontend against the hosted indexer, which covers all Rabdi data, with
 
 Next.js loads environment files from `apps/web`, not the repository root. Copy or link the root `.env.local` to `apps/web/.env.local`, or export the variables before starting Next.js. Set `NEXT_PUBLIC_PRIVY_APP_ID`, `PRIVY_APP_SECRET` and `DASHBOARD_PRIVATE_KEY`; the chain (Rabdi, chain ID `7794095`) is defined in `lib/chain.ts` and the RPC uses `NEXT_PUBLIC_ARKIV_RPC_URL`. Optionally set `ARKIV_API_KEY` (server only) so browser reads, which go through the same origin read proxy `POST /api/rpc` (`app/api/rpc/route.ts`, logic in `lib/dash/server/rpc-proxy.ts`), use the keyed quota instead of the anonymous budget. Restart the dev server after changing it. New browser read code must use `createBrowserRpc` or `browserRpcUrl` from `lib/rpc-browser.ts`, and any new read method must be added to `READ_METHODS` in the proxy. Keep secret values out of logs and browser bundles. See the README for Privy provider and embedded wallet setup.
 
-Browser signing needs Rabdi (chain ID `7794095`) in Privy `supportedChains` and as the `defaultChain`. Fund a test wallet with 0.1 GLM or more before testing Extend, Transfer or Delete. Saving widgets and dashboards remains paid by the backend wallet. Balance warnings appear below 0.1 GLM; a zero balance disables signing actions.
+Browser signing needs Rabdi (chain ID `7794095`) in Privy `supportedChains` and as the `defaultChain`. Fund a test wallet with 0.1 tGLM or more before testing Extend, Transfer or Delete. Saving widgets and dashboards remains paid by the backend wallet. Balance warnings appear below 0.1 tGLM; a zero balance disables signing actions.
 
 Nonces, rate limits and the serial backend wallet queue are in memory. Run one web instance to preserve nonce checks, abuse limits and wallet serialization. The dashboard wallet's public address comes from `GET /api/dash/config` at runtime.
 
@@ -83,7 +96,7 @@ In Compose `DATA_DIR=/data` is a bind mount of the host path `INDEX_DATA_PATH` (
 
 ## Backfill and fill
 
-In the default logs mode, backfill replays public logs from block zero to one confirmed block, committing each adaptive window (starting at 20,000 blocks) with its checkpoint. It computes live keys in SQL, writes every live key from log data with `attrs_pending = true`, then writes the first snapshot and checkpoint. `apps/indexer/src/fill.ts` fills attributes newest first beside live sync. The sync tick and the filler share one store lock, and RPC calls run outside it. Pending state lives in `entities`, so a restart resumes filling where it stopped. Keys the RPC does not return move behind untried keys (`fill_misses`). `BACKFILL_MODE=query` pages the expression at one confirmed block instead.
+The default scan mode walks latest state across 16 equal key ranges, scanned 4 at a time, with keyset pages of at most 100 entities. Query mode uses the same walk with the configured API key. Logs mode is reserved for providers retaining genesis history. The filler handles newly pending attributes through latest state key queries, sharing the store lock with sync. A log retention gap triggers a fresh generation rebuild.
 
 ## Live sync
 
@@ -91,7 +104,7 @@ A live batch spans the checkpoint plus one through the confirmed chain head and 
 
 By default (`syncLogs` in `apps/indexer/src/sync.ts`) no API key is used and no `arkiv_query` runs during sync. Events apply in block and log order. Creations allowed by the creator or owner prefilter insert a pending log row. Patches set `attrs_pending` and `updated_at` while keeping the old attributes. Extensions update `expires_at`. Transfers update `owner` (and mark the row pending under a filter expression). Deletions remove the row with a tombstone. Each changed key gets one change row at the batch end. The filler writes a fetched row only while the row is still pending and its `updated_at` is not newer than the block it queried; otherwise the key stays pending and is fetched again later. `createClients` in `main.ts` builds every RPC client, and only a keyed opt in gives a client the key. `apps/indexer/test/keyless.test.ts` asserts that no request carries `Authorization` or `X-API-Key` through bootstrap, ticks and fills.
 
-With `SYNC_USE_API_KEY=true` or `BACKFILL_MODE=query` the keyed path (`syncBatch`) runs instead. It deduplicates touched keys and retains indexed keys plus relevant creations allowed by creator or owner terms (all touched keys without such terms), queries them in chunks of 50 at the batch end with the configured expression, upserts returned entities, replaces their attributes, and removes absent keys with tombstones.
+With `SYNC_USE_API_KEY=true` or `BACKFILL_MODE=query` the keyed path (`syncBatch`) runs instead. It deduplicates touched keys and retains indexed keys plus relevant creations allowed by creator or owner terms (all touched keys without such terms), queries their latest state in chunks of 50 with the configured expression, upserts returned entities, replaces their attributes, and removes absent keys with tombstones.
 
 Both paths sweep `expires_at <= batchEnd` even when no events arrive, check the batch end block hash, and commit the batch and checkpoint together. The delta is then published atomically.
 

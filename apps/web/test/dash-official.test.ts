@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { DuckDBInstance } from '../../../packages/core/node_modules/@duckdb/node-api'
+import { DuckDBInstance } from '@duckdb/node-api'
 import { RAW_TABLES_SQL, MERGE_VIEWS_SQL, MATERIALIZE_SQL, setHeadSql } from '@asi/core'
 import { isOfficialUser, isOfficialOwned, officialExpr } from '../lib/dash/official'
 import { OFFICIAL_DASHBOARDS } from '../lib/dash/official-defs'

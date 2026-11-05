@@ -10,7 +10,7 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@arkiv-network/sdk": "0.8.1",
+    "@arkiv-network/sdk": "1.0.1",
     "@asi/core": "workspace:*",
     "@codemirror/lang-sql": "^6.10.0",
     "@dnd-kit/core": "6.3.1",

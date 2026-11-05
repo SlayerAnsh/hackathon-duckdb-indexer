@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { syncBatch, syncLogs } from './sync'
 import { writeDelta } from './delta'
 import { bootstrappingHandler, createHandler, serve } from './http'
-import { createRpc, hasCreatorTerm, RpcError, type ArkivRpc } from '@asi/core'
+import { createRpc, hasCreatorTerm, isLogCapacityError, RpcError, type ArkivRpc } from '@asi/core'
 import { loadConfig, storeDir, type Config } from './config'
 import { Store } from './store'
 import { replayDetails, replayLiveKeys, replayTarget, writeLogRows } from './replay'
@@ -34,7 +34,7 @@ async function runBackfill(config: Config, logsRpc: ArkivRpc, queryRpc: ArkivRpc
     await replayDetails(logsRpc, store, head, log)
     const written = await writeLogRows(store, head)
     log?.('Live keys at block ' + head + ': ' + keys.length + '; written from logs and pending attributes: ' + written)
-  } else await backfill(queryRpc, store, config.expression, head, log)
+  } else await backfill(config.backfillMode === 'query' ? queryRpc : logsRpc, store, config.expression, log)
 }
 export async function bootstrap(config: Config, rpc: ArkivRpc, log: (msg: string) => void = console.log, queryRpc: ArkivRpc = rpc): Promise<{ store: Store; dir: string; head: number }> {
   const chainId = await rpc.chainId(), genesisHash = await rpc.genesisHash()
@@ -87,6 +87,8 @@ export async function servePaused(config: Config, log: (msg: string) => void = c
   log('Sync paused; serving ' + candidates[0])
   return { dir: candidates[0]! }
 }
+// Below this lag a log error is treated as transient and retried on the next tick.
+export const LOG_WINDOW_GUARD = 500
 export type TickContext = { rpc: ArkivRpc; queryRpc?: ArkivRpc; store: Store; dir: string; config: Config; meta: { chainId: number; genesisHash: string; expression: string }; chainHead?: number }
 async function rebuild(ctx: TickContext, head: number): Promise<void> {
   const { rpc, config } = ctx
@@ -139,6 +141,12 @@ export async function tick(ctx: TickContext): Promise<void> {
     else await syncLogs(rpc, store, config.expression, state.head_block + 1, to)
   }
   catch (error) {
+    // Rabdi serves logs for roughly the last 1,000 blocks only. A single old block it cannot serve means the
+    // checkpoint fell out of that window (the indexer was down or behind), so only a fresh scan can recover.
+    if (isLogCapacityError(error) && ctx.chainHead - state.head_block > LOG_WINDOW_GUARD) {
+      console.log('Logs after block ' + state.head_block + ' are no longer served; building a fresh generation')
+      await rebuild(ctx, Math.max(0, to)); return
+    }
     if (!(error instanceof RpcError && error.code === -32006)) throw error
     // Verify the provider is still ahead before treating unavailable state as a retained-range gap.
     if (await rpc.blockNumber() < to) throw error

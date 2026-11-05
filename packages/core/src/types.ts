@@ -1,5 +1,5 @@
 export type { RpcEntity } from '@arkiv-network/sdk/types'
-export type AttrType = 'str' | 'i32' | 'u64' | 'u256' | 'dec' | 'bool' | 'addr' | 'key' | 'bytes32'
+export type AttrType = 'str' | 'i32' | 'u64' | 'u256' | 'dec' | 'bool' | 'addr' | 'key' | 'bytes32' | 'bytes'
 export type EntityRow = {
   key: string; owner: string; creator: string
   created_at: number; updated_at: number; expires_at: number

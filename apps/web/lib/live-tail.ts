@@ -1,4 +1,4 @@
-import { MATERIALIZE_SQL, ENTITY_EVENTS_ABI, ENTITY_INSERT_COLUMNS, decodeEventLog, createRpc, decodeEntity, keyChunkQueries, ownerTerms, ROW_SELECT, RpcError, type EntityRow, type RawLog } from '@asi/core'
+import { MATERIALIZE_SQL, ENTITY_EVENTS_ABI, ENTITY_INSERT_COLUMNS, decodeEventLog, createRpc, decodeEntity, getLogsSplitting, keyChunkQueries, ownerTerms, ROW_SELECT, RpcError, type EntityRow, type RawLog } from '@asi/core'
 import { createBrowserRpc } from './rpc-browser'
 
 export type LiveChange = { kind: 'upsert'; entity: Partial<EntityRow> & { key: string; updated_at: number }; needsAttributes: boolean } | { kind: 'tombstone'; key: string; block: number }
@@ -60,7 +60,7 @@ export class LiveTail {
     const terms = ownerTerms(this.opts.expression), owners = [...terms.creators, ...terms.owners]
     while (this.block < head && active()) {
       const end = Math.min(head, this.block + 1000)
-      const logs = await this.rpc.getLogs(this.block + 1, end)
+      const logs = await getLogsSplitting(this.rpc, this.block + 1, end)
       const known = new Map<string, EntityRow>()
       const relevant = new Set<string>()
       for (const log of logs) {
@@ -105,7 +105,7 @@ export class LiveTail {
       const keys = [...this.pending].slice(0, 50)
       this.lastQuery = now
       try {
-        const page = await this.rpc.query(keyChunkQueries(this.opts.expression || null, keys)[0]!, { atBlock: head, select: ROW_SELECT, limit: 50 })
+        const page = await this.rpc.query(keyChunkQueries(this.opts.expression || null, keys)[0]!, { select: ROW_SELECT, limit: 50 })
         if (!active()) return
         const rows = new Map(page.data.map(raw => { const row = decodeEntity(raw); return [row.entity.key, row] }))
         const sql: string[] = []

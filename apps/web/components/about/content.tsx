@@ -28,7 +28,7 @@ export const TRUST = [
 export const WIDGET_LIFE: FlowStep[] = [
  { title: 'Save', text: 'The app wallet creates the widget. Saving is free.' },
  { title: 'Transferred to you', text: 'In the same transaction it moves to your wallet.' },
- { title: 'Extend, transfer or delete', text: 'Signed in your browser and paid in GLM. Anyone logged in may extend it.' },
+ { title: 'Extend, transfer or delete', text: 'Signed in your browser and paid in tGLM. Anyone logged in may extend it.' },
  { title: 'Expires', text: 'After its lifetime ends, unless someone extends it.', tone: 'faded' },
 ]
 

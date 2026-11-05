@@ -10,7 +10,7 @@ services:
       ARKIV_API_KEY: ${ARKIV_API_KEY:-}
       INDEX_EXPRESSION: ${INDEX_EXPRESSION:-}
       PUBLIC_RPC_URL: ${PUBLIC_RPC_URL:-https://rpc.rabdi.db-chain.testnet.arkiv.network}
-      BACKFILL_MODE: ${BACKFILL_MODE:-logs}
+      BACKFILL_MODE: ${BACKFILL_MODE:-scan}
       FILL_RPC_URL: ${FILL_RPC_URL:-https://rpc.rabdi.db-chain.testnet.arkiv.network}
       FILL_USE_API_KEY: ${FILL_USE_API_KEY:-false}
       SYNC_USE_API_KEY: ${SYNC_USE_API_KEY:-false}

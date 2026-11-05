@@ -1,4 +1,4 @@
-import { DuckDBInstance } from '../../../packages/core/node_modules/@duckdb/node-api'
+import { DuckDBInstance } from '@duckdb/node-api'
 import { RAW_TABLES_SQL, MERGE_VIEWS_SQL, MATERIALIZE_SQL, setHeadSql } from '@asi/core'
 import { OLD_MERGE_VIEWS_SQL } from '../../../packages/core/test/old-views'
 import { VIEWS } from '../lib/views'

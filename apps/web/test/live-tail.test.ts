@@ -29,6 +29,7 @@ test('throttles queries, preserves pending on 429, retries then tombstones missi
     expect(new Headers(init.headers).has('authorization')).toBe(false)
     const request = JSON.parse(String(init.body))
     if (request.method === 'arkiv_query') {
+      expect(request.params[1]).toEqual({ limit: '0x32', select: { key: true, owner: true, creator: true, createdAt: true, updatedAt: true, expiresAt: true, creationFlags: true, attributes: true } })
       queries++
       if (queries === 1) return Response.json({ error: 'ANON_COST_LIMITED' }, { status: 429, headers: { 'Retry-After': '30' } })
       return Response.json({ result: { data: [], blockNumber: '0x3' } })
@@ -99,7 +100,7 @@ test('successful query replaces attributes and deletion drops pending during bac
 })
 
 test('live log apply refreshes public rows and preserves attributes on transfer', async () => {
-  const { DuckDBInstance } = await import('../../../packages/core/node_modules/@duckdb/node-api')
+  const { DuckDBInstance } = await import('@duckdb/node-api')
   const { RAW_TABLES_SQL, MERGE_VIEWS_SQL, MATERIALIZE_SQL, setHeadSql } = await import('@asi/core')
   const instance = await DuckDBInstance.create(':memory:'); const conn = await instance.connect()
   const apply = async (statements: string[]) => { for (const sql of statements) await conn.run(sql) }

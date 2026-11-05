@@ -48,7 +48,7 @@ test('anonymous home shows login gate', () => {
  const auth: DashAuth = { config: null, status: 'anonymous', confirming: false, error: null, sign: async () => { throw Error('unused') }, requestLogin: async () => false, logout: async () => {}, refresh: async () => {} }
  const html = render(<DashAuthContext.Provider value={auth}><HomePage/></DashAuthContext.Provider>)
  expect(html).toContain('Log in to build dashboards')
- expect(html).toContain('Use Google, Discord, X or Telegram. Saving widgets and dashboards is free and nothing personal goes on chain. Your widgets belong to your wallet; extending, transferring or deleting them is signed by it and needs a little GLM.')
+ expect(html).toContain('Use Google, Discord, X or Telegram. Saving widgets and dashboards is free and nothing personal goes on chain. Your widgets belong to your wallet; extending, transferring or deleting them is signed by it and needs a little tGLM.')
 })
 test('empty home collections use exact copy', () => {
  const html = render(<HomeCollections dashboards={[]} widgets={[]} address={ME} onCreate={() => {}}/> )
@@ -81,7 +81,7 @@ test('home rows accept owner delete actions and header displays the balance warn
  expect(html.match(/Delete widget/g)).toHaveLength(2)
  expect(html).toContain('data-key="one"')
  expect(html).toContain('data-key="two"')
- expect(render(<HomeHeader address={address} balance={{wei:BigInt(40000000000000000),level:'low'}}/>)).toContain('Low balance: 0.04 GLM.')
+ expect(render(<HomeHeader address={address} balance={{wei:BigInt(40000000000000000),level:'low'}}/>)).toContain('Low balance: 0.04 tGLM.')
 })
 test('pending owner changes and deletes hide home widgets until the index catches up', async () => {
  const { visibleWidgetRows } = await import('../components/widgets/HomePage')

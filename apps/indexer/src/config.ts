@@ -1,10 +1,12 @@
 import { join } from 'node:path'
 const PUBLIC_RPC = 'https://rpc.rabdi.db-chain.testnet.arkiv.network'
-export type Config = { publicRpcUrl: string; fillRpcUrl: string; fillUseApiKey: boolean; syncUseApiKey: boolean; fillChunk: number; fillIntervalMs: number; backfillMode: 'logs' | 'query'; syncPaused: boolean; rpcUrl: string; apiKey: string; expression: string; confirmations: number; syncBatchBlocks: number; snapshotIntervalBlocks: number; keepSnapshots: number; dataDir: string; port: number }
+export type Config = { publicRpcUrl: string; fillRpcUrl: string; fillUseApiKey: boolean; syncUseApiKey: boolean; fillChunk: number; fillIntervalMs: number; backfillMode: 'scan' | 'logs' | 'query'; syncPaused: boolean; rpcUrl: string; apiKey: string; expression: string; confirmations: number; syncBatchBlocks: number; snapshotIntervalBlocks: number; keepSnapshots: number; dataDir: string; port: number }
 export function loadConfig(env: Record<string, string | undefined>): Config {
   const syncPaused = env.SYNC_PAUSED === 'true' || env.SYNC_PAUSED === '1'
-  const backfillMode = env.BACKFILL_MODE ?? 'logs'
-  if (backfillMode !== 'logs' && backfillMode !== 'query') throw Error('Invalid BACKFILL_MODE')
+  // scan reads the latest state (Rabdi keeps no log history past about 1,000 blocks); query is the same scan with
+  // the API key; logs replays operation logs from genesis, for chains that still serve them.
+  const backfillMode = env.BACKFILL_MODE ?? 'scan'
+  if (backfillMode !== 'scan' && backfillMode !== 'logs' && backfillMode !== 'query') throw Error('Invalid BACKFILL_MODE')
   const flag = (name: string) => env[name] === 'true' || env[name] === '1'
   const apiKey = env.ARKIV_API_KEY?.trim() ?? ''
   // The API key is optional: only these explicit opt ins send it, and each needs it to be set.

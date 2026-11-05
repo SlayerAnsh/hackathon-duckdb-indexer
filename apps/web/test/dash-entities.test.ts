@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
-import { addr, key } from '@arkiv-network/sdk/attr'
+import { rabdiEntity } from './dash-fakes'
+import { addr, key } from '@arkiv-network/sdk/schema'
 import { and, eq, or, render } from '@arkiv-network/sdk/query'
 import type { ArkivRpc, RpcEntity } from '@asi/core'
 import { emptyWidget } from '../lib/dash/schema'
@@ -12,8 +13,8 @@ const upper = (v: string) => v.toUpperCase().replace('0X', '0x') as `0x${string}
 const hex = (v: object) => ('0x' + Buffer.from(JSON.stringify(v)).toString('hex')) as `0x${string}`
 const validWidget = { ...emptyWidget(), name: 'Top', sql: 'SELECT creator, count(*) AS n FROM entities GROUP BY 1', chart: 'hbar' as const }
 const attr = (name: string, value: string, type = 'str') => ({ name, type, value })
-const row = (over: Partial<RpcEntity> = {}): RpcEntity => ({ key: upper(K), owner: upper(W), creator: upper(W), createdAt: '0x10', updatedAt: '0x20', expiresAt: '0x30',
-  attributes: [attr('type', 'widget'), attr('project', 'arkiv-sql-indexer-dash'), attr('user', upper(U), 'addr'), attr('login', 'google'), attr('name', 'Top'), attr('chart', 'hbar')], payload: hex(validWidget), ...over })
+const row = (over: Partial<RpcEntity> & { payload?: string } = {}): RpcEntity => rabdiEntity({ key: upper(K), owner: upper(W), creator: upper(W), createdAt: '0x10', updatedAt: '0x20', expiresAt: '0x30',
+  attributes: [attr('type', 'widget'), attr('project', 'arkiv-sql-indexer-dash'), attr('user', upper(U), 'addr'), attr('login', 'google'), attr('name', 'Top'), attr('chart', 'hbar')], payload: hex(validWidget), ...over } as RpcEntity & { payload?: string }) as RpcEntity
 
 test('decodes a widget with lowercase hex and numeric blocks', () => {
   const w = asWidget(decodeDashEntity(row()), W)!
@@ -65,16 +66,21 @@ test('expressions scope every read to the dashboard wallet and project', () => {
   expect(keysExprs(W, [])).toEqual([])
 })
 
-test('queryAll follows cursors and reports the first page block', async () => {
-  const pages = [{ data: [row()], blockNumber: 100, cursor: 'c1' }, { data: [row({ key: D })], blockNumber: 101 }]
+test('queryAll pages by key order, 100 at a time, and reports the first page block', async () => {
+  const keys = Array.from({ length: 150 }, (_, n) => '0x' + (n + 1).toString(16).padStart(64, '0'))
   const calls: Parameters<ArkivRpc['query']>[] = []
-  const rpc = { query: async (...args: Parameters<ArkivRpc['query']>) => { calls.push(args); return pages.shift()! } }
+  const rpc = { query: async (...args: Parameters<ArkivRpc['query']>) => {
+    calls.push(args)
+    const after = /\$key > key\((0x[0-9a-f]+)\)/.exec(args[0])?.[1]
+    const from = after ? keys.indexOf(after) + 1 : 0
+    return { data: keys.slice(from, from + 100).map(k => row({ key: k as `0x${string}` })), blockNumber: 100 + calls.length - 1 }
+  } }
   const result = await queryAll(rpc, 'x')
   expect(result.head).toBe(100)
-  expect(result.entities.map(e => e.key)).toEqual([K, D])
-  expect(calls.map(c => c[1].cursor)).toEqual([undefined, 'c1'])
-  expect(calls.every(c => c[0] === 'x' && c[1].limit === 200 && c[1].select === DASH_SELECT)).toBe(true)
-  expect(DASH_SELECT).toEqual({ key: true, owner: true, creator: true, createdAt: true, updatedAt: true, expiresAt: true, attributes: true, payload: true })
+  expect(result.entities.map(e => e.key)).toEqual(keys)
+  expect(calls.map(c => c[0])).toEqual(['(x) ORDER BY $key:key ASC', `(x) AND $key > key(${keys[99]}) ORDER BY $key:key ASC`])
+  expect(calls.every(c => c[1].limit === 100 && c[1].select === DASH_SELECT && c[1].cursor === undefined && c[1].atBlock === undefined)).toBe(true)
+  expect(DASH_SELECT).toEqual({ key: true, owner: true, creator: true, createdAt: true, updatedAt: true, expiresAt: true, attributes: true })
   expect(await queryAll({ query: async () => ({ data: [], blockNumber: 102 }) }, 'x')).toEqual({ head: 102, entities: [] })
 })
 
@@ -108,4 +114,10 @@ test('all official entity decoders require app ownership', async () => {
  expect(asWidget(decodeDashEntity(widgetRow({ owner: U })), W)).toMatchObject({ official: false, owner: U, user: U })
  expect(asDashboard(decodeDashEntity(officialDashboardRow('creators', { owner: U })), W)?.official).toBe(false)
  expect(asLink(decodeDashEntity(linkRow({ user: W, owner: U })), W)?.official).toBe(false)
+})
+
+test('blank dashboard expressions scan all keys without historical state', async () => {
+ const calls: any[] = []
+ await queryAll({ query: async (...args) => { calls.push(args); return { data: [], blockNumber: 102 } } }, '  ')
+ expect(calls).toEqual([['(*) ORDER BY $key:key ASC', { limit: 100, select: DASH_SELECT }]])
 })

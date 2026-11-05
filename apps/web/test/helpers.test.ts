@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test'
-import { DuckDBInstance } from '../../../packages/core/node_modules/@duckdb/node-api'
+import { DuckDBInstance } from '@duckdb/node-api'
 import { RAW_TABLES_SQL, MERGE_VIEWS_SQL, setHeadSql } from '@asi/core'
 import { classifyVerify } from '../lib/verify'
 import { toCsv } from '../lib/csv'

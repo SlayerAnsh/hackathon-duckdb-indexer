@@ -143,7 +143,7 @@ test('valid handlers invoke the existing operations', async () => {
   }
   const { deps, calls } = fixture()
   expect((await routes.handleCreateDashboard(request({ title: 'New' }), deps)).status).toBe(200)
-  expect(calls[0].data.attributes.title).toBe('New')
+  expect(calls[0].data.values.title).toBe('New')
   const added = fixture()
   expect((await routes.handleCreateWidget(request({ widget: validWidget, addTo: { dashboard: D, size: 'sm' } }), added.deps)).status).toBe(200)
   expect(added.calls.map(c => c.method)).toEqual(['batch'])

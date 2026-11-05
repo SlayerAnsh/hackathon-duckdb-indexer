@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test'
 import { renderToStaticMarkup as rawRender } from 'react-dom/server'
 import { QueryProvider } from '../components/QueryProvider'
 const renderToStaticMarkup = (node: React.ReactNode) => rawRender(<QueryProvider>{node}</QueryProvider>)
-import { DuckDBInstance } from '../../../packages/core/node_modules/@duckdb/node-api'
+import { DuckDBInstance } from '@duckdb/node-api'
 import { RAW_TABLES_SQL, MERGE_VIEWS_SQL, MATERIALIZE_SQL, setHeadSql } from '@asi/core'
 import { FIGURE_SQL, averageMs, readFigure } from '../components/landing/stats'
 import { NAV_ITEMS, isActiveRoute, PageNav } from '../components/dash/TopBar'

@@ -1,4 +1,4 @@
-import { key } from '@arkiv-network/sdk/attr'
+import { key } from '@arkiv-network/sdk/schema'
 import { eq, or, render } from '@arkiv-network/sdk/query'
 export function keyChunkQueries(expression: string | null, keys: string[], chunkSize = 50): string[] {
   if (!Number.isInteger(chunkSize) || chunkSize < 1) throw new Error('chunkSize must be a positive integer')

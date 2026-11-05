@@ -1,11 +1,11 @@
 import { defineChain, type Chain } from 'viem'
 
-/** Rabdi DB-Chain testnet (https://stage.docs.arkiv.network). SDK 0.8.1 ships no definition, so it lives here. */
+/** Rabdi DB-Chain testnet (https://stage.docs.arkiv.network). Local definition for the configured Rabdi RPC. */
 export const ARKIV_CHAIN = defineChain({
  id: 7794095,
  name: 'Rabdi',
  network: 'rabdi',
- nativeCurrency: { name: 'Golem', symbol: 'GLM', decimals: 18 },
+ nativeCurrency: { name: 'Golem', symbol: 'tGLM', decimals: 18 },
  rpcUrls: { default: {
   http: ['https://rpc.rabdi.db-chain.testnet.arkiv.network'],
   webSocket: ['wss://rpc.rabdi.db-chain.testnet.arkiv.network'] } },

@@ -17,7 +17,14 @@ function fakeChain() {
     else if (body.method === 'eth_blockNumber') result = hex(chain.head)
     else if (body.method === 'eth_getBlockByNumber') result = { hash: first === '0x0' ? hash : '0x' + Number(first).toString(16).padStart(64, '0') }
     else if (body.method === 'eth_getLogs') result = logs.filter(l => l.blockNumber >= Number(first.fromBlock) && l.blockNumber <= Number(first.toBlock)).map(l => ({ ...l, blockNumber: hex(l.blockNumber), logIndex: hex(l.logIndex) }))
-    else if (body.method === 'arkiv_query') result = { data: [...String(first).matchAll(/key\((0x[0-9a-f]+)\)/g)].map(m => ({ ...raw(m[1]), expiresAt: hex(100000), attributes: [{ name: 'type', type: 'str', value: 'x' }] })), blockNumber: body.params[1].atBlock }
+    else if (body.method === 'arkiv_query') {
+      // Rabdi answers at its latest block. The scan (ORDER BY) sees the entities created before the head;
+      // key lookups return the keys they name.
+      const scanned = [1, 2].map(n => '0x' + n.toString(16).padStart(64, '0'))
+      const bounds = [...String(first).matchAll(/\$key (>=|>|<) key\((0x[0-9a-f]+)\)/g)]
+      const keys = String(first).includes('ORDER BY') ? scanned.filter(key => bounds.every(([, op, bound]) => op === '>=' ? key >= bound! : op === '>' ? key > bound! : key < bound!)) : [...String(first).matchAll(/key\((0x[0-9a-f]+)\)/g)].map(m => m[1]!)
+      result = { data: keys.map(k => ({ ...raw(k), expiresAt: hex(100000), attributes: [{ name: 'type', type: 'str', value: 'x' }] })), blockNumber: hex(chain.head) }
+    }
     else throw Error('unexpected ' + body.method)
     return Response.json({ jsonrpc: '2.0', id: body.id, result })
   }) as unknown as typeof fetch

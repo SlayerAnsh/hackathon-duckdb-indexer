@@ -13,7 +13,7 @@ function fake() {
 }
 test('Rabdi uses the configured RPC and routes signing to the wallet', async () => {
  const chain = arkivChain(url)
- expect(chain.id).toBe(7794095); expect(chain.rpcUrls.default.http).toEqual([url]); expect(chain.nativeCurrency.symbol).toBe('GLM')
+ expect(chain.id).toBe(7794095); expect(chain.rpcUrls.default.http).toEqual([url]); expect(chain.nativeCurrency.symbol).toBe('tGLM')
  for (const method of ['eth_sendTransaction', 'eth_signTransaction', 'eth_accounts', 'eth_requestAccounts', 'eth_chainId', 'wallet_switchEthereumChain', 'wallet_addEthereumChain', 'personal_sign', 'eth_sign', 'eth_signTypedData_v4']) expect(routeRpc(method)).toBe('wallet')
  for (const method of ['eth_blockNumber', 'eth_getTransactionReceipt', 'eth_call', 'eth_getBalance']) expect(routeRpc(method)).toBe('rpc')
  const calls: unknown[] = []
@@ -26,7 +26,7 @@ test('Rabdi uses the configured RPC and routes signing to the wallet', async () 
 test('direct extension reads the head, caps expiry and never sends expired or capped writes', async () => {
  const { client, calls } = fake()
  expect(await extendWidgetDirect(client, { key: K, expiresAt: 44200, lifetimeDays: 7 })).toEqual({ txHash: '0xt', afterBlock: 1000, expiresAt: 1000 + 8 * 43200 })
- expect(calls).toEqual([{ entityKey: K, expires: ExpirationTime.atBlock(BigInt(1000 + 8 * 43200)) }])
+ expect(calls).toEqual([{ entityKey: K, expiration: ExpirationTime.atBlock(BigInt(1000 + 8 * 43200)) }])
  for (const [expiresAt, kind] of [[1000 + 90 * 43200, 'at_cap'], [900, 'expired']] as const) {
   const f = fake()
   await expect(extendWidgetDirect(f.client, { key: K, expiresAt, lifetimeDays: 7 })).rejects.toMatchObject({ kind })
@@ -53,13 +53,13 @@ test('wallet errors recognize nested reverts and return only fixed copy', () => 
   [new Error('boom'), 'wallet'], [new WalletActionError('mismatch'), 'mismatch'],
   [{ walk: (fn: (e: unknown) => boolean) => { const e = { data: { errorName: 'NotOwner' } }; return fn(e) ? e : undefined } }, 'not_owner'],
  ] as const) expect(walletErrorKind(error)).toBe(kind)
- const messages = { rejected: null, not_owner: "Only the widget's owner can do this. It may have been transferred.", expired: 'This widget has expired. Arkiv no longer has it.', funds: 'Not enough GLM to pay the network fee. Fund your wallet and try again.', at_cap: 'Already at the 90 day maximum', mismatch: 'Your wallet changed. Log out and log in again.', wallet: "Your wallet couldn't sign. Try again.", invalid_address: 'Enter a 0x address with 40 hex characters.', self: 'That is already your address.' } as const
+ const messages = { rejected: null, not_owner: "Only the widget's owner can do this. It may have been transferred.", expired: 'This widget has expired. Arkiv no longer has it.', funds: 'Not enough tGLM to pay the network fee. Fund your wallet and try again.', at_cap: 'Already at the 90 day maximum', mismatch: 'Your wallet changed. Log out and log in again.', wallet: "Your wallet couldn't sign. Try again.", invalid_address: 'Enter a 0x address with 40 hex characters.', self: 'That is already your address.' } as const
  for (const kind of Object.keys(messages) as (keyof typeof messages)[]) expect(walletErrorMessage(kind)).toBe(messages[kind])
  expect(new WalletActionError('funds').message).toBe('funds')
 })
 test('balance arithmetic and formatting stay in wei', async () => {
  expect([null, BigInt(0), BigInt('99999999999999999'), BigInt('100000000000000000')].map(balanceLevel)).toEqual(['unknown', 'empty', 'low', 'ok'])
- expect([BigInt('40000000000000000'), BigInt(0), BigInt('1234567890000000000')].map(formatGlm)).toEqual(['0.04 GLM', '0 GLM', '1.2345 GLM'])
+ expect([BigInt('40000000000000000'), BigInt(0), BigInt('1234567890000000000')].map(formatGlm)).toEqual(['0.04 tGLM', '0 tGLM', '1.2345 tGLM'])
  expect(await readBalance(url, U, { getBalance: async () => BigInt(5) })).toBe(BigInt(5))
  expect(await readBalance(url, U, { getBalance: async () => { throw Error('offline') } })).toBeNull()
  expect(await readBalance(url, 'nope', { getBalance: async () => { throw Error('must not call') } })).toBeNull()

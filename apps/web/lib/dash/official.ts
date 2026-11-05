@@ -1,4 +1,4 @@
-import { addr } from '@arkiv-network/sdk/attr'
+import { addr } from '@arkiv-network/sdk/schema'
 import { and, eq, render } from '@arkiv-network/sdk/query'
 import { DASH_PROJECT, isHexAddress } from './schema'
 
