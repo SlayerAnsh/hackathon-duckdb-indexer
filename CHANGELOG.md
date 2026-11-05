@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-* Rabdi testnet (chain 7794095, `rpc.rabdi.db-chain.testnet.arkiv.network`, from https://stage.docs.arkiv.network) as a selectable chain. `NEXT_PUBLIC_ARKIV_CHAIN=rabdi` switches wallet signing, the chain switch, the native currency, the status bar label and the default RPC and explorer in the web app (`apps/web/lib/chain.ts`); Tiramisu stays the default. The indexer reads the chain from its RPC URLs, so Rabdi needs only those URLs and a fresh data directory.
+* Rabdi is the only chain. Tiramisu support and the `NEXT_PUBLIC_ARKIV_CHAIN` selector are removed; every default RPC, explorer and chain ID now points at Rabdi (chain 7794095). Renamed `NEXT_PUBLIC_TIRAMISU_RPC_URL` to `NEXT_PUBLIC_ARKIV_RPC_URL` and `TIRAMISU_API_KEY` to `ARKIV_API_KEY`; deployments must rename them. Existing index data directories hold Tiramisu data and must be replaced. Dated evidence from the challenge stays on Tiramisu and its explorer links stay there.
 
 * New logo: SQL brackets around rising bars, a query over chain data drawn as a chart. Used in the top bar, the footer, the README and as the SVG favicon (`apps/web/app/icon.svg`, replacing `favicon.ico`). My home uses the shared Explore widget and dashboard cards.
 

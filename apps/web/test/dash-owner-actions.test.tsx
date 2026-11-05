@@ -7,7 +7,7 @@ import { shortHex } from '../lib/format'
 const U = '0x' + 'ef'.repeat(20)
 test('balance notice warns below 0.1 GLM and hides unknown and sufficient balances', () => {
  const html = render(<BalanceNotice address={U} wei={BigInt(40000000000000000)} level="low"/>)
- for (const text of ['Low balance: 0.04 GLM.', 'needs at least 0.1 GLM on Tiramisu', shortHex(U), 'role="status"', 'notice notice-warn', 'Copy address']) expect(html).toContain(text)
+ for (const text of ['Low balance: 0.04 GLM.', 'needs at least 0.1 GLM on Rabdi', shortHex(U), 'role="status"', 'notice notice-warn', 'Copy address']) expect(html).toContain(text)
  expect(render(<BalanceNotice address={U} wei={BigInt(1)} level="low" initialCopied/>)).toContain('✓ Copied')
  expect(render(<BalanceNotice address={U} wei={BigInt(0)} level="empty"/>)).toContain('Your wallet has no GLM.')
  for (const level of ['ok', 'unknown'] as const) expect(render(<BalanceNotice address={U} wei={null} level={level}/>)).toBe('')

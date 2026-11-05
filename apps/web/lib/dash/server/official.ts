@@ -107,6 +107,6 @@ export function readOfficialEnv(env: Record<string, string | undefined>): { ok: 
   if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey)) return { ok: false, reason: 'DASHBOARD_PRIVATE_KEY must be a 32 byte hex key' }
   try {
     const wallet = privateKeyToAccount(privateKey as `0x${string}`).address.toLowerCase()
-    return { ok: true, privateKey: privateKey as `0x${string}`, wallet, rpcUrl: env.NEXT_PUBLIC_TIRAMISU_RPC_URL?.trim() || DEFAULT_RPC_URL }
+    return { ok: true, privateKey: privateKey as `0x${string}`, wallet, rpcUrl: env.NEXT_PUBLIC_ARKIV_RPC_URL?.trim() || DEFAULT_RPC_URL }
   } catch { return { ok: false, reason: 'DASHBOARD_PRIVATE_KEY is invalid' } }
 }

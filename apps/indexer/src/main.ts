@@ -17,7 +17,7 @@ function keyFlags(config: Config): string[] {
 const keyedSync = (config: Config) => config.backfillMode === 'query' || config.syncUseApiKey
 export function keyUsage(config: Config): string {
   const flags = keyFlags(config)
-  if (!flags.length) return 'API key not used: live sync applies public logs and attributes fill on the anonymous RPC budget' + (config.apiKey ? ' (TIRAMISU_API_KEY is set but ignored)' : '') + '.'
+  if (!flags.length) return 'API key not used: live sync applies public logs and attributes fill on the anonymous RPC budget' + (config.apiKey ? ' (ARKIV_API_KEY is set but ignored)' : '') + '.'
   return 'Warning: API key enabled by ' + flags.join(', ') + '; ' + [keyedSync(config) ? 'live sync key lookups' : '', config.fillUseApiKey ? 'attribute fills' : ''].filter(Boolean).join(' and ') + ' spend the monthly quota.'
 }
 // Builds every RPC client. Only clients for an enabled opt in carry the API key; by default none does.

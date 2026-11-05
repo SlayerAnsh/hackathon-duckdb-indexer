@@ -104,7 +104,7 @@ function CreateDashboardDialog({ open, onClose }: { open: boolean; onClose(): vo
   </>}>
   <form id="new-dashboard-form" className="field-stack" noValidate onSubmit={event => { event.preventDefault(); void create() }}>
    <Field label="Title" error={invalid} hint={invalid ? undefined : `${trimmed.length}/${TITLE_MAX} characters. Shown on the card and the public page.`}>
-    <input className="input" data-autofocus="true" maxLength={TITLE_MAX} placeholder="Tiramisu activity" autoComplete="off" value={title} onChange={event => setTitle(event.target.value)} onBlur={() => { if (title) setTouched(true) }} disabled={busy}/>
+    <input className="input" data-autofocus="true" maxLength={TITLE_MAX} placeholder="Rabdi activity" autoComplete="off" value={title} onChange={event => setTitle(event.target.value)} onBlur={() => { if (title) setTouched(true) }} disabled={busy}/>
    </Field>
    {error && <div className="notice notice-bad" role="alert"><div><p>{error}</p></div></div>}
   </form>

@@ -1,7 +1,7 @@
 """Check indexed rows against the chain, the same rule as the web app's Verify button.
 
 The index is a cache; the chain is the record. This script reads the most recently updated rows of
-an indexer's current Parquet snapshot, asks a Tiramisu RPC node for the same keys (one
+an indexer's current Parquet snapshot, asks a Rabdi RPC node for the same keys (one
 `arkiv_query` for up to 50 keys, so about 100 units of the anonymous budget) and labels each row:
 
   ok        updatedAt and expiresAt match the chain
@@ -13,7 +13,7 @@ an indexer's current Parquet snapshot, asks a Tiramisu RPC node for the same key
 Point it at an indexer started with SYNC_PAUSED=true on an old data directory and most rows come back
 stale, extended or deleted. Usage: python3 examples/verify_against_chain.py [indexer base URL] [rows]
 
-The labels are only as good as the RPC node asked. It defaults to the public Tiramisu endpoint; set
+The labels are only as good as the RPC node asked. It defaults to the public Rabdi endpoint; set
 ARKIV_RPC_URL to an endpoint you choose or to your own node to move that trust to a party you pick.
 """
 import json
@@ -25,7 +25,7 @@ from collections import Counter
 
 import duckdb
 
-RPC = os.environ.get("ARKIV_RPC_URL") or "https://rpc.tiramisu.db-chain.testnet.arkiv.network"
+RPC = os.environ.get("ARKIV_RPC_URL") or "https://rpc.rabdi.db-chain.testnet.arkiv.network"
 base = (sys.argv[1] if len(sys.argv) > 1 else "https://arkiv-sql-indexer.dokploy.anshudhar.dev").rstrip("/") + "/"
 limit = min(int(sys.argv[2]) if len(sys.argv) > 2 else 50, 50)
 

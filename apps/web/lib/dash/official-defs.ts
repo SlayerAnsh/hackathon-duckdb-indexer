@@ -21,7 +21,7 @@ function counter(id: string, name: string): OfficialWidgetDef {
 }
 // One dashboard per showcase view in lib/views.ts, in the same order.
 export const OFFICIAL_DASHBOARDS: OfficialDashboardDef[] = [
-  { slug: 'network-overview', cover: 6, title: 'Arkiv network overview', description: 'The live dataset at a glance: volume, creators, entity types and what expires next on the Tiramisu testnet.', widgets: [
+  { slug: 'network-overview', cover: 6, title: 'Arkiv network overview', description: 'The live dataset at a glance: volume, creators, entity types and what expires next on the Rabdi testnet.', widgets: [
     widget('Live entities', 'counter', 'xs', FIGURE_SQL.live),
     widget('Distinct creators', 'counter', 'xs', FIGURE_SQL.creators),
     counter('known', 'Known entities'), counter('owners-count', 'Distinct owners'),

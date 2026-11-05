@@ -4,7 +4,7 @@
 //   bun examples/ws_events_probe.ts            # 70 s: watch 30 s, force a reconnect, watch 40 s more
 //   bun examples/ws_events_probe.ts 20         # shorter run of 20 s, reconnect at 10 s
 //
-// It subscribes with @arkiv-network/sdk watchEntityEvents over the Tiramisu WebSocket RPC, closes the
+// It subscribes with @arkiv-network/sdk watchEntityEvents over the Rabdi WebSocket RPC, closes the
 // raw socket halfway to force viem's reconnect, then compares every received event with eth_getLogs
 // over HTTP for the same block range and prints the logs (and blocks) the subscription never delivered.
 //
@@ -14,8 +14,10 @@ import { join } from 'node:path'
 
 const from = join(import.meta.dir, '..', 'packages', 'core')
 const sdk = await import(Bun.resolveSync('@arkiv-network/sdk', from))
-const { tiramisu } = await import(Bun.resolveSync('@arkiv-network/sdk/chains', from))
 const viem = await import(Bun.resolveSync('viem', from))
+const wsRpc = 'wss://rpc.rabdi.db-chain.testnet.arkiv.network'
+const rabdi = viem.defineChain({ id: 7794095, name: 'Rabdi', nativeCurrency: { name: 'Golem', symbol: 'GLM', decimals: 18 },
+  rpcUrls: { default: { http: ['https://rpc.rabdi.db-chain.testnet.arkiv.network'], webSocket: [wsRpc] } }, testnet: true })
 const viemVersion = (await import(Bun.resolveSync('viem/package.json', from))).version
 
 const ARKIV_ADDRESS = '0x4400000000000000000000000000000000000044'
@@ -24,7 +26,7 @@ const closeAt = total <= 20 ? total / 2 : 30
 
 const t0 = Date.now()
 const t = () => ((Date.now() - t0) / 1000).toFixed(1) + 's'
-const wsUrl: string = tiramisu.rpcUrls.default.webSocket[0]
+const wsUrl: string = wsRpc
 console.log(t(), `sdk 0.8.1, viem ${viemVersion}, bun ${Bun.version}, ws ${wsUrl}, run ${total}s, reconnect at ${closeAt}s`)
 
 type Seen = { block: bigint; tx: string; logIndex: number; type: string }
@@ -33,7 +35,7 @@ const errors: string[] = []
 const marks: string[] = []
 let lastMark = 0
 
-const client = sdk.createPublicClient({ chain: tiramisu, transport: viem.webSocket(wsUrl) })
+const client = sdk.createPublicClient({ chain: rabdi, transport: viem.webSocket(wsUrl) })
 const unwatch = client.watchEntityEvents({
   onEvent: (e: { blockNumber: bigint; transactionHash: string; logIndex: number; type: string }) => {
     seen.push({ block: e.blockNumber, tx: e.transactionHash, logIndex: e.logIndex, type: e.type })
@@ -65,7 +67,7 @@ console.log('errors', errors.length ? errors : 'none')
 if (seen.length) {
   const lo = seen.reduce((m, e) => (e.block < m ? e.block : m), seen[0].block)
   const hi = seen.reduce((m, e) => (e.block > m ? e.block : m), seen[0].block)
-  const http = viem.createPublicClient({ chain: tiramisu, transport: viem.http() })
+  const http = viem.createPublicClient({ chain: rabdi, transport: viem.http() })
   const logs: { transactionHash: string; logIndex: number; blockNumber: bigint }[] =
     await http.getLogs({ address: ARKIV_ADDRESS, fromBlock: lo, toBlock: hi })
   const got = new Set(seen.map(e => `${e.tx}:${e.logIndex}`))

@@ -6,7 +6,7 @@ Status: implemented. The first version shipped on 18 October 2026; the challenge
 
 Two parts:
 
-* **Indexer** (`apps/indexer`, MIT, self hostable with Docker Compose or Bun). Mirrors all Arkiv entities, or the subset matching `INDEX_EXPRESSION`, and publishes Parquet snapshots, a delta and a manifest over HTTP. The hosted instance at `https://arkiv-sql-indexer.dokploy.anshudhar.dev` indexes every entity on Tiramisu.
+* **Indexer** (`apps/indexer`, MIT, self hostable with Docker Compose or Bun). Mirrors all Arkiv entities, or the subset matching `INDEX_EXPRESSION`, and publishes Parquet snapshots, a delta and a manifest over HTTP. The hosted instance at `https://arkiv-sql-indexer.dokploy.anshudhar.dev` indexes every entity on Rabdi.
 * **Web app** (`apps/web`, hosted at `https://arkiv-sql.dokploy.anshudhar.dev`). Runs against the hosted indexer through the `/data` proxy (`INDEXER_URL`) and offers a SQL Playground, widgets and public dashboards stored as Arkiv entities, Featured dashboards kept live by the app wallet, Privy login and a keyed read only RPC proxy (`/api/rpc`).
 
 In detail: a self hostable indexer mirrors the Arkiv entities matching one optional Arkiv query expression (blank means every entity) into immutable Parquet snapshots plus a small live delta. A Next.js frontend loads them into DuckDB WASM so anyone can run full SQL (joins, GROUP BY, ORDER BY on attributes, window functions) in their own browser. Expired data disappears from every layer: the snapshot excludes it, old snapshots are deleted, and the browser filters every row against the current chain head read directly from Arkiv RPC. A verify button checks any row against the chain.
@@ -46,9 +46,9 @@ Non goals: server side SQL endpoint, history beyond current state, Parquet expir
   - Query syntax uses `AND`, `OR`, `NOT` and typed literals, for example `$creator = addr(0x..) AND ($key = key(0x..) OR $key = key(0x..))`. Strings are `str('..')`. Build key filters with the SDK expression helpers, never by hand.
   - `arkiv_query` is cost metered. On 18 October 2026 the `RateLimit` header of an unauthenticated `arkiv_query` reported a budget per caller of `limit=10000` cost units, reset after about one hour (headers `RateLimit`, `Retry-After`, `Arkiv-Cost`, `Arkiv-Quota-Used-Percent`). This is a header reading, not a documented value; the Arkiv docs give no anonymous number. On 20 October 2026 the same header reported `limit=600, reset=60` and fell by one per request, so it now counts requests per 60 second window and no longer shows the cost budget ([friction report](arkiv/friction.md#anonymous-query-budget-and-error-envelope)). One broad query (`$expiresAt > u64(0)`, limit 5) used the whole budget. After that every `arkiv_query` returns HTTP 429 with body `{"error":"ANON_COST_LIMITED","message":"unauthenticated query budget exhausted; get an API key at https://hub.arkiv.network for a monthly quota"}`, which is not a JSON-RPC error envelope.
   - `eth_blockNumber`, `eth_getLogs`, `arkiv_getEntityCount` and `arkiv_getBlockTiming` kept working while the query budget was exhausted. `eth_getLogs` over 5,000 blocks returned 12,797 logs in one call.
-  - Consequences: queries must stay selective, and neither the indexer nor the browser may run `arkiv_query` per event. The first plan required an API key for the indexer; the later measurements in 7.1 made the indexer keyless by default. The browser uses `eth_blockNumber` for the live head and `eth_getLogs` for the change feed. Verify and payload fetches spend the visitor's own anonymous budget, one batched `$key` query per click. Since the `/api/rpc` read proxy (section 12), browser reads run through the web server and use `TIRAMISU_API_KEY` when it is set; without the key they share the web server's anonymous budget.
+  - Consequences: queries must stay selective, and neither the indexer nor the browser may run `arkiv_query` per event. The first plan required an API key for the indexer; the later measurements in 7.1 made the indexer keyless by default. The browser uses `eth_blockNumber` for the live head and `eth_getLogs` for the change feed. Verify and payload fetches spend the visitor's own anonymous budget, one batched `$key` query per click. Since the `/api/rpc` read proxy (section 12), browser reads run through the web server and use `ARKIV_API_KEY` when it is set; without the key they share the web server's anonymous budget.
 
-- With an API key (header `Authorization: Bearer <key>`, also accepted as `X-API-Key`; env `TIRAMISU_API_KEY`):
+- With an API key (header `Authorization: Bearer <key>`, also accepted as `X-API-Key`; env `ARKIV_API_KEY`):
   - Every `arkiv_query` costs a flat 100 units (`Arkiv-Cost: 100`), whether it is one key, 50 OR'ed keys, a full 200 row page with all fields, or a request that fails. Cost is per call, so batching is free.
   - A short term limit (`RateLimit: limit=9999 ... reset=1`) plus a monthly quota (`Arkiv-Quota-Used-Percent`, which read 1 after about 20 calls). The quota size is unknown, so the indexer must minimise calls and log the quota header.
   - An OR of 50 `$key = key(..)` terms (about 4,100 characters) works. 100 terms (about 8,200 characters) fails with `-32004 query is too long`. Chunk size: 50 keys.
@@ -70,7 +70,7 @@ Surprises are recorded in `arkiv/friction.md` with versions and reproduction ste
 ## 6. Architecture
 
 ```
-Arkiv RPC (Tiramisu, public endpoint)
+Arkiv RPC (Rabdi, public endpoint)
    |  eth_getLogs (replay, live sync)              ^  eth_blockNumber, eth_getLogs (live tail), arkiv_query
    |  arkiv_query $key batches (fill)              |  (live attributes, payload, verify) via the web /api/rpc read proxy
    v                                               |
@@ -100,16 +100,16 @@ arkiv/friction.md   friction report
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `ARKIV_RPC_URL` | HTTP RPC | Tiramisu public RPC |
+| `ARKIV_RPC_URL` | HTTP RPC | Rabdi public RPC |
 | `INDEX_EXPRESSION` | Optional Arkiv query expression, blank means every entity | empty |
-| `PUBLIC_RPC_URL` | Anonymous logs and chain metadata | Tiramisu public RPC |
+| `PUBLIC_RPC_URL` | Anonymous logs and chain metadata | Rabdi public RPC |
 | `BACKFILL_MODE` | Public log replay or legacy query scan | `logs` |
-| `FILL_RPC_URL` | RPC for attribute fills of pending rows | Tiramisu public RPC |
+| `FILL_RPC_URL` | RPC for attribute fills of pending rows | Rabdi public RPC |
 | `FILL_USE_API_KEY` | send the API key with fills (spends monthly quota) | `false` |
 | `SYNC_USE_API_KEY` | keyed live sync: key lookups on `ARKIV_RPC_URL` (spends monthly quota) | `false` |
 | `FILL_CHUNK` | keys per fill query, at most 50 | 50 |
 | `FILL_INTERVAL_MS` | pause between fill queries | 4000 |
-| `TIRAMISU_API_KEY` | sent as `Authorization: Bearer`, server only; optional. The web server also uses it for the `/api/rpc` read proxy | empty (unused) |
+| `ARKIV_API_KEY` | sent as `Authorization: Bearer`, server only; optional. The web server also uses it for the `/api/rpc` read proxy | empty (unused) |
 | `SYNC_PAUSED` | serve existing store without RPC calls | `false` |
 | `CONFIRMATIONS` | blocks behind head | 3 |
 | `SYNC_BATCH_BLOCKS` | blocks per live sync batch | 5 |
@@ -120,7 +120,7 @@ arkiv/friction.md   friction report
 
 Warn at startup when `INDEX_EXPRESSION` contains no `$creator` term, because user attributes can be written by anyone.
 
-The API key is never sent by default. Only `BACKFILL_MODE=query`, `SYNC_USE_API_KEY=true` and `FILL_USE_API_KEY=true` send it; each requires `TIRAMISU_API_KEY` and startup fails with a clear message without it (unless `SYNC_PAUSED`). Startup logs `API key not used` or a warning naming the flags that enable it. No RPC client is constructed with the key unless one of these flags is set. Measured live rate on Tiramisu: about 2,800 distinct keys touched per hour (4,011 events per 1,800 blocks); keyed live sync at that rate would use roughly 25 to 35 percent of the monthly quota per day, while the anonymous budget the header showed on 18 October (10,000 units per hour, see §4) allows about 100 queries of up to 50 keys per hour.
+The API key is never sent by default. Only `BACKFILL_MODE=query`, `SYNC_USE_API_KEY=true` and `FILL_USE_API_KEY=true` send it; each requires `ARKIV_API_KEY` and startup fails with a clear message without it (unless `SYNC_PAUSED`). Startup logs `API key not used` or a warning naming the flags that enable it. No RPC client is constructed with the key unless one of these flags is set. Measured live rate on Tiramisu: about 2,800 distinct keys touched per hour (4,011 events per 1,800 blocks); keyed live sync at that rate would use roughly 25 to 35 percent of the monthly quota per day, while the anonymous budget the header showed on 18 October (10,000 units per hour, see §4) allows about 100 queries of up to 50 keys per hour.
 
 ### 7.2 Store identity
 
@@ -343,8 +343,8 @@ Removed widget endpoints: `PUT /api/dash/widgets/[key]`, `DELETE /api/dash/widge
 
 - No server side SQL. Arbitrary queries run in the visitor's browser and only cost the visitor.
 - The index expression controls published index data. Widget and dashboard reads also require the configured backend `$creator` and project, since attributes alone cannot establish identity. Startup warns when the expression has no `$creator` term.
-- `TIRAMISU_API_KEY` reaches the indexer service (unused by default) and the web server runtime environment. It is never a `NEXT_PUBLIC_` variable, never a Docker build argument or `ARG`, and never part of the browser bundle. The deployment test asserts this for the compose files, the Dockerfiles and the web source tree (only `apps/web/lib/dash/server` may name it).
-- Browser reads go through the same origin read proxy `POST /api/rpc`, which adds `Authorization: Bearer <TIRAMISU_API_KEY>` when the key is set and forwards anonymously otherwise. It accepts only the read methods `arkiv_query`, `eth_blockNumber`, `eth_chainId`, `eth_getBlockByNumber`, `eth_getLogs` and `eth_getBalance`; anything else (transactions, signing, debug or admin methods) gets a JSON RPC error with HTTP 400 and never reaches the upstream. Limits: 64 KB body (HTTP 413), batches of at most 20 calls, a 15 second upstream timeout (HTTP 504), and an in memory token bucket of 10 calls per second with a burst of 30 per client IP bucket (HTTP 429). Upstream status and body pass through; upstream headers other than `content-type` and `retry-after` are dropped, and the key is never echoed. Wallet signing and transactions keep the public RPC (`NEXT_PUBLIC_TIRAMISU_RPC_URL`) and never use the key.
+- `ARKIV_API_KEY` reaches the indexer service (unused by default) and the web server runtime environment. It is never a `NEXT_PUBLIC_` variable, never a Docker build argument or `ARG`, and never part of the browser bundle. The deployment test asserts this for the compose files, the Dockerfiles and the web source tree (only `apps/web/lib/dash/server` may name it).
+- Browser reads go through the same origin read proxy `POST /api/rpc`, which adds `Authorization: Bearer <ARKIV_API_KEY>` when the key is set and forwards anonymously otherwise. It accepts only the read methods `arkiv_query`, `eth_blockNumber`, `eth_chainId`, `eth_getBlockByNumber`, `eth_getLogs` and `eth_getBalance`; anything else (transactions, signing, debug or admin methods) gets a JSON RPC error with HTTP 400 and never reaches the upstream. Limits: 64 KB body (HTTP 413), batches of at most 20 calls, a 15 second upstream timeout (HTTP 504), and an in memory token bucket of 10 calls per second with a burst of 30 per client IP bucket (HTTP 429). Upstream status and body pass through; upstream headers other than `content-type` and `retry-after` are dropped, and the key is never echoed. Wallet signing and transactions keep the public RPC (`NEXT_PUBLIC_ARKIV_RPC_URL`) and never use the key.
 - Server side dashboard reads (`arkiv_query` through the backend reader) also send the key when it is set; backend writes keep the public transport.
 - The indexer serves static files and JSON only. The web app has write endpoints under `/api/dash`, authenticated through a verified Privy access token plus EIP 191 personal_sign of a single use nonce. The recovered signer must be a linked Privy embedded wallet. An HMAC signed HttpOnly session lasts eight hours, with SameSite=Lax and Secure on HTTPS.
 - Writes enforce application ownership, JSON payload and SQL guard validation, same origin checks when Origin is supplied, and a serial backend wallet queue with at most 25 waiting jobs. Per address limits are 5 writes per minute and 40 per hour; the global limit is 80 per hour. Nonce requests allow 20 per minute per client IP bucket. Nonces expire after five minutes. State is in memory, so deploy one web instance.
@@ -378,10 +378,9 @@ Dashboard environment:
 | `NEXT_PUBLIC_PRIVY_APP_ID` | Web build and runtime | Privy app ID; blank disables dashboards |
 | `PRIVY_APP_SECRET` | Web runtime only | Privy verification and session HMAC |
 | `DASHBOARD_PRIVATE_KEY` | Web runtime only | Funded backend dashboard wallet |
-| `NEXT_PUBLIC_ARKIV_CHAIN` | Web build and runtime | `tiramisu` (default) or `rabdi`; selects chain ID, native currency, default RPC and default explorer (`lib/chain.ts`) |
-| `NEXT_PUBLIC_TIRAMISU_RPC_URL` | Web build and runtime | Public RPC for wallet signing, backend writes and the `/api/rpc` upstream |
+| `NEXT_PUBLIC_ARKIV_RPC_URL` | Web build and runtime | Public RPC for wallet signing, backend writes and the `/api/rpc` upstream |
 | `NEXT_PUBLIC_EXPLORER_URL` | Web build and runtime | Block explorer for address links |
-| `TIRAMISU_API_KEY` | Web runtime only (and indexer) | Optional key for `/api/rpc` and server dashboard reads |
+| `ARKIV_API_KEY` | Web runtime only (and indexer) | Optional key for `/api/rpc` and server dashboard reads |
 | `INDEXER_URL` | Web runtime | `/data` proxy upstream, `http://indexer:8080` in Compose |
 
 Secrets are never build arguments, and the Privy secret and wallet key never reach the indexer. Production runs on Dokploy with `docker-compose.dokploy.yml`: the app at `https://arkiv-sql.dokploy.anshudhar.dev` and the indexer at `https://arkiv-sql-indexer.dokploy.anshudhar.dev`, with a blank expression. Filtered self hosted indexes must include the dashboard creator with `OR`; changing the expression requires a fresh data directory and full backfill.
@@ -393,7 +392,7 @@ Secrets are never build arguments, and the Privy secret and wallet key never rea
 - Merge views: DuckDB (node) tests for the merge cases in section 8.
 - Web: proxy and disk fallback, read proxy, live tail, verify classification, views, playground and Featured dashboards rendering.
 - Deployment: compose, Dockerfiles, `.env.example` and docs (`test/deployment.test.ts`).
-- Manual smoke test against Tiramisu using widget creation and dashboard placement.
+- Manual smoke test against Rabdi using widget creation and dashboard placement.
 
 ## 16. Deliverables for the gates
 

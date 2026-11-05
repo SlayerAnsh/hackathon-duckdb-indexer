@@ -3,7 +3,7 @@
 Plain SQL over every live Arkiv entity. The project has two parts:
 
 1. **An open source, self hostable indexer** (`apps/indexer`). It mirrors all Arkiv entities on chain, or a subset chosen with `INDEX_EXPRESSION`, into versioned Parquet snapshots plus a JSON delta and a manifest served over HTTP. Run it with Docker Compose or Bun. MIT licensed.
-2. **A web app** (`apps/web`) that runs against the hosted indexer covering all Arkiv data on Tiramisu. It offers a SQL Playground (DuckDB WASM in your browser), widgets (one SQL query plus a chart, saved as Arkiv entities) and public dashboards, including Featured dashboards kept live by the app.
+2. **A web app** (`apps/web`) that runs against the hosted indexer covering all Arkiv data on the Rabdi testnet. It offers a SQL Playground (DuckDB WASM in your browser), widgets (one SQL query plus a chart, saved as Arkiv entities) and public dashboards, including Featured dashboards kept live by the app.
 
 **Who is stuck today.** Arkiv app teams, analysts and AI agents who need `GROUP BY`, `JOIN` or `ORDER BY` on attributes. `arkiv_query` returns at most 200 rows per page, newest first, with none of those. Answering "which wallets create the most entities?" means paging about 183 pages of 200 over the 36,457 live entities and counting in their own code. Anonymously that runs into a cost budget: on 18 October 2026 the `RateLimit` header of an anonymous `arkiv_query` reported `limit=10000` cost units with a reset after about one hour, and one broad query used all of it ([friction report](arkiv/friction.md#anonymous-query-budget-and-error-envelope)). That figure is our header reading, not a documented one; the Arkiv docs say only that the public RPC works "at the default rate limit". On 20 October 2026 the header reports `limit=600, reset=60` instead, which counts requests per 60 second window, with `Arkiv-Cost: 100` per query, so the caller can no longer see how much cost budget is left. At the 18 October budget that is about 100 queries an hour, an estimate from the cost header. The alternative today is to write their own indexer from `eth_getLogs`: decode the operation logs, track owners and expiry blocks, and fetch attributes by key on the same budget. **What changes on day one:** a documented data contract ([Data API](#data-api-for-apps-and-ai-agents), [arkiv/schema.md](arkiv/schema.md)), an MIT indexer anyone can run without an API key, and hosted Parquet files that DuckDB or Python read without asking anyone. That question becomes one `GROUP BY` that runs in milliseconds in the browser. **A day one consumer:** an analyst with the DuckDB CLI 1.5.5 and nothing else ran `./examples/top-creators.sh` against the hosted index on 20 October 2026 at 02:37 UTC and had the ten top creators of live entities in 3.0 seconds of wall clock time, including the HTTPS reads of the manifest and the Parquet snapshot (`real 2.99` from `/usr/bin/time -p`). No clone of the indexer, no API key and no RPC call were involved.
 
@@ -12,7 +12,7 @@ Plain SQL over every live Arkiv entity. The project has two parts:
 | | URL |
 | :--- | :--- |
 | Hosted app | https://arkiv-sql.dokploy.anshudhar.dev |
-| Hosted indexer (all Tiramisu entities) | https://arkiv-sql-indexer.dokploy.anshudhar.dev |
+| Hosted indexer (all Rabdi entities) | https://arkiv-sql-indexer.dokploy.anshudhar.dev |
 | Demo video | `<VIDEO_URL>` |
 | On chain evidence (wallets, entities, transactions) | [On chain evidence](#on-chain-evidence) |
 | Entity schema and exact queries | [arkiv/schema.md](arkiv/schema.md) |
@@ -52,7 +52,7 @@ Check it yourself: `project = str('arkiv-sql-indexer-dash') AND NOT ($creator = 
 Arkiv moves the trust point from a database operator to the public chain. With an ordinary database, a reader trusts whoever runs it to say which rows exist, who wrote them and when they expire. Here those facts are chain state: `$creator` and `$owner` are set by the chain, `expiresAt` is a block number the chain enforces, and every create, patch, extend, transfer and delete is a public log. That changes what a reader can check, and what they still have to trust:
 
 * **Completeness.** Anyone can replay the public operation logs from block zero without an API key, or run this MIT indexer (`bun apps/indexer/src/main.ts`, with `PUBLIC_RPC_URL` set to any endpoint or their own node), and compare the result with the hosted files. Verify cannot show a row the index left out; a second index built from the same logs can.
-* **Freshness of a row.** Verify in the app and `examples/verify_against_chain.py` reread rows from an RPC node and label each one `ok`, `stale`, `extended`, `expired` or `deleted`. Anyone can choose the RPC endpoint (`NEXT_PUBLIC_TIRAMISU_RPC_URL` for a self hosted web app, `ARKIV_RPC_URL` for the script) or run their own node.
+* **Freshness of a row.** Verify in the app and `examples/verify_against_chain.py` reread rows from an RPC node and label each one `ok`, `stale`, `extended`, `expired` or `deleted`. Anyone can choose the RPC endpoint (`NEXT_PUBLIC_ARKIV_RPC_URL` for a self hosted web app, `ARKIV_RPC_URL` for the script) or run their own node.
 * **What is still trusted.** Verify trusts the RPC node it queries. It is a consistency check, not a proof, because `eth_getProof` is not available on Arkiv ([arkiv/schema.md](arkiv/schema.md), browser reads, calls it an RPC comparison, not a cryptographic proof). On the hosted app, Verify also passes through that server's `/api/rpc` read proxy. Choosing your own RPC, self hosting the app or running a node moves that trust to a party you pick; it does not remove it.
 
 | Alternative | What breaks for this project |
@@ -70,7 +70,7 @@ What deliberately stays off Arkiv, and why:
 | DuckDB (indexer store and browser engine) | Computation, not data. SQL runs in the visitor's tab and never on a server. |
 | Session cookies, login nonces, rate limit counters | Short lived state of one web instance. On chain they would be public and outlive their purpose. |
 | Payload mirroring | Payloads stay on chain and load on demand (Payload button, widget reads). The indexer never copies them into Parquet, so the index holds no second copy of entity contents. |
-| The API key (`TIRAMISU_API_KEY`) | A secret. It lives only in the server runtime environment; `test/deployment.test.ts` enforces this. |
+| The API key (`ARKIV_API_KEY`) | A secret. It lives only in the server runtime environment; `test/deployment.test.ts` enforces this. |
 | Email, social handles, Privy user IDs | Personal data. Only the embedded wallet address and the login provider name are written. |
 
 ## How the app uses Arkiv
@@ -91,7 +91,7 @@ Each feature below is visible to a user and checked in code and on chain.
 
 ## On chain evidence
 
-All application entities are created by one wallet on Tiramisu. Explorer: https://tiramisu.explorer.arkiv.network.
+The app now runs on the Rabdi testnet (chain ID 7794095, explorer https://rabdi.explorer.arkiv.network). The records below were made on the earlier Tiramisu testnet (chain ID 7738577) during the challenge, where one wallet created all application entities. Explorer: https://tiramisu.explorer.arkiv.network.
 
 | Role | Address, entity key or transaction |
 | :--- | :--- |
@@ -130,7 +130,7 @@ curl -s -XPOST https://rpc.tiramisu.db-chain.testnet.arkiv.network -H 'content-t
 
 ```mermaid
 flowchart TD
-  RPC[Arkiv RPC on Tiramisu] -->|public eth_getLogs replay and live logs| Indexer[Bun indexer, self hostable]
+  RPC[Arkiv RPC on Rabdi] -->|public eth_getLogs replay and live logs| Indexer[Bun indexer, self hostable]
   RPC -->|arkiv_query key batches of at most 50, anonymous budget| Indexer
   Indexer --> DB[(DuckDB checkpoint)]
   DB --> Files[Parquet snapshots, delta.json, manifest.json]
@@ -162,7 +162,7 @@ How data flows:
 
 ### Self host the indexer
 
-Requires Docker, or Bun 1.3 (tested with 1.3.11), and outbound access to `https://rpc.tiramisu.db-chain.testnet.arkiv.network`. No API key is needed.
+Requires Docker, or Bun 1.3 (tested with 1.3.11), and outbound access to `https://rpc.rabdi.db-chain.testnet.arkiv.network`. No API key is needed.
 
 With Docker, indexer only:
 
@@ -181,7 +181,7 @@ bun install
 DATA_DIR=./data bun apps/indexer/src/main.ts
 ```
 
-Both index every live Tiramisu entity. To index a subset, set `INDEX_EXPRESSION` (for example `-e INDEX_EXPRESSION='$creator = addr(0x...)'` with Docker) before the first start. A changed expression needs a fresh data directory, because startup refuses a store built for a different expression. Restarts resume from the checkpoint. The indexer serves the files in [Data API](#data-api-for-apps-and-ai-agents) at its root (`/health`, `/manifest.json`, `/delta.json`, `/snap/v<N>/...`).
+Both index every live Rabdi entity. To index a subset, set `INDEX_EXPRESSION` (for example `-e INDEX_EXPRESSION='$creator = addr(0x...)'` with Docker) before the first start. A changed expression needs a fresh data directory, because startup refuses a store built for a different expression. Restarts resume from the checkpoint. The indexer serves the files in [Data API](#data-api-for-apps-and-ai-agents) at its root (`/health`, `/manifest.json`, `/delta.json`, `/snap/v<N>/...`).
 
 ### Full stack with Docker Compose
 
@@ -214,13 +214,13 @@ Defaults come from `apps/indexer/src/config.ts`. Compose passes the same names t
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
 | `INDEX_EXPRESSION` | blank | Arkiv query expression to index; blank indexes every entity. Keep single quotes in `.env` so Compose preserves `$creator` |
-| `PUBLIC_RPC_URL` | Tiramisu public RPC | Log replay, live logs and chain metadata, never keyed |
+| `PUBLIC_RPC_URL` | Rabdi public RPC | Log replay, live logs and chain metadata, never keyed |
 | `BACKFILL_MODE` | `logs` | `logs` replays public logs; `query` opts into the legacy keyed expression scan |
-| `FILL_RPC_URL` | Tiramisu public RPC | Attribute fills for pending rows |
+| `FILL_RPC_URL` | Rabdi public RPC | Attribute fills for pending rows |
 | `FILL_USE_API_KEY` | `false` | Send the API key with fills |
 | `SYNC_USE_API_KEY` | `false` | Keyed live sync on `ARKIV_RPC_URL` |
-| `ARKIV_RPC_URL` | Tiramisu public RPC | Keyed RPC, used only by keyed modes |
-| `TIRAMISU_API_KEY` | blank | Optional Arkiv API key, sent only by the three keyed opt ins |
+| `ARKIV_RPC_URL` | Rabdi public RPC | Keyed RPC, used only by keyed modes |
+| `ARKIV_API_KEY` | blank | Optional Arkiv API key, sent only by the three keyed opt ins |
 | `FILL_CHUNK` | `50` | Keys per fill query, at most 50 |
 | `FILL_INTERVAL_MS` | `4000` | Pause between fill queries |
 | `SYNC_PAUSED` | `false` | Serve an existing store with no RPC calls |
@@ -238,20 +238,19 @@ Defaults come from `apps/indexer/src/config.ts`. Compose passes the same names t
 | :--- | :--- | :--- |
 | `INDEXER_URL` | Web runtime | Upstream of the `/data` proxy. Compose sets `http://indexer:8080`; the hosted indexer is `https://arkiv-sql-indexer.dokploy.anshudhar.dev` |
 | `DATA_DIR` | Web runtime, optional | Read only copy of the index served when the indexer is unreachable |
-| `NEXT_PUBLIC_ARKIV_CHAIN` | Web build and runtime | Chain the web app signs on: `tiramisu` (default, chain 7738577) or `rabdi` (chain 7794095); also picks the default RPC and explorer |
-| `NEXT_PUBLIC_TIRAMISU_RPC_URL` | Web build and runtime | Public RPC for wallet signing, server writes and the upstream of `/api/rpc`; never include credentials |
+| `NEXT_PUBLIC_ARKIV_RPC_URL` | Web build and runtime | Public RPC for wallet signing, server writes and the upstream of `/api/rpc`; never include credentials |
 | `NEXT_PUBLIC_EXPLORER_URL` | Web build and runtime | Block explorer for address links |
 | `NEXT_PUBLIC_PRIVY_APP_ID` | Web build and runtime | Public Privy app ID; blank disables widgets and dashboards |
 | `PRIVY_APP_SECRET` | Web runtime only | Privy verification and session signing |
-| `DASHBOARD_PRIVATE_KEY` | Web runtime only | Funded Tiramisu app wallet that creates every widget, dashboard and link |
-| `TIRAMISU_API_KEY` | Web runtime only (and indexer) | Optional. The web server adds it to browser reads proxied through `POST /api/rpc` and to server dashboard reads; without it reads use the anonymous budget. Never a build argument or `NEXT_PUBLIC_` variable |
+| `DASHBOARD_PRIVATE_KEY` | Web runtime only | Funded Rabdi app wallet that creates every widget, dashboard and link |
+| `ARKIV_API_KEY` | Web runtime only (and indexer) | Optional. The web server adds it to browser reads proxied through `POST /api/rpc` and to server dashboard reads; without it reads use the anonymous budget. Never a build argument or `NEXT_PUBLIC_` variable |
 
 `NEXT_PUBLIC_` values are embedded at build time, so rebuild after changing them. `GET /api/dash/config` returns `{ wallet: string | null }`, deriving the public app wallet address from the configured key at runtime. Enable Google, Discord, X and Telegram in the Privy dashboard and Ethereum embedded wallets for all users.
 
 ## Web app features
 
 * **Playground** (`/playground`): SQL editor with schema aware autocomplete, snippets, history, CSV export, and Payload and Verify per row. Queries run in DuckDB WASM in your tab.
-* **Widgets** (`/widgets/new`, `/widgets/<key>`): one SQL query plus a chart, saved as an Arkiv entity. The app wallet creates the widget (saving is free) and transfers it to your wallet in the same batch. You then extend, delete or transfer it by signing in the browser, which needs GLM on Tiramisu. Lifetimes are 1, 7, 30 or 90 days. Anyone logged in can extend a live widget. Editing saves a new version.
+* **Widgets** (`/widgets/new`, `/widgets/<key>`): one SQL query plus a chart, saved as an Arkiv entity. The app wallet creates the widget (saving is free) and transfers it to your wallet in the same batch. You then extend, delete or transfer it by signing in the browser, which needs GLM on Rabdi. Lifetimes are 1, 7, 30 or 90 days. Anyone logged in can extend a live widget. Editing saves a new version.
 * **Dashboards** (`/d/<key>`, organize at `/d/<key>/edit`): public pages that arrange your own or anyone's widgets. Featured dashboards are owned by the app wallet and kept live automatically.
 * **Explore** (`/explore`): public dashboards and widgets. **Home** (`/me`): your dashboards, widgets and activity. `/about` explains the architecture and expiry. The old showcase page and `/widgets` redirect to Explore.
 * **Login** through Privy (Google, Discord, X or Telegram) with an embedded wallet. Browsing needs no login.
@@ -405,7 +404,7 @@ From Python, follow `examples/top_creators.py`: read the manifest with `urllib`,
 * **App wallet identity.** `GET /api/dash/config` shows the app wallet address derived from `DASHBOARD_PRIVATE_KEY`. This wallet is the Arkiv creator of every widget, dashboard and link, so application reads filter on `$creator` plus the project tag. Attributes alone are never an identity boundary, since anyone can write a `project` or `type` attribute. The indexer warns at startup when the expression has no `$creator` term.
 * **Ownership.** User widgets are created `readonly` with permissionless extension and transferred to the user's wallet, so the user controls delete, transfer and new versions. Featured entities require both the `user` attribute and `$owner` to equal the app wallet; the server refuses app wallet sessions in user writes, so users cannot forge them.
 * **No server SQL.** All SQL runs in the visitor's browser. Stored widget SQL passes a guard before running, capped at 5,000 result rows.
-* **Secrets stay on the server.** `PRIVY_APP_SECRET`, `DASHBOARD_PRIVATE_KEY` and `TIRAMISU_API_KEY` live only in runtime environments, never build arguments or `NEXT_PUBLIC_` variables. `test/deployment.test.ts` enforces this.
+* **Secrets stay on the server.** `PRIVY_APP_SECRET`, `DASHBOARD_PRIVATE_KEY` and `ARKIV_API_KEY` live only in runtime environments, never build arguments or `NEXT_PUBLIC_` variables. `test/deployment.test.ts` enforces this.
 * **Read proxy.** `POST /api/rpc` forwards only read methods (`arkiv_query`, `eth_blockNumber`, `eth_chainId`, `eth_getBlockByNumber`, `eth_getLogs`, `eth_getBalance`), caps the body at 64 KB and batches at 20 calls, rate limits per client IP and times out after 15 seconds. Wallet signing uses the public RPC directly.
 * **Server writes.** `/api/dash` routes need a verified Privy token plus a signed single use nonce, and run through one serial wallet queue with per address and global rate limits.
 
@@ -417,7 +416,7 @@ Three layers enforce expiry. Snapshots exclude entities whose `expires_at <= hea
 
 By default the indexer never sends the API key, and startup logs `API key not used`. Backfill and live sync read only public `eth_getLogs` and block headers. The filler fetches attributes for pending keys with `$key` batches on the anonymous budget, and a 429 pauses only the filler until Retry-After. On Tiramisu about 2,800 distinct keys change per hour, so keyed live sync would spend roughly 25 to 35 percent of the monthly quota per day.
 
-Three explicit settings send `TIRAMISU_API_KEY`. Each one fails at startup without the key and logs a warning: `SYNC_USE_API_KEY=true` (keyed live sync on `ARKIV_RPC_URL`), `FILL_USE_API_KEY=true` (fills with the key) and `BACKFILL_MODE=query` (legacy paginated expression scan plus keyed live sync). With a filter expression that has no `$creator` or `$owner` term, keyless sync cannot see an existing entity that starts matching through a patch; use `SYNC_USE_API_KEY=true` for that case. Set `SYNC_PAUSED=true` to serve an existing store with no RPC calls at all.
+Three explicit settings send `ARKIV_API_KEY`. Each one fails at startup without the key and logs a warning: `SYNC_USE_API_KEY=true` (keyed live sync on `ARKIV_RPC_URL`), `FILL_USE_API_KEY=true` (fills with the key) and `BACKFILL_MODE=query` (legacy paginated expression scan plus keyed live sync). With a filter expression that has no `$creator` or `$owner` term, keyless sync cannot see an existing entity that starts matching through a patch; use `SYNC_USE_API_KEY=true` for that case. Set `SYNC_PAUSED=true` to serve an existing store with no RPC calls at all.
 
 ## Roadmap
 

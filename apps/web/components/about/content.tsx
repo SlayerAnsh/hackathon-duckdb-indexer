@@ -1,5 +1,4 @@
 import s from './about.module.css'
-import { EXPLORER_URL } from '../../lib/explorer'
 import type { FlowStep } from './Flow'
 
 // Copy shared by the home page and /about. Every claim is backed by the files named in the Src notes on /about
@@ -12,7 +11,7 @@ export const HOSTED_INDEXER_URL = 'https://arkiv-sql-indexer.dokploy.anshudhar.d
 
 /** Landing: the four steps from the chain to a dashboard. */
 export const PIPELINE: FlowStep[] = [
- { title: 'Arkiv chain', text: 'Entities, their attributes and expiry blocks, on the Tiramisu testnet.' },
+ { title: 'Arkiv chain', text: 'Entities, their attributes and expiry blocks, on the Rabdi testnet.' },
  { title: 'Indexer', text: 'Follows the chain and publishes the data as Parquet files plus a live delta.' },
  { title: 'Your browser', text: 'DuckDB loads the files and runs every query right in this tab.', tone: 'accent' },
  { title: 'Your dashboards', text: 'Saved queries turn into charts, widgets and public reports.' },
@@ -92,8 +91,10 @@ export const PILLARS = [
 ]
 
 /** Explorer page of an address, entity key or transaction hash. */
+// The evidence entities and transactions were recorded on the earlier Tiramisu testnet, so their links stay on its explorer.
+export const EVIDENCE_EXPLORER_URL = 'https://tiramisu.explorer.arkiv.network'
 export function explorerUrl(kind: 'address' | 'entity' | 'tx', value: string): string {
- return `${EXPLORER_URL}/${kind}/${value}`
+ return `${EVIDENCE_EXPLORER_URL}/${kind}/${value}`
 }
 
 export function Src({ files }: { files: string[] }) {

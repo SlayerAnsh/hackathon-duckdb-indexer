@@ -13,7 +13,7 @@ function fakeChain() {
     chain.requests.push({ headers: new Headers(init.headers), method: body.method })
     const [first] = body.params
     let result: unknown
-    if (body.method === 'eth_chainId') result = hex(7738577)
+    if (body.method === 'eth_chainId') result = hex(7794095)
     else if (body.method === 'eth_blockNumber') result = hex(chain.head)
     else if (body.method === 'eth_getBlockByNumber') result = { hash: first === '0x0' ? hash : '0x' + Number(first).toString(16).padStart(64, '0') }
     else if (body.method === 'eth_getLogs') result = logs.filter(l => l.blockNumber >= Number(first.fromBlock) && l.blockNumber <= Number(first.toBlock)).map(l => ({ ...l, blockNumber: hex(l.blockNumber), logIndex: hex(l.logIndex) }))
@@ -27,11 +27,11 @@ const keyed = (headers: Headers) => headers.has('authorization') || headers.has(
 
 test('default config never sends the API key through bootstrap, ticks and fills', async () => {
   const { chain, fetchImpl } = fakeChain()
-  const config = loadConfig({ TIRAMISU_API_KEY: 'secret', DATA_DIR: await temp() })
+  const config = loadConfig({ ARKIV_API_KEY: 'secret', DATA_DIR: await temp() })
   const clients = createClients(config, fetchImpl)
   expect(clients.queryRpc).toBeUndefined()
   const result = await bootstrap(config, clients.rpc, () => {}, clients.queryRpc); track(result.store)
-  const ctx: TickContext = { ...result, rpc: clients.rpc, queryRpc: clients.queryRpc, config, meta: { chainId: 7738577, genesisHash: hash, expression: '' } }
+  const ctx: TickContext = { ...result, rpc: clients.rpc, queryRpc: clients.queryRpc, config, meta: { chainId: 7794095, genesisHash: hash, expression: '' } }
   const lock = createLock()
   const fill = fillTask({ rpc: clients.fillRpc, store: () => ctx.store, expression: '', chunk: 2, lock, log: () => {} })
   for (const head of [115, 120, 125]) {
@@ -49,7 +49,7 @@ test('default config never sends the API key through bootstrap, ticks and fills'
 })
 test('SYNC_USE_API_KEY restores the keyed sync client', async () => {
   const { chain, fetchImpl } = fakeChain()
-  const clients = createClients(loadConfig({ TIRAMISU_API_KEY: 'secret', SYNC_USE_API_KEY: 'true' }), fetchImpl)
+  const clients = createClients(loadConfig({ ARKIV_API_KEY: 'secret', SYNC_USE_API_KEY: 'true' }), fetchImpl)
   await clients.rpc.blockNumber(); await clients.fillRpc.blockNumber(); await clients.queryRpc!.blockNumber()
   expect(chain.requests.map(r => r.headers.get('authorization'))).toEqual([null, null, 'Bearer secret'])
 })

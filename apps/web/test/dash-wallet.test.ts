@@ -11,9 +11,9 @@ function fake() {
  const client = { account: { address: U }, getBlockNumber: async () => BigInt(1000), extendEntity: send, deleteEntity: send, changeOwnership: send } as unknown as UserWalletClient
  return { client, calls }
 }
-test('Tiramisu uses the configured RPC and routes signing to the wallet', async () => {
+test('Rabdi uses the configured RPC and routes signing to the wallet', async () => {
  const chain = arkivChain(url)
- expect(chain.id).toBe(7738577); expect(chain.rpcUrls.default.http).toEqual([url]); expect(chain.nativeCurrency.symbol).toBe('GLM')
+ expect(chain.id).toBe(7794095); expect(chain.rpcUrls.default.http).toEqual([url]); expect(chain.nativeCurrency.symbol).toBe('GLM')
  for (const method of ['eth_sendTransaction', 'eth_signTransaction', 'eth_accounts', 'eth_requestAccounts', 'eth_chainId', 'wallet_switchEthereumChain', 'wallet_addEthereumChain', 'personal_sign', 'eth_sign', 'eth_signTypedData_v4']) expect(routeRpc(method)).toBe('wallet')
  for (const method of ['eth_blockNumber', 'eth_getTransactionReceipt', 'eth_call', 'eth_getBalance']) expect(routeRpc(method)).toBe('rpc')
  const calls: unknown[] = []

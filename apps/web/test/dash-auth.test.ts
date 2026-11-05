@@ -33,7 +33,7 @@ async function signed(deps: AuthDeps, signer = account) {
 test('server config derives the wallet from the key without echoing secrets', () => {
   const key = '0x' + '42'.repeat(32)
   const env = { NEXT_PUBLIC_PRIVY_APP_ID: 'app', PRIVY_APP_SECRET: 's3cret', DASHBOARD_PRIVATE_KEY: key }
-  expect(readServerDashConfig(env)).toMatchObject({ ok: true, config: { wallet: info.address, rpcUrl: 'https://rpc.tiramisu.db-chain.testnet.arkiv.network' } })
+  expect(readServerDashConfig(env)).toMatchObject({ ok: true, config: { wallet: info.address, rpcUrl: 'https://rpc.rabdi.db-chain.testnet.arkiv.network' } })
   for (const missing of Object.keys(env)) expect(readServerDashConfig({ ...env, [missing]: '' }).ok).toBe(false)
   for (const patch of [{ DASHBOARD_PRIVATE_KEY: 'bad' }, { DASHBOARD_PRIVATE_KEY: '0x' + '00'.repeat(32) }]) {
     const result = readServerDashConfig({ ...env, ...patch })

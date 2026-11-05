@@ -1,6 +1,6 @@
 # Arkiv schema and queries
 
-This file lists the widget, dashboard and link entity types the web app's app wallet (the dashboard wallet) creates, their attributes and expiry, and every Arkiv RPC request the indexer and the browser send. Network: Tiramisu, chain ID 7738577, RPC `https://rpc.tiramisu.db-chain.testnet.arkiv.network`. SDK: `@arkiv-network/sdk` 0.8.1 with viem 2.57.7 (declared range `^2.57.3`). App wallet (creator of every app entity): `0x1f61c3cac1612c020f64739b128c5f198939c8cd`; on chain evidence with explorer links is in the [README](../README.md#on-chain-evidence).
+This file lists the widget, dashboard and link entity types the web app's app wallet (the dashboard wallet) creates, their attributes and expiry, and every Arkiv RPC request the indexer and the browser send. Network: Rabdi, chain ID 7794095, RPC `https://rpc.rabdi.db-chain.testnet.arkiv.network` (until November 2026: Tiramisu, chain ID 7738577; the app wallet and evidence below are from there). SDK: `@arkiv-network/sdk` 0.8.1 with viem 2.57.7 (declared range `^2.57.3`). App wallet (creator of every app entity): `0x1f61c3cac1612c020f64739b128c5f198939c8cd`; on chain evidence with explorer links is in the [README](../README.md#on-chain-evidence).
 
 The open source indexer (`apps/indexer`) is schema agnostic. It mirrors every live entity that matches `INDEX_EXPRESSION` (blank means every entity on the chain), whatever its attributes. The application entity types, lifetimes and operations are documented in [Widget dashboards](#widget-dashboards). Payloads stay on chain and are fetched on demand, never stored in Parquet.
 
@@ -50,11 +50,11 @@ No `arkiv_query` runs per event. A fill response is accepted only if its `blockN
 
 ### Indexer (opt in, keyed)
 
-`BACKFILL_MODE=query` pages the expression itself at one confirmed block: `arkiv_query(INDEX_EXPRESSION, {atBlock: head minus CONFIRMATIONS, limit: 200, select: ROW_SELECT, cursor})`. With `SYNC_USE_API_KEY=true` or `BACKFILL_MODE=query`, live sync queries the touched relevant keys of each batch as key chunks with `{atBlock: <batch end>, limit: 200, select: ROW_SELECT, cursor}` on `ARKIV_RPC_URL`, sending `Authorization: Bearer <TIRAMISU_API_KEY>`. Returned keys replace their attributes; relevant indexed keys that are missing become tombstones. A batch with no relevant keys sends no `arkiv_query`.
+`BACKFILL_MODE=query` pages the expression itself at one confirmed block: `arkiv_query(INDEX_EXPRESSION, {atBlock: head minus CONFIRMATIONS, limit: 200, select: ROW_SELECT, cursor})`. With `SYNC_USE_API_KEY=true` or `BACKFILL_MODE=query`, live sync queries the touched relevant keys of each batch as key chunks with `{atBlock: <batch end>, limit: 200, select: ROW_SELECT, cursor}` on `ARKIV_RPC_URL`, sending `Authorization: Bearer <ARKIV_API_KEY>`. Returned keys replace their attributes; relevant indexed keys that are missing become tombstones. A batch with no relevant keys sends no `arkiv_query`.
 
 ### Browser (through the `/api/rpc` read proxy, no credentials in the browser)
 
-Browser reads go to the web app's same origin `POST /api/rpc`, which forwards them to `NEXT_PUBLIC_TIRAMISU_RPC_URL` and adds `Authorization: Bearer <TIRAMISU_API_KEY>` only when the server has a key. Wallet signatures use the public RPC directly.
+Browser reads go to the web app's same origin `POST /api/rpc`, which forwards them to `NEXT_PUBLIC_ARKIV_RPC_URL` and adds `Authorization: Bearer <ARKIV_API_KEY>` only when the server has a key. Wallet signatures use the public RPC directly.
 
 | Purpose | Method and arguments | Cadence |
 | :--- | :--- | :--- |
@@ -65,7 +65,7 @@ Browser reads go to the web app's same origin `POST /api/rpc`, which forwards th
 | Payload button | `arkiv_query("$key = key(<key>)", {select: {"payload":true,"contentType":true}})` at current head | On click |
 | Verify button (`verifyRows` in `apps/web/lib/verify.ts`) | `arkiv_query(<bare key chunk>, {select: {"key":true,"updatedAt":true,"expiresAt":true,"owner":true}, cursor})` for the result's keys, chunks of 50 | On click |
 
-Payload and Verify use bare key predicates without the configured expression, without `atBlock` and without an explicit limit. Verify compares returned metadata with the indexed row and the live head; it is an RPC comparison, not a cryptographic proof, so it trusts the RPC node that answers (the server's `NEXT_PUBLIC_TIRAMISU_RPC_URL`, reached through `/api/rpc`; a self hosted app can point it at any endpoint or its own node), and a missing entity cannot distinguish deletion from expiry. The browser relevance prefilter matches the indexer: a log is used when its key is already known, when its `EntityCreated` owner matches a `$creator` or `$owner` term, or when the expression has no such terms.
+Payload and Verify use bare key predicates without the configured expression, without `atBlock` and without an explicit limit. Verify compares returned metadata with the indexed row and the live head; it is an RPC comparison, not a cryptographic proof, so it trusts the RPC node that answers (the server's `NEXT_PUBLIC_ARKIV_RPC_URL`, reached through `/api/rpc`; a self hosted app can point it at any endpoint or its own node), and a missing entity cannot distinguish deletion from expiry. The browser relevance prefilter matches the indexer: a log is used when its key is already known, when its `EntityCreated` owner matches a `$creator` or `$owner` term, or when the expression has no such terms.
 
 ## Widget dashboards
 

@@ -18,6 +18,6 @@ export function readServerDashConfig(env: Record<string, string | undefined>):
   catch { return { ok: false, reason: 'DASHBOARD_PRIVATE_KEY is invalid' } }
   return { ok: true, config: { privyAppId: env.NEXT_PUBLIC_PRIVY_APP_ID!.trim(), privyAppSecret: env.PRIVY_APP_SECRET!,
     privateKey: privateKey as `0x${string}`, wallet,
-    rpcUrl: env.NEXT_PUBLIC_TIRAMISU_RPC_URL?.trim() || DEFAULT_RPC_URL,
+    rpcUrl: env.NEXT_PUBLIC_ARKIV_RPC_URL?.trim() || DEFAULT_RPC_URL,
     sessionSecret: deriveSessionSecret(env.PRIVY_APP_SECRET!) } }
 }

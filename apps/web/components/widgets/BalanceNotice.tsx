@@ -22,7 +22,7 @@ export function BalanceNotice({ address, wei, level, initialCopied = false }: { 
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 1.75 14.5 13.5h-13Z"/><path d="M8 6.25V9M8 11.25h.01"/></svg>
   <div>
    <p className="notice-title">{empty ? 'Your wallet has no GLM.' : `Low balance: ${formatGlm(wei ?? BigInt(0))}.`}</p>
-   <p>Extending, transferring or deleting needs at least 0.1 GLM on Tiramisu. Fund <span className="mono">{shortHex(address)}</span>.</p>
+   <p>Extending, transferring or deleting needs at least 0.1 GLM on Rabdi. Fund <span className="mono">{shortHex(address)}</span>.</p>
   </div>
   <button type="button" className="btn btn-sm" onClick={() => void copy()}>{copied ? '✓ Copied' : 'Copy address'}</button>
  </div>

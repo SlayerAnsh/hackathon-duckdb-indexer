@@ -10,7 +10,7 @@ Use Bun 1.3.x (tested with 1.3.11). Docker uses `oven/bun:1.3` for workspace ins
 | `apps/indexer` | DuckDB store, log replay backfill, attribute filler, live sync, snapshots, delta, internal HTTP |
 | `apps/web` | Next.js app that runs against any indexer through `INDEXER_URL`: `/data` proxy with disk fallback, DuckDB WASM loader, browser live tail, Playground, widgets, dashboards, /explore, about page |
 | `apps/web/lib/dash` | Widget schemas, SQL, RPC reads, pending writes, authentication and serialized wallet operations |
-| `apps/web/lib/dash/wallet.ts` | Tiramisu wallet transport, balance reads and GLM formatting |
+| `apps/web/lib/dash/wallet.ts` | Rabdi wallet transport, balance reads and GLM formatting |
 | `apps/web/lib/dash/widget-actions.ts` | Direct widget extend, delete and transfer with safe wallet errors |
 | `apps/web/lib/dash/use-balance.ts` | Session wallet balance state and refresh after signatures |
 | `apps/web/app/api/dash` | Runtime wallet config, session, and authenticated app wallet writes (widget create and new version, dashboards, links, organize) |
@@ -32,13 +32,13 @@ bun test ./apps/web/test
 
 All automated tests use fixtures or fakes and need no RPC. The deployment tests inspect configuration and docs, not running containers. They also reject dash punctuation in the docs. Docker image builds, Range responses, credential absence in built bundles, restart persistence and public deployment need separate integration checks.
 
-Start the frontend against the hosted indexer, which covers all Tiramisu data, with `INDEXER_URL=https://arkiv-sql-indexer.dokploy.anshudhar.dev bun run --cwd apps/web dev`, or against a local indexer (`DATA_DIR=./data bun apps/indexer/src/main.ts`) with `INDEXER_URL=http://localhost:8080`. The default upstream inside Compose is `http://indexer:8080`. The Playground needs no secrets; widgets and dashboards need the variables below. Set `DATA_DIR` for the web app too if it should fall back to the stored files while the indexer is down.
+Start the frontend against the hosted indexer, which covers all Rabdi data, with `INDEXER_URL=https://arkiv-sql-indexer.dokploy.anshudhar.dev bun run --cwd apps/web dev`, or against a local indexer (`DATA_DIR=./data bun apps/indexer/src/main.ts`) with `INDEXER_URL=http://localhost:8080`. The default upstream inside Compose is `http://indexer:8080`. The Playground needs no secrets; widgets and dashboards need the variables below. Set `DATA_DIR` for the web app too if it should fall back to the stored files while the indexer is down.
 
 ## Widget dashboard development
 
-Next.js loads environment files from `apps/web`, not the repository root. Copy or link the root `.env.local` to `apps/web/.env.local`, or export the variables before starting Next.js. Set `NEXT_PUBLIC_PRIVY_APP_ID`, `PRIVY_APP_SECRET` and `DASHBOARD_PRIVATE_KEY`; the chain is `NEXT_PUBLIC_ARKIV_CHAIN` (`tiramisu` or `rabdi`, defined in `lib/chain.ts`) and the RPC uses `NEXT_PUBLIC_TIRAMISU_RPC_URL`. Optionally set `TIRAMISU_API_KEY` (server only) so browser reads, which go through the same origin read proxy `POST /api/rpc` (`app/api/rpc/route.ts`, logic in `lib/dash/server/rpc-proxy.ts`), use the keyed quota instead of the anonymous budget. Restart the dev server after changing it. New browser read code must use `createBrowserRpc` or `browserRpcUrl` from `lib/rpc-browser.ts`, and any new read method must be added to `READ_METHODS` in the proxy. Keep secret values out of logs and browser bundles. See the README for Privy provider and embedded wallet setup.
+Next.js loads environment files from `apps/web`, not the repository root. Copy or link the root `.env.local` to `apps/web/.env.local`, or export the variables before starting Next.js. Set `NEXT_PUBLIC_PRIVY_APP_ID`, `PRIVY_APP_SECRET` and `DASHBOARD_PRIVATE_KEY`; the chain (Rabdi, chain ID `7794095`) is defined in `lib/chain.ts` and the RPC uses `NEXT_PUBLIC_ARKIV_RPC_URL`. Optionally set `ARKIV_API_KEY` (server only) so browser reads, which go through the same origin read proxy `POST /api/rpc` (`app/api/rpc/route.ts`, logic in `lib/dash/server/rpc-proxy.ts`), use the keyed quota instead of the anonymous budget. Restart the dev server after changing it. New browser read code must use `createBrowserRpc` or `browserRpcUrl` from `lib/rpc-browser.ts`, and any new read method must be added to `READ_METHODS` in the proxy. Keep secret values out of logs and browser bundles. See the README for Privy provider and embedded wallet setup.
 
-Browser signing needs Tiramisu (chain ID `7738577`) in Privy `supportedChains` and as the `defaultChain`. Fund a test wallet with 0.1 GLM or more before testing Extend, Transfer or Delete. Saving widgets and dashboards remains paid by the backend wallet. Balance warnings appear below 0.1 GLM; a zero balance disables signing actions.
+Browser signing needs Rabdi (chain ID `7794095`) in Privy `supportedChains` and as the `defaultChain`. Fund a test wallet with 0.1 GLM or more before testing Extend, Transfer or Delete. Saving widgets and dashboards remains paid by the backend wallet. Balance warnings appear below 0.1 GLM; a zero balance disables signing actions.
 
 Nonces, rate limits and the serial backend wallet queue are in memory. Run one web instance to preserve nonce checks, abuse limits and wallet serialization. The dashboard wallet's public address comes from `GET /api/dash/config` at runtime.
 
@@ -52,7 +52,7 @@ bun test ./test/deployment.test.ts
 
 ## Featured dashboards
 
-Featured dashboards are app owned dashboards (called official in code: `lib/dash/official.ts`, `official-defs.ts`, `scripts/seed-official.ts`). The coordinator seeds the five Featured dashboards (network overview, expiry watch, creators, attributes, activity) from the repository root with the existing dashboard wallet. Export `DASHBOARD_PRIVATE_KEY` and optionally `NEXT_PUBLIC_TIRAMISU_RPC_URL` from the root environment without printing their values. The script defaults to Tiramisu and needs no Privy variables.
+Featured dashboards are app owned dashboards (called official in code: `lib/dash/official.ts`, `official-defs.ts`, `scripts/seed-official.ts`). The coordinator seeds the five Featured dashboards (network overview, expiry watch, creators, attributes, activity) from the repository root with the existing dashboard wallet. Export `DASHBOARD_PRIVATE_KEY` and optionally `NEXT_PUBLIC_ARKIV_RPC_URL` from the root environment without printing their values. The script defaults to Rabdi and needs no Privy variables.
 
 ```sh
 bun apps/web/scripts/seed-official.ts --dry-run

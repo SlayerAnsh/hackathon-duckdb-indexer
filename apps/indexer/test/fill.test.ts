@@ -96,7 +96,7 @@ test('fill client sends no API key unless FILL_USE_API_KEY is true', async () =>
   for (const use of [false, true]) {
     const headers: (string | null)[] = []
     const fetchImpl = (async (_url: string, init: RequestInit) => { headers.push(new Headers(init.headers).get('authorization')); return Response.json({ jsonrpc: '2.0', id: 1, result: '0x1' }) }) as unknown as typeof fetch
-    const config = loadConfig({ TIRAMISU_API_KEY: 'secret', FILL_USE_API_KEY: String(use) })
+    const config = loadConfig({ ARKIV_API_KEY: 'secret', FILL_USE_API_KEY: String(use) })
     await createFillRpc(config, fetchImpl).blockNumber()
     expect(headers).toEqual([use ? 'Bearer secret' : null])
   }

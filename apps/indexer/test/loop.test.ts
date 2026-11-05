@@ -4,10 +4,10 @@ import { bootstrap, tick } from '../src/main'
 import { loadConfig } from '../src/config'
 import { temp, track, fake, hash, expression } from './helpers'
 async function setup() {
-  const config = loadConfig({ BACKFILL_MODE: 'query', INDEX_EXPRESSION: expression, TIRAMISU_API_KEY: 'test', DATA_DIR: await temp() })
+  const config = loadConfig({ BACKFILL_MODE: 'query', INDEX_EXPRESSION: expression, ARKIV_API_KEY: 'test', DATA_DIR: await temp() })
   const query = mock(async (_e, o) => ({ data: [], blockNumber: o.atBlock }))
   const rpc = fake(query), result = await bootstrap(config, rpc); track(result.store); query.mockClear()
-  return { ...result, rpc, config, meta: { chainId: 7738577, genesisHash: hash, expression } }
+  return { ...result, rpc, config, meta: { chainId: 7794095, genesisHash: hash, expression } }
 }
 test('tick below batch size does nothing', async () => { const ctx = await setup(); ctx.rpc.blockNumber = async () => 107; const logs = mock(async () => []); ctx.rpc.getLogs = logs; await tick(ctx); expect(logs).not.toHaveBeenCalled(); expect((await ctx.store.state())!.head_block).toBe(100) })
 test('tick syncs and publishes delta', async () => { const ctx = await setup(); ctx.rpc.blockNumber = async () => 108; await tick(ctx); expect((await ctx.store.state())!.head_block).toBe(105); expect(JSON.parse(await readFile(ctx.dir + '/delta.json', 'utf8'))).toMatchObject({ fromBlock: 101, toBlock: 105 }) })

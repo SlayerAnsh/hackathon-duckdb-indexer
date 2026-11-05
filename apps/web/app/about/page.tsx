@@ -47,7 +47,7 @@ export default function AboutPage() {
   <header className={s.hero}>
    <p className={s.eyebrow}>About</p>
    <h1 className={s.title}>How Arkiv SQL works</h1>
-   <p className={s.lead}>Two parts. An open source indexer that anyone can self host, and this app, which runs on a hosted instance that indexes all Arkiv data on Tiramisu. This page explains both, and how to check each claim yourself.</p>
+   <p className={s.lead}>Two parts. An open source indexer that anyone can self host, and this app, which runs on a hosted instance that indexes all Arkiv data on the Rabdi testnet. This page explains both, and how to check each claim yourself.</p>
    <p className={s.facts}>MIT licensed. Built for Arkiv: Global Tour Stop, within the challenge window of 9 October 2026 to the extended deadline of 20 October 2026, on the Tiramisu testnet (chain 7738577) with Arkiv SDK 0.8.1. The git history runs from 18 to 20 October 2026; pre-existing work: none. <a href={REPO_URL} target="_blank" rel="noreferrer">Source on GitHub</a></p>
   </header>
 
@@ -147,7 +147,7 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build`}
       { title: 'Plain files', text: <>Read <code>manifest.json</code>, then the Parquet files it lists, with DuckDB or any Parquet tool.</> },
       { title: 'Docker or Bun', text: 'Docker Compose for the full stack, or Bun 1.3 to run the indexer and the app directly.' },
      ]}/>
-     <p>The hosted indexer behind this app serves the same files at <a href={HOSTED_INDEXER_URL} target="_blank" rel="noreferrer">{HOSTED_INDEXER_URL.replace('https://', '')}</a>, so you can query all of Tiramisu with DuckDB without running anything.</p>
+     <p>The hosted indexer behind this app serves the same files at <a href={HOSTED_INDEXER_URL} target="_blank" rel="noreferrer">{HOSTED_INDEXER_URL.replace('https://', '')}</a>, so you can query all of Rabdi with DuckDB without running anything.</p>
      <p className={s.more}><a href={`${REPO_URL}#quick-start`} target="_blank" rel="noreferrer">Full setup in the README</a></p>
      <Src files={['README.md', 'docker-compose.yml', '.env.example', 'apps/indexer/test/keyless.test.ts']}/>
     </Section>

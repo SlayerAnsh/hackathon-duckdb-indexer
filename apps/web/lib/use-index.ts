@@ -17,7 +17,7 @@ export function useIndex(): { db: IndexDb | null; state: IndexState; version: nu
     listeners.add(update)
     update()
     if (!pending) {
-      pending = IndexDb.create(window.location.origin, process.env.NEXT_PUBLIC_TIRAMISU_RPC_URL ?? DEFAULT_RPC_URL)
+      pending = IndexDb.create(window.location.origin, process.env.NEXT_PUBLIC_ARKIV_RPC_URL ?? DEFAULT_RPC_URL)
       void pending.then(instance => {
         db = instance
         if (listeners.size) instance.start(next => { state = next; notify() })

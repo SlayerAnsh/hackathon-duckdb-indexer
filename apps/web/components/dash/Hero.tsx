@@ -48,7 +48,7 @@ export function Hero({version,manifest}:{version:number;manifest?:Manifest}) {
    <div className={s.intro}>
     <p className={s.eyebrow}>Open source SQL indexer for Arkiv</p>
     <h1 id="hero-h" className={s.title}>Explore live Arkiv data, in SQL.</h1>
-    <p className={s.pitch}>A hosted index of every live entity on the Tiramisu testnet, loaded into DuckDB in your browser. Join, group and sort by attributes, which <code>arkiv_query</code> cannot do, then save the answers as charts and dashboards.</p>
+    <p className={s.pitch}>A hosted index of every live entity on the Rabdi testnet, loaded into DuckDB in your browser. Join, group and sort by attributes, which <code>arkiv_query</code> cannot do, then save the answers as charts and dashboards.</p>
     <div className={s.ctas}><Link className="btn btn-primary btn-lg" href="/explore">Explore dashboards <span aria-hidden="true">→</span></Link><Link className="btn btn-lg" href="/playground">Open playground</Link></div>
    </div>
    <HeroFigures stats={stats} times={times} manifest={manifest}/>

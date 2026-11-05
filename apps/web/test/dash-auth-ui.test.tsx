@@ -89,13 +89,13 @@ test('closing the Privy flow is a silent cancellation', () => {
 })
 
 
-test('signer picks only the matching embedded wallet and checks Tiramisu', () => {
+test('signer picks only the matching embedded wallet and checks Rabdi', () => {
  const embedded = { address: address.toUpperCase().replace('0X', '0x'), walletClientType: 'privy' }
  const external = { address, walletClientType: 'metamask' }
  expect(pickEmbeddedWallet([embedded, external], address)).toBe(embedded)
  expect(pickEmbeddedWallet([external], address)).toBeNull()
- expect(needsChainSwitch('eip155:7738577')).toBe(false)
- expect(needsChainSwitch('7738577')).toBe(false)
+ expect(needsChainSwitch('eip155:7794095')).toBe(false)
+ expect(needsChainSwitch('7794095')).toBe(false)
  expect(needsChainSwitch('eip155:1')).toBe(true)
  expect(needsChainSwitch(undefined)).toBe(true)
 })

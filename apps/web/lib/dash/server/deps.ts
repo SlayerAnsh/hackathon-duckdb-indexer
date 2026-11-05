@@ -18,7 +18,7 @@ declare global {
   var __dashDeps: DashDepsState | undefined
 }
 // The API key only raises the read budget of reader (arkiv_query); writes stay on the public transport.
-export function buildOps(privateKey: `0x${string}`, rpcUrl: string, apiKey = process.env.TIRAMISU_API_KEY?.trim() || undefined): OpsDeps {
+export function buildOps(privateKey: `0x${string}`, rpcUrl: string, apiKey = process.env.ARKIV_API_KEY?.trim() || undefined): OpsDeps {
   const account = privateKeyToAccount(privateKey)
   const wallet = createWalletClient({ chain: ARKIV_CHAIN, account, transport: http(rpcUrl) })
   const publicClient = createPublicClient({ chain: ARKIV_CHAIN, cacheTime: 0,

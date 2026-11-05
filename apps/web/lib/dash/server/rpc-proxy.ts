@@ -42,8 +42,8 @@ export type RpcProxyDeps = {
 }
 
 export function readRpcProxyEnv(env: Record<string, string | undefined>): { upstreamUrl: string; apiKey?: string } {
-  const apiKey = env.TIRAMISU_API_KEY?.trim()
-  return { upstreamUrl: env.NEXT_PUBLIC_TIRAMISU_RPC_URL?.trim() || DEFAULT_RPC_URL, ...(apiKey ? { apiKey } : {}) }
+  const apiKey = env.ARKIV_API_KEY?.trim()
+  return { upstreamUrl: env.NEXT_PUBLIC_ARKIV_RPC_URL?.trim() || DEFAULT_RPC_URL, ...(apiKey ? { apiKey } : {}) }
 }
 
 function rpcError(status: number, code: number, message: string, id: JsonRpcId = null, headers: Record<string, string> = {}): Response {

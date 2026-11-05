@@ -6,7 +6,7 @@ import { resolveStoreDir, serveFromDisk } from '../lib/disk-data'
 import { proxy } from '../lib/proxy'
 
 let root: string, dataDir: string, emptyDir: string, outside: string
-const store = () => join(dataDir, '7738577-0x9548806311')
+const store = () => join(dataDir, '7794095-0x9548806311')
 const parquet = new Uint8Array(Array.from({ length: 64 }, (_, i) => i))
 const manifest = { version: 1, snapshotBlock: 100, headBlock: 100, files: { entities: 'snap/v1/entities.parquet', attributes: 'snap/v1/attributes.parquet' }, delta: 'delta.json' }
 const failing = (async () => { throw new Error('offline') }) as unknown as typeof fetch

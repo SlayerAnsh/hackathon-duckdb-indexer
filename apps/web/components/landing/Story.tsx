@@ -14,7 +14,7 @@ export function SectionHead({ id, title, text, link }: { id: string; title: stri
 export function Story() {
  return <>
   <section className={s.section} id="how" aria-labelledby="how-h">
-   <SectionHead id="how-h" title="How it works" text="A hosted indexer keeps a copy of every live entity on Tiramisu. Your browser loads it and runs the SQL itself." link={<Link className={s.headLink} href="/about#architecture">Architecture <span aria-hidden="true">→</span></Link>}/>
+   <SectionHead id="how-h" title="How it works" text="A hosted indexer keeps a copy of every live entity on Rabdi. Your browser loads it and runs the SQL itself." link={<Link className={s.headLink} href="/about#architecture">Architecture <span aria-hidden="true">→</span></Link>}/>
    <StepFlow label="How a row gets from Arkiv to your dashboard" steps={PIPELINE}/>
    <div className={s.trust}><Points items={TRUST}/></div>
   </section>

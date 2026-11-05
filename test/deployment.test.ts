@@ -12,7 +12,7 @@ test('compose keeps data persistent and credentials isolated', () => {
   expect(s.indexer.expose).toEqual(['8080']);
   expect(s.indexer.ports).toBeUndefined();
   expect(s.indexer.env_file).toBeUndefined();
-  expect(s.indexer.environment.TIRAMISU_API_KEY).toBe('${TIRAMISU_API_KEY:-}');
+  expect(s.indexer.environment.ARKIV_API_KEY).toBe('${ARKIV_API_KEY:-}');
   expect(s.indexer.environment.SYNC_USE_API_KEY).toBe('${SYNC_USE_API_KEY:-false}');
   expect(s.indexer.volumes).toContain('${INDEX_DATA_PATH:-./data}:/data');
   expect(s.indexer.healthcheck.test.join(' ')).toContain("fetch('http://localhost:8080/health')");
@@ -20,9 +20,9 @@ test('compose keeps data persistent and credentials isolated', () => {
   expect(s.web.ports).toBeUndefined();
   expect(s.web.expose).toEqual(['3000']);
   expect(s.web.environment.INDEXER_URL).toBe('http://indexer:8080');
-  expect(s.web.environment).toHaveProperty('NEXT_PUBLIC_TIRAMISU_RPC_URL');
-  expect(s.web.build.args.NEXT_PUBLIC_TIRAMISU_RPC_URL).toBe(s.web.environment.NEXT_PUBLIC_TIRAMISU_RPC_URL);
-  expect(s.web.build.args.NEXT_PUBLIC_EXPLORER_URL).toBe('${NEXT_PUBLIC_EXPLORER_URL:-https://tiramisu.explorer.arkiv.network}');
+  expect(s.web.environment).toHaveProperty('NEXT_PUBLIC_ARKIV_RPC_URL');
+  expect(s.web.build.args.NEXT_PUBLIC_ARKIV_RPC_URL).toBe(s.web.environment.NEXT_PUBLIC_ARKIV_RPC_URL);
+  expect(s.web.build.args.NEXT_PUBLIC_EXPLORER_URL).toBe('${NEXT_PUBLIC_EXPLORER_URL:-https://rabdi.explorer.arkiv.network}');
   expect(s.web.environment.NEXT_PUBLIC_EXPLORER_URL).toBe(s.web.build.args.NEXT_PUBLIC_EXPLORER_URL);
   for (const name of ['PRIVY_APP_SECRET', 'DASHBOARD_PRIVATE_KEY', 'NEXT_PUBLIC_PRIVY_APP_ID'])
     expect(s.web.environment[name]).toBe('${' + name + ':-}');
@@ -35,28 +35,28 @@ test('compose keeps data persistent and credentials isolated', () => {
   for (const name of ['web']) {
     expect(s[name].env_file).toBeUndefined();
     // The key reaches the web server runtime for the /api/rpc read proxy, never a public variable or the build.
-    expect(s[name].environment.TIRAMISU_API_KEY).toBe('${TIRAMISU_API_KEY:-}');
+    expect(s[name].environment.ARKIV_API_KEY).toBe('${ARKIV_API_KEY:-}');
     for (const [variable, value] of Object.entries(s[name].environment))
-      if (variable.startsWith('NEXT_PUBLIC_')) expect(String(value)).not.toContain('TIRAMISU_API_KEY');
+      if (variable.startsWith('NEXT_PUBLIC_')) expect(String(value)).not.toContain('ARKIV_API_KEY');
   }
   for (const service of Object.values(s) as any[]) {
     expect(service.restart).toBe('unless-stopped');
     expect(service.build.context).toBe('.');
-    expect(JSON.stringify(service.build.args ?? {})).not.toContain('TIRAMISU_API_KEY');
+    expect(JSON.stringify(service.build.args ?? {})).not.toContain('ARKIV_API_KEY');
     expect(JSON.stringify(service.build.args ?? {})).not.toContain('DASHBOARD_PRIVATE_KEY');
     expect(JSON.stringify(service.build.args ?? {})).not.toContain('PRIVY_APP_SECRET');
   }
 });
 
-test('TIRAMISU_API_KEY stays in server code and never becomes a public variable', () => {
+test('ARKIV_API_KEY stays in server code and never becomes a public variable', () => {
   function files(path: string): string[] {
     return readdirSync(new URL(`../${path}`, import.meta.url), { withFileTypes: true }).flatMap(entry =>
       entry.isDirectory() ? files(`${path}/${entry.name}`) : [`${path}/${entry.name}`])
   }
   for (const path of ['docker-compose.yml', 'docker-compose.dokploy.yml', '.env.example', 'apps/web/Dockerfile', 'apps/web/next.config.ts', ...files('apps/web/lib'), ...files('apps/web/components'), ...files('apps/web/app')].filter(p => existsSync(new URL(`../${p}`, import.meta.url)))) {
     const text = read(path);
-    expect(text).not.toContain('NEXT_PUBLIC_TIRAMISU_API_KEY');
-    if (text.includes('TIRAMISU_API_KEY') && path.startsWith('apps/web/')) expect(path).toMatch(/^apps\/web\/lib\/dash\/server\//);
+    expect(text).not.toContain('NEXT_PUBLIC_ARKIV_API_KEY');
+    if (text.includes('ARKIV_API_KEY') && path.startsWith('apps/web/')) expect(path).toMatch(/^apps\/web\/lib\/dash\/server\//);
   }
 });
 
@@ -83,12 +83,12 @@ test('images use locked workspace installs and the standalone runtime layout', (
     expect(file).toContain('bun install --frozen-lockfile');
     for (const workspace of ['packages/core', 'apps/indexer', 'apps/web'])
       expect(file).toContain(`${workspace}/package.json`);
-    expect(file).not.toContain('TIRAMISU_API_KEY');
+    expect(file).not.toContain('ARKIV_API_KEY');
   }
   expect(read('apps/indexer/Dockerfile')).toContain('CMD ["bun", "apps/indexer/src/main.ts"]');
   expect(read('apps/indexer/Dockerfile')).toContain('ENV DATA_DIR=/data');
   const web = read('apps/web/Dockerfile');
-  expect(web).toContain('ARG NEXT_PUBLIC_EXPLORER_URL=https://tiramisu.explorer.arkiv.network');
+  expect(web).toContain('ARG NEXT_PUBLIC_EXPLORER_URL=https://rabdi.explorer.arkiv.network');
   expect(web).toContain('ENV NEXT_PUBLIC_EXPLORER_URL=$NEXT_PUBLIC_EXPLORER_URL');
   for (const name of ['NEXT_PUBLIC_PRIVY_APP_ID']) {
     expect(web).toContain(`ARG ${name}=`);
@@ -107,7 +107,7 @@ test('images use locked workspace installs and the standalone runtime layout', (
   const env = read('.env.example');
   for (const name of ['NEXT_PUBLIC_PRIVY_APP_ID', 'PRIVY_APP_SECRET', 'DASHBOARD_PRIVATE_KEY'])
     expect(env).toContain(`${name}=`);
-  for (const value of ['TIRAMISU_API_KEY=', 'SYNC_USE_API_KEY=false', 'FILL_USE_API_KEY=false', 'INDEX_EXPRESSION=', 'NEXT_PUBLIC_TIRAMISU_RPC_URL=', 'NEXT_PUBLIC_EXPLORER_URL=']) expect(env).toContain(value);
+  for (const value of ['ARKIV_API_KEY=', 'SYNC_USE_API_KEY=false', 'FILL_USE_API_KEY=false', 'INDEX_EXPRESSION=', 'NEXT_PUBLIC_ARKIV_RPC_URL=', 'NEXT_PUBLIC_EXPLORER_URL=']) expect(env).toContain(value);
 });
 
 test('submission docs cover dashboard identity, schema, expiry, and observed friction', () => {

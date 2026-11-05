@@ -121,9 +121,9 @@ test('upstream failure and timeout give 502 and 504 without leaking the key', as
 })
 
 test('env reader uses the server key and the public RPC default', () => {
-  expect(readRpcProxyEnv({})).toEqual({ upstreamUrl: 'https://rpc.tiramisu.db-chain.testnet.arkiv.network' })
-  expect(readRpcProxyEnv({ TIRAMISU_API_KEY: ' k ', NEXT_PUBLIC_TIRAMISU_RPC_URL: 'http://rpc' })).toEqual({ upstreamUrl: 'http://rpc', apiKey: 'k' })
-  expect(readRpcProxyEnv({ TIRAMISU_API_KEY: '  ' })).not.toHaveProperty('apiKey')
+  expect(readRpcProxyEnv({})).toEqual({ upstreamUrl: 'https://rpc.rabdi.db-chain.testnet.arkiv.network' })
+  expect(readRpcProxyEnv({ ARKIV_API_KEY: ' k ', NEXT_PUBLIC_ARKIV_RPC_URL: 'http://rpc' })).toEqual({ upstreamUrl: 'http://rpc', apiKey: 'k' })
+  expect(readRpcProxyEnv({ ARKIV_API_KEY: '  ' })).not.toHaveProperty('apiKey')
 })
 
 const g = globalThis as { window?: unknown; fetch: typeof fetch }
@@ -138,7 +138,7 @@ test('createBrowserRpc targets the same origin /api/rpc proxy in a browser', asy
     expect(new Headers(init?.headers).has('authorization')).toBe(false)
     return Response.json({ jsonrpc: '2.0', id: 1, result: '0x2a' })
   }) as typeof fetch
-  expect(await createBrowserRpc('https://rpc.tiramisu.db-chain.testnet.arkiv.network').blockNumber()).toBe(42)
+  expect(await createBrowserRpc('https://rpc.rabdi.db-chain.testnet.arkiv.network').blockNumber()).toBe(42)
   expect(urls).toEqual(['http://app.test/api/rpc'])
   expect(browserRpcUrl('https://public')).toBe('http://app.test/api/rpc')
 })

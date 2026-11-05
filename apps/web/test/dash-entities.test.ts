@@ -79,7 +79,7 @@ test('queryAll follows cursors and reports the first page block', async () => {
 })
 
 test('public config is enabled only with an app id and a valid wallet', () => {
-  expect(readPublicDashConfig({ privyAppId: 'app', wallet: upper(W) })).toEqual({ enabled: true, privyAppId: 'app', wallet: W, rpcUrl: 'https://rpc.tiramisu.db-chain.testnet.arkiv.network' })
+  expect(readPublicDashConfig({ privyAppId: 'app', wallet: upper(W) })).toEqual({ enabled: true, privyAppId: 'app', wallet: W, rpcUrl: 'https://rpc.rabdi.db-chain.testnet.arkiv.network' })
   for (const privyAppId of ['', '   ', undefined]) expect(readPublicDashConfig({ privyAppId, wallet: W }).enabled).toBe(false)
   expect(readPublicDashConfig({ privyAppId: 'app', wallet: 'nope' }).enabled).toBe(false)
   expect(readPublicDashConfig({}).enabled).toBe(false)

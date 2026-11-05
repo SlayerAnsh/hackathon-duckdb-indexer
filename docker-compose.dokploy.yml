@@ -7,16 +7,16 @@ services:
     volumes: ["index-data:/data"]
     environment:
       SYNC_PAUSED: ${SYNC_PAUSED:-false}
-      TIRAMISU_API_KEY: ${TIRAMISU_API_KEY:-}
+      ARKIV_API_KEY: ${ARKIV_API_KEY:-}
       INDEX_EXPRESSION: ${INDEX_EXPRESSION:-}
-      PUBLIC_RPC_URL: ${PUBLIC_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
+      PUBLIC_RPC_URL: ${PUBLIC_RPC_URL:-https://rpc.rabdi.db-chain.testnet.arkiv.network}
       BACKFILL_MODE: ${BACKFILL_MODE:-logs}
-      FILL_RPC_URL: ${FILL_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
+      FILL_RPC_URL: ${FILL_RPC_URL:-https://rpc.rabdi.db-chain.testnet.arkiv.network}
       FILL_USE_API_KEY: ${FILL_USE_API_KEY:-false}
       SYNC_USE_API_KEY: ${SYNC_USE_API_KEY:-false}
       FILL_CHUNK: ${FILL_CHUNK:-50}
       FILL_INTERVAL_MS: ${FILL_INTERVAL_MS:-4000}
-      ARKIV_RPC_URL: ${ARKIV_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
+      ARKIV_RPC_URL: ${ARKIV_RPC_URL:-https://rpc.rabdi.db-chain.testnet.arkiv.network}
       DATA_DIR: /data
       PORT: "8080"
     healthcheck:
@@ -32,23 +32,21 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        NEXT_PUBLIC_ARKIV_CHAIN: ${NEXT_PUBLIC_ARKIV_CHAIN:-tiramisu}
-        NEXT_PUBLIC_TIRAMISU_RPC_URL: ${NEXT_PUBLIC_TIRAMISU_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
-        NEXT_PUBLIC_EXPLORER_URL: ${NEXT_PUBLIC_EXPLORER_URL:-https://tiramisu.explorer.arkiv.network}
+        NEXT_PUBLIC_ARKIV_RPC_URL: ${NEXT_PUBLIC_ARKIV_RPC_URL:-https://rpc.rabdi.db-chain.testnet.arkiv.network}
+        NEXT_PUBLIC_EXPLORER_URL: ${NEXT_PUBLIC_EXPLORER_URL:-https://rabdi.explorer.arkiv.network}
         NEXT_PUBLIC_PRIVY_APP_ID: ${NEXT_PUBLIC_PRIVY_APP_ID:-}
     # Read only copy of the index so stored data stays reachable while the indexer is down.
     volumes: ["index-data:/data:ro"]
     environment:
       INDEXER_URL: http://indexer:8080
       DATA_DIR: /data
-      NEXT_PUBLIC_ARKIV_CHAIN: ${NEXT_PUBLIC_ARKIV_CHAIN:-tiramisu}
-      NEXT_PUBLIC_TIRAMISU_RPC_URL: ${NEXT_PUBLIC_TIRAMISU_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
-      NEXT_PUBLIC_EXPLORER_URL: ${NEXT_PUBLIC_EXPLORER_URL:-https://tiramisu.explorer.arkiv.network}
+      NEXT_PUBLIC_ARKIV_RPC_URL: ${NEXT_PUBLIC_ARKIV_RPC_URL:-https://rpc.rabdi.db-chain.testnet.arkiv.network}
+      NEXT_PUBLIC_EXPLORER_URL: ${NEXT_PUBLIC_EXPLORER_URL:-https://rabdi.explorer.arkiv.network}
       NEXT_PUBLIC_PRIVY_APP_ID: ${NEXT_PUBLIC_PRIVY_APP_ID:-}
       PRIVY_APP_SECRET: ${PRIVY_APP_SECRET:-}
       DASHBOARD_PRIVATE_KEY: ${DASHBOARD_PRIVATE_KEY:-}
       # Runtime only: the /api/rpc read proxy sends it upstream. Never a build arg or NEXT_PUBLIC_ variable.
-      TIRAMISU_API_KEY: ${TIRAMISU_API_KEY:-}
+      ARKIV_API_KEY: ${ARKIV_API_KEY:-}
     depends_on:
       indexer:
         condition: service_started

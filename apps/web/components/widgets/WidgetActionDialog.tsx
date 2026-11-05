@@ -41,7 +41,7 @@ export function WidgetActionDialog({ kind, name, phase, error, address = '', onC
   </>}>
   {kind === 'transfer' || phase === 'error' ? <>
   {kind === 'transfer' && <form id={formId} className="field-stack" noValidate onSubmit={event => { event.preventDefault(); confirm() }}>
-   <Field label="New owner address" error={inputError} hint={inputError ? undefined : 'A Tiramisu address starting with 0x. Your wallet signs and pays a small network fee.'}>
+   <Field label="New owner address" error={inputError} hint={inputError ? undefined : 'A Rabdi address starting with 0x. Your wallet signs and pays a small network fee.'}>
     <input className="input mono" placeholder="0x…" autoComplete="off" spellCheck={false} value={to} onChange={event => setTo(event.target.value)} disabled={busy}/>
    </Field>
   </form>}

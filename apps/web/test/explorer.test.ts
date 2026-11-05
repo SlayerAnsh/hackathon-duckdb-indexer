@@ -3,8 +3,8 @@ import { EXPLORER_URL, addressUrl, isAddress } from '../lib/explorer'
 
 const addr = '0x6cb4a1b2c3d4e5f60718293a4b5c6d7e8f905e22'
 
-test('explorer defaults to the Tiramisu block explorer', () => {
- expect(EXPLORER_URL).toBe(process.env.NEXT_PUBLIC_EXPLORER_URL || 'https://tiramisu.explorer.arkiv.network')
+test('explorer defaults to the Rabdi block explorer', () => {
+ expect(EXPLORER_URL).toBe(process.env.NEXT_PUBLIC_EXPLORER_URL || 'https://rabdi.explorer.arkiv.network')
 })
 
 test('address urls point at the explorer address page', () => {

@@ -50,7 +50,7 @@ test('logs bootstrap uses public metadata and never queries rows', async () => {
   logs.getLogs = async () => [event(1, 'EntityCreated', 1, 200)]
   const query = fake(mock(async () => { throw Error('private query forbidden') }))
   query.chainId = async () => { throw Error('private metadata forbidden') }
-  const result = await bootstrap(loadConfig({ TIRAMISU_API_KEY: 'x', DATA_DIR: await temp() }), logs, () => {}, query)
+  const result = await bootstrap(loadConfig({ ARKIV_API_KEY: 'x', DATA_DIR: await temp() }), logs, () => {}, query)
   track(result.store)
   expect(query.query).not.toHaveBeenCalled()
   expect(await rows(result.store, 'SELECT key, attrs_pending FROM entities')).toEqual([{ key: '0x' + '1'.padStart(64, '0'), attrs_pending: true }])

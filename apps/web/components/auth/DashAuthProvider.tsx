@@ -61,7 +61,7 @@ export function DashAuthProvider({ children }: { children: ReactNode }) {
   void fetchDashWallet().then(wallet => {
    if (!active) return
    setConfig(readPublicDashConfig({ privyAppId: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
-    wallet, rpcUrl: process.env.NEXT_PUBLIC_TIRAMISU_RPC_URL }))
+    wallet, rpcUrl: process.env.NEXT_PUBLIC_ARKIV_RPC_URL }))
   })
   return () => { active = false; cancelSigning(); revision.current++; pending.current?.resolve(false); pending.current = null }
  }, [])
