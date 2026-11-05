@@ -4,7 +4,7 @@ COPY package.json bun.lock ./
 COPY packages/core/package.json ./packages/core/package.json
 COPY apps/indexer/package.json ./apps/indexer/package.json
 COPY apps/web/package.json ./apps/web/package.json
-RUN bun install --frozen-lockfile --production
+RUN bun install --frozen-lockfile --production --filter @asi/indexer
 COPY packages/core ./packages/core
 COPY apps/indexer ./apps/indexer
 ENV DATA_DIR=/data

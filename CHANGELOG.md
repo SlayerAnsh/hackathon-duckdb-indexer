@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* The indexer image installs only the `@asi/indexer` workspace (`bun install --filter`): 27 packages instead of 655, without the web app wallet stack.
+
 * Backfill scans split the key space into 16 equal ranges scanned 4 at a time, with serialized store writes and drained workers on failure. A full anonymous scan of about 87,000 entities costs roughly 9,000 of the 10,000 hourly anonymous query units, so a second scan from the same IP within the hour waits for `Retry-After` (up to about 30 minutes) before resuming.
 
 * Migrated runtime dependencies and writes to Arkiv SDK 1.0.1. Rabdi wallet and balance labels now use tGLM.
