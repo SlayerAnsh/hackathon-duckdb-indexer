@@ -33,6 +33,7 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
+        NEXT_PUBLIC_ARKIV_CHAIN: ${NEXT_PUBLIC_ARKIV_CHAIN:-tiramisu}
         NEXT_PUBLIC_TIRAMISU_RPC_URL: ${NEXT_PUBLIC_TIRAMISU_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
         NEXT_PUBLIC_EXPLORER_URL: ${NEXT_PUBLIC_EXPLORER_URL:-https://tiramisu.explorer.arkiv.network}
         NEXT_PUBLIC_PRIVY_APP_ID: ${NEXT_PUBLIC_PRIVY_APP_ID:-}
@@ -42,6 +43,7 @@ services:
     environment:
       INDEXER_URL: http://indexer:8080
       DATA_DIR: /data
+      NEXT_PUBLIC_ARKIV_CHAIN: ${NEXT_PUBLIC_ARKIV_CHAIN:-tiramisu}
       NEXT_PUBLIC_TIRAMISU_RPC_URL: ${NEXT_PUBLIC_TIRAMISU_RPC_URL:-https://rpc.tiramisu.db-chain.testnet.arkiv.network}
       NEXT_PUBLIC_EXPLORER_URL: ${NEXT_PUBLIC_EXPLORER_URL:-https://tiramisu.explorer.arkiv.network}
       NEXT_PUBLIC_PRIVY_APP_ID: ${NEXT_PUBLIC_PRIVY_APP_ID:-}

@@ -1,4 +1,5 @@
 'use client'
+import { ARKIV_CHAIN } from '../../lib/chain'
 import type { IndexState } from '../../lib/indexdb'
 import { describeHeights, heightText, OLDEST_LABEL, OLDEST_SQL } from '../../lib/heights'
 import { compact } from '../../lib/format'
@@ -16,7 +17,7 @@ export function indexStatus(state: BarState, oldest?: number) {
  return { h, status, label: state.source==='disk' ? 'served from disk' : undefined }
 }
 
-const NOTE: Record<string,string> = { chain:'Tiramisu RPC', serving:'Browser live tail', stored:'Stored delta' }
+const NOTE: Record<string,string> = { chain:`${ARKIV_CHAIN.name} RPC`, serving:'Browser live tail', stored:'Stored delta' }
 const EXPR_MAX = 32
 
 export function StatusBarView({state,oldest}:{state:BarState;oldest?:number}) {
@@ -29,7 +30,7 @@ export function StatusBarView({state,oldest}:{state:BarState;oldest?:number}) {
   <div className={c.hts}>
    <button type="button" className={c.btn} aria-describedby="height-details">
     <StateChip state={status} label={label}/>
-    <span className={cx(c.it, c.chain)}><span className={c.k}>Tiramisu</span> <span className={c.v}>{m?.chainId ?? '…'}</span></span>
+    <span className={cx(c.it, c.chain)}><span className={c.k}>{ARKIV_CHAIN.name}</span> <span className={c.v}>{m?.chainId ?? '…'}</span></span>
     {h.items.map(i=><span key={i.label} className={cx(c.it, cls[i.label] ?? '')}><span className={c.k}>{i.label}</span> <span className={c.v}>{heightText(i)}</span></span>)}
     {h.lagText&&<span className={cx(c.it, c.lag)}>{h.lagText}</span>}
    </button>

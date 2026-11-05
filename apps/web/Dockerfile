@@ -7,6 +7,8 @@ COPY apps/web/package.json ./apps/web/package.json
 RUN bun install --frozen-lockfile
 COPY packages/core ./packages/core
 COPY apps/web ./apps/web
+ARG NEXT_PUBLIC_ARKIV_CHAIN=tiramisu
+ENV NEXT_PUBLIC_ARKIV_CHAIN=$NEXT_PUBLIC_ARKIV_CHAIN
 ARG NEXT_PUBLIC_TIRAMISU_RPC_URL=https://rpc.tiramisu.db-chain.testnet.arkiv.network
 ENV NEXT_PUBLIC_TIRAMISU_RPC_URL=$NEXT_PUBLIC_TIRAMISU_RPC_URL
 ARG NEXT_PUBLIC_EXPLORER_URL=https://tiramisu.explorer.arkiv.network

@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { ExpirationTime } from '@arkiv-network/sdk'
-import { balanceLevel, formatGlm, readBalance, routeRpc, splitTransport, tiramisuChain, type UserWalletClient } from '../lib/dash/wallet'
+import { balanceLevel, formatGlm, readBalance, routeRpc, splitTransport, arkivChain, type UserWalletClient } from '../lib/dash/wallet'
 import { deleteWidgetDirect, extendWidgetDirect, transferWidgetDirect, transferAddressError, WalletActionError, walletErrorKind, walletErrorMessage } from '../lib/dash/widget-actions'
 import { extendTarget } from '../lib/dash/time'
 import { K, U, OTHER } from './dash-fakes'
@@ -12,7 +12,7 @@ function fake() {
  return { client, calls }
 }
 test('Tiramisu uses the configured RPC and routes signing to the wallet', async () => {
- const chain = tiramisuChain(url)
+ const chain = arkivChain(url)
  expect(chain.id).toBe(7738577); expect(chain.rpcUrls.default.http).toEqual([url]); expect(chain.nativeCurrency.symbol).toBe('GLM')
  for (const method of ['eth_sendTransaction', 'eth_signTransaction', 'eth_accounts', 'eth_requestAccounts', 'eth_chainId', 'wallet_switchEthereumChain', 'wallet_addEthereumChain', 'personal_sign', 'eth_sign', 'eth_signTypedData_v4']) expect(routeRpc(method)).toBe('wallet')
  for (const method of ['eth_blockNumber', 'eth_getTransactionReceipt', 'eth_call', 'eth_getBalance']) expect(routeRpc(method)).toBe('rpc')

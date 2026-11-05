@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Rabdi testnet (chain 7794095, `rpc.rabdi.db-chain.testnet.arkiv.network`, from https://stage.docs.arkiv.network) as a selectable chain. `NEXT_PUBLIC_ARKIV_CHAIN=rabdi` switches wallet signing, the chain switch, the native currency, the status bar label and the default RPC and explorer in the web app (`apps/web/lib/chain.ts`); Tiramisu stays the default. The indexer reads the chain from its RPC URLs, so Rabdi needs only those URLs and a fresh data directory.
+
 * New logo: SQL brackets around rising bars, a query over chain data drawn as a chart. Used in the top bar, the footer, the README and as the SVG favicon (`apps/web/app/icon.svg`, replacing `favicon.ico`). My home uses the shared Explore widget and dashboard cards.
 
 * `examples/ws_events_probe.ts`: the WebSocket entity events probe from the friction report, runnable with `bun examples/ws_events_probe.ts [seconds]` from the repo root (SDK and viem resolved from `packages/core`). `verify_against_chain.py` accepts `ARKIV_RPC_URL` to ask an RPC node of your choice.

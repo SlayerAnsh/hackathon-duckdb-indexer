@@ -378,6 +378,7 @@ Dashboard environment:
 | `NEXT_PUBLIC_PRIVY_APP_ID` | Web build and runtime | Privy app ID; blank disables dashboards |
 | `PRIVY_APP_SECRET` | Web runtime only | Privy verification and session HMAC |
 | `DASHBOARD_PRIVATE_KEY` | Web runtime only | Funded backend dashboard wallet |
+| `NEXT_PUBLIC_ARKIV_CHAIN` | Web build and runtime | `tiramisu` (default) or `rabdi`; selects chain ID, native currency, default RPC and default explorer (`lib/chain.ts`) |
 | `NEXT_PUBLIC_TIRAMISU_RPC_URL` | Web build and runtime | Public RPC for wallet signing, backend writes and the `/api/rpc` upstream |
 | `NEXT_PUBLIC_EXPLORER_URL` | Web build and runtime | Block explorer for address links |
 | `TIRAMISU_API_KEY` | Web runtime only (and indexer) | Optional key for `/api/rpc` and server dashboard reads |

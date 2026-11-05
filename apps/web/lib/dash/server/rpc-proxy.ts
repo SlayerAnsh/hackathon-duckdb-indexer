@@ -1,3 +1,4 @@
+import { DEFAULT_RPC_URL } from '../../chain'
 import { clientIp } from './auth'
 
 // Read only JSON-RPC methods the browser sends: @asi/core createRpc (query, blockNumber, chainId,
@@ -5,7 +6,7 @@ import { clientIp } from './auth'
 export const READ_METHODS: ReadonlySet<string> = new Set([
   'arkiv_query', 'eth_blockNumber', 'eth_chainId', 'eth_getBlockByNumber', 'eth_getLogs', 'eth_getBalance',
 ])
-export const DEFAULT_RPC_URL = 'https://rpc.tiramisu.db-chain.testnet.arkiv.network'
+export { DEFAULT_RPC_URL }
 export const MAX_BODY_BYTES = 64 * 1024
 export const MAX_BATCH = 20
 export const UPSTREAM_TIMEOUT_MS = 15_000

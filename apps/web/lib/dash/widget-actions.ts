@@ -1,5 +1,5 @@
 import { ExpirationTime } from '@arkiv-network/sdk'
-import { tiramisu } from '@arkiv-network/sdk/chains'
+import { ARKIV_CHAIN } from '../chain'
 import { isHexAddress, type LifetimeDays } from './schema'
 import { extendTarget } from './time'
 import type { UserWalletClient } from './wallet'
@@ -67,7 +67,7 @@ export function walletErrorMessage(kind: WalletErrorKind): string | null {
   rejected: null,
   not_owner: "Only the widget's owner can do this. It may have been transferred.",
   expired: 'This widget has expired. Arkiv no longer has it.',
-  funds: `Not enough ${tiramisu.nativeCurrency.symbol} to pay the network fee. Fund your wallet and try again.`,
+  funds: `Not enough ${ARKIV_CHAIN.nativeCurrency.symbol} to pay the network fee. Fund your wallet and try again.`,
   at_cap: 'Already at the 90 day maximum',
   mismatch: 'Your wallet changed. Log out and log in again.',
   invalid_address: 'Enter a 0x address with 40 hex characters.',

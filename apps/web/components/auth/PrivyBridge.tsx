@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef } from 'react'
 import { PrivyProvider, usePrivy, useLogin, useModalStatus, useSignMessage, useWallets } from '@privy-io/react-auth'
-import { createUserWalletClient, tiramisuChain, TIRAMISU_CHAIN_ID, type UserWalletClient } from '../../lib/dash/wallet'
+import { createUserWalletClient, arkivChain, ARKIV_CHAIN_ID, type UserWalletClient } from '../../lib/dash/wallet'
 import { WalletActionError } from '../../lib/dash/widget-actions'
 import { dashApi } from '../../lib/dash/api'
 import { runSessionHandshake } from '../../lib/dash/auth-client'
@@ -81,7 +81,7 @@ export function pickEmbeddedWallet<W extends { address: string; walletClientType
  return wallets.find(wallet => wallet.walletClientType === 'privy' && wallet.address.toLowerCase() === address.toLowerCase()) ?? null
 }
 export function needsChainSwitch(chainId: string | undefined): boolean {
- return chainId !== `eip155:${TIRAMISU_CHAIN_ID}` && chainId !== String(TIRAMISU_CHAIN_ID)
+ return chainId !== `eip155:${ARKIV_CHAIN_ID}` && chainId !== String(ARKIV_CHAIN_ID)
 }
 function Signer(props: Props) {
  const privy = usePrivy()
@@ -112,7 +112,7 @@ function Signer(props: Props) {
     if (!mounted.current || finished.current) return
     const wallet = select()
     if (!wallet) throw new WalletActionError('mismatch')
-    if (needsChainSwitch(wallet.chainId)) await wallet.switchChain(TIRAMISU_CHAIN_ID)
+    if (needsChainSwitch(wallet.chainId)) await wallet.switchChain(ARKIV_CHAIN_ID)
     if (!mounted.current || finished.current) return
     const provider = await wallet.getEthereumProvider()
     if (!mounted.current || finished.current) return
@@ -131,6 +131,6 @@ function Signer(props: Props) {
  return null
 }
 export default function PrivyBridge(props: Props) {
- const chain = tiramisuChain(props.rpcUrl)
+ const chain = arkivChain(props.rpcUrl)
  return <PrivyProvider appId={props.appId} config={{ supportedChains: [chain], defaultChain: chain, loginMethods: ['google', 'discord', 'twitter', 'telegram'], embeddedWallets: { ethereum: { createOnLogin: 'all-users' }, showWalletUIs: false } }}>{props.mode === 'sign' ? <Signer {...props}/> : <Runner {...props}/>}</PrivyProvider>
 }

@@ -238,6 +238,7 @@ Defaults come from `apps/indexer/src/config.ts`. Compose passes the same names t
 | :--- | :--- | :--- |
 | `INDEXER_URL` | Web runtime | Upstream of the `/data` proxy. Compose sets `http://indexer:8080`; the hosted indexer is `https://arkiv-sql-indexer.dokploy.anshudhar.dev` |
 | `DATA_DIR` | Web runtime, optional | Read only copy of the index served when the indexer is unreachable |
+| `NEXT_PUBLIC_ARKIV_CHAIN` | Web build and runtime | Chain the web app signs on: `tiramisu` (default, chain 7738577) or `rabdi` (chain 7794095); also picks the default RPC and explorer |
 | `NEXT_PUBLIC_TIRAMISU_RPC_URL` | Web build and runtime | Public RPC for wallet signing, server writes and the upstream of `/api/rpc`; never include credentials |
 | `NEXT_PUBLIC_EXPLORER_URL` | Web build and runtime | Block explorer for address links |
 | `NEXT_PUBLIC_PRIVY_APP_ID` | Web build and runtime | Public Privy app ID; blank disables widgets and dashboards |

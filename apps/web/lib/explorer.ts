@@ -1,5 +1,6 @@
+import { DEFAULT_EXPLORER_URL } from './chain'
 /** Block explorer base URL for the indexed chain, without a trailing slash. */
-export const EXPLORER_URL = (process.env.NEXT_PUBLIC_EXPLORER_URL || 'https://tiramisu.explorer.arkiv.network').replace(/\/+$/, '')
+export const EXPLORER_URL = (process.env.NEXT_PUBLIC_EXPLORER_URL || DEFAULT_EXPLORER_URL).replace(/\/+$/, '')
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/
 

@@ -1,3 +1,4 @@
+import { DEFAULT_RPC_URL } from '../chain'
 import { isHexAddress } from './schema'
 
 export type PublicDashConfig = { enabled: boolean; privyAppId: string; wallet: string; rpcUrl: string }
@@ -5,7 +6,7 @@ export function readPublicDashConfig(env: { privyAppId?: string; wallet?: string
   const privyAppId = env.privyAppId?.trim() ?? ''
   const wallet = (env.wallet ?? '').toLowerCase()
   return { enabled: privyAppId.length > 0 && isHexAddress(wallet), privyAppId, wallet,
-    rpcUrl: env.rpcUrl || 'https://rpc.tiramisu.db-chain.testnet.arkiv.network' }
+    rpcUrl: env.rpcUrl || DEFAULT_RPC_URL }
 }
 let walletRequest: Promise<string | null> | undefined
 export function fetchDashWallet(fetchImpl: typeof fetch = fetch): Promise<string | null> {
